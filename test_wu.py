@@ -31,6 +31,7 @@ def test_spatiotemporal(path, subjects, conf_file, type, **kwargs):
     
     conf['analysis_type'] = 'spatiotemporal'
     conf['analysis_task'] = type
+    conf['classes'] = np.unique(ds.targets)
     
     save_results(path, total_results, conf)
     
@@ -55,11 +56,14 @@ def test_spatial(path, subjects, conf_file, type, **kwargs):
         
         total_results[subj] = r
     
+    conf['analysis_type'] = 'spatial'
+    conf['analysis_task'] = type
+    conf['classes'] = np.unique(ds.targets)  
     #save_results()
+    save_results(path, total_results, conf)
     
     return total_results
-    
-    return
+
 
 def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs):    
     
@@ -101,6 +105,7 @@ def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs
     conf_src['analysis_type'] = 'clustering'
     conf_src['analysis_task'] = 'task'
     conf_src['analysis_func'] = analysis.func_name
+    conf_src['classes'] = np.unique(ds_src.targets)
     
     save_results(path, total_results, conf_src)
 
@@ -148,11 +153,38 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     conf_src['analysis_type'] = 'transfer_learning'
     conf_src['analysis_task'] = 'task'
     conf_src['analysis_func'] = analysis.func_name
-
+    conf_src['classes'] = np.unique(ds_src.targets)
+    
     save_results(path, total_results, conf_src)
     
     return total_results
 
 
+def test_searchlight(path, subjects, conf_file, type, **kwargs):
+    
+    
+    conf = read_configuration(path, conf_file, type)
+    
+    for arg in kwargs:
+        conf[arg] = kwargs[arg]
+    
+    total_results = dict()
+    
+    for subj in subjects:
+        
+        ds = load_dataset(path, subj, type, **conf)
+        ds = preprocess_dataset(ds, type, **conf)
+        
+        r = searchlight(ds, **kwargs)
+        
+        total_results[subj] = r
+    
+    conf['analysis_type'] = 'searchlight'
+    conf['analysis_task'] = type
+    conf['classes'] = np.unique(ds.targets)  
+    #save_results()
+    save_results(path, total_results, conf)
+    
+    return total_results
 #####################################################################
     

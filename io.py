@@ -641,39 +641,45 @@ def save_results(path, results, configuration):
     
     return 'OK' 
 
-def save_results_searchlight (path, analysis, type, mask, results):
+def save_results_searchlight (path, results):
     
+    parent_dir = path 
     
-    datetime = get_time()
-    configuration = results[0]['configuration']
+    total_map = []
     
-    new_dir = datetime+'_'+analysis.func_name+'_'+type+'_'+mask 
-    
-    command = 'mkdir '+os.path.join(path, '0_results', new_dir)
-    os.system(command)
-    
-    dir = os.path.join(path, '0_results', new_dir)
-
-    if (analysis.func_name == 'searchlight'):
-        for res in results:
-            subj = res['name']
-            radius = res['results']['radius']
-            filename = datetime+'_'+subj+'_searchlight_'+type+'_'+mask+'_rad_'+radius
-            ni.save(results['results']['map'], 
-                    os.path.join(path, subj, filename+'_.nii.gz'))
-    
-    else:      
-           
-        import csv
-        w = csv.writer(open(os.path.join(dir, 'configuration.csv'), "w"))
-        for key, val in results[0]['configuration'].items():
-            w.writerow([key, val])
-            
-        pickle.dump(results, open(os.path.join(dir, new_dir+'_results.pyobj'), 'w'))
+    for key in results:
         
-
+        name = key
+        command = 'mkdir '+os.path.join(parent_dir, name)
+        os.system(command)
+        
+        results_dir = os.path.join(parent_dir, name)
+        
+        map = results[name]['map']
+        
+        radius = np.int(results[name]['radius'])
+        
+        
+        if len(map.get_data().shape) > 3:
+            mean_map = map.get_data().mean(axis=3)
+            mean_img = ni.Nifti1Image(mean_map, affine=map.get_affine())
+            fname = name+'_radius_'+str(radius)+'searchlight_mean_map.nii.gz'
+            ni.save(mean_img, os.path.join(results_dir,fname))
+        else:
+            mean_map = map.get_data()
+            
+        fname = name+'_radius_'+str(radius)+'searchlight_map.nii.gz'
+        ni.save(map, os.path.join(results_dir,fname))
+        
+        total_map.append(mean_map)
+    
+    total_map = np.array(total_map).mean()
+    total_img = ni.Nifti1Image(total_map, affine=map.get_affine())
+    fname = 'accuracy_map_radius_'+str(radius)+'searchlight_all_subj.nii.gz'
+    ni.save(total_img, os.path.join(path,fname))
+                   
     print 'Results writed in '+path    
-    return new_dir
+    return path
 
 def save_results_basic(path, results):
     
