@@ -5,6 +5,8 @@ from utils import *
 import matplotlib.pyplot as plt
 from mvpa2.suite import find_events, fmri_dataset, SampleAttributes
 from itertools import cycle
+import cPickle as pickle
+from sklearn.linear_model import Ridge
 
 def get_time():
         #Time acquisition for file name!
@@ -21,6 +23,121 @@ def get_time():
         datetime += str(elem)
         
     return datetime    
+
+def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
+    
+    result_file = open(
+                       os.path.join(path, 
+                               '0_results', 
+                               analysis_folder, 
+                               name, 
+                               name+'_classifier.pyobj')
+                       , 'r')
+    
+    results = pickle.load(result_file)
+    
+    runs = 12
+    
+    probabilities = results.probabilities
+    prob = np.array([p[1][p[0]] for p in probabilities])
+    pred = np.array([p[0] for p in probabilities])
+    lab = np.unique(results.predictions)
+    run_length = len(prob)/runs
+       
+    ridge = Ridge()
+    
+    f = plt.figure(figsize=(11,8))
+    
+    data = dict()
+    
+    for c in np.unique(lab):
+        data[c] = []
+    
+    for i in range(runs):
+        if i < 6:
+            add = 1
+            l = '_pre'
+        else:
+            add = 2
+            l = '_post'
+        for c in np.unique(pred):
+            a = f.add_subplot(3,2,(c*2)+add)
+            a.set_title(lab[c]+l)
+            #v = prob[i*run_length:(i+1)*run_length]
+            v = prob[i*run_length:(i+1)*run_length] * (pred[i*run_length:(i+1)*run_length] == c)
+            yy = v.copy()
+        
+            xx = np.linspace(0, len(v), len(v))
+        
+            try:
+                ridge.fit(np.vander(xx, 12), yy)
+                y_fit = ridge.predict(np.vander(xx, 12))
+            except LinAlgError,err:
+                ridge.fit(np.vander(xx, 9), yy)
+                y_fit = ridge.predict(np.vander(xx, 9))
+            
+            data[lab[c]].append(y_fit) 
+            a.plot(y_fit)
+            
+            
+            a.set_ybound(upper=1.1, lower=-0.1)
+    
+    f.legend(a.get_lines()[:],range(runs), loc=0)
+    fname = os.path.join(path,'0_results', 
+                               analysis_folder, 
+                               name, 
+                               name+'_values_fitted.png')
+    f.savefig(fname)
+    
+    return data
+    
+
+
+def plot_transfer_graph_fitted(path, name, analysis_folder):
+    
+    result_file = open(
+                       os.path.join(path, 
+                               '0_results', 
+                               analysis_folder, 
+                               name, 
+                               name+'_classifier.pyobj')
+                       , 'r')
+    
+    results = pickle.load(result_file)
+    
+    runs = 6
+    
+    values = results.estimates
+    run_length = len(values)/runs
+    
+    ridge = Ridge()
+    
+    f = plt.figure()
+    a = f.add_subplot(111)
+    for i in range(runs):
+        
+        v = values[i*run_length:(i+1)*run_length]
+        yy = v.copy()
+        
+        xx = np.linspace(0, len(v), len(v))
+        
+        try:
+            ridge.fit(np.vander(xx, 12), yy)
+            y_fit = ridge.predict(np.vander(xx, 12))
+        except LinAlgError,err:
+            ridge.fit(np.vander(xx, 9), yy)
+            y_fit = ridge.predict(np.vander(xx, 9))
+        
+        a.plot(y_fit)
+    
+    a.legend(range(runs))
+    fname = os.path.join(path,'0_results', 
+                               analysis_folder, 
+                               name, 
+                               name+'_values_fitted.png')
+    f.savefig(fname)
+    
+
 
 def plot_transfer_graph(path, name, results):
     
@@ -65,7 +182,7 @@ def plot_transfer_graph(path, name, results):
             a_prob.set_ylim(bottom=0.55)
             #a_pred.plot(values * mask_label)
         a_prob.legend(np.unique(prediction))     
-        a_prob.legend(np.unique(prediction))
+        #a_prob.legend(np.unique(prediction))
         #a_pred.legend(np.unique(prediction))
 
         for axes in f_pred.get_axes():
@@ -77,7 +194,8 @@ def plot_transfer_graph(path, name, results):
         
         fname = os.path.join(path, name+'_'+target+'_probabilities_values.png')
         f_pred.savefig(fname)
-            
+    
+    
     rep_txt = name+'_stats.txt'   
     
     rep = open(os.path.join(path, rep_txt), 'w')
@@ -168,6 +286,35 @@ def plot_clusters_graph(path, name, results):
     rep = open(os.path.join(path, rep_txt), 'w')
     rep.write(report)
     rep.close()
+
+def load_remote_dataset(path, conf_file):
+    
+    conf = read_remote_configuration(path)
+    return
+
+
+def load_conc_fmri_data(conc_file_list, el_vols = 0, **kwargs):
+        
+        imgList = []
+        
+        for file in conc_file_list:
+            
+            print 'Now loading... '+file        
+            
+            im = ni.load(file)
+            data = im.get_data()
+        
+            print data.shape
+        
+            new_im = ni.Nifti1Image(data[:,:,:,el_vols:], 
+                                    affine = im.get_affine(), 
+                                    header = im.get_header()) 
+        
+            del data, im
+            imgList.append(new_im)
+        
+        return imgList
+
     
 def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     """
@@ -197,7 +344,8 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     for dir in sub_dirs:
         if dir == 'none':
             dir = ''
-        path_file_dirs.append(os.path.join(path,name,dir))
+        if dir.find('/') == -1:
+            path_file_dirs.append(os.path.join(path,name,dir))
     
    
     print 'Loading...'
@@ -217,7 +365,7 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     
     #if no file are found I perform previous analysis!        
     if (len(fileL) < runs and len(fileL) >= 0):
-        
+        """
         print ' **** File corrected not found... ****'
         if cmp(analysis, 'single') == 0:
             mc_wu_data(path, name, task = 'task')
@@ -237,7 +385,8 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
         else:
             fileL = [elem for elem in fileL if (elem.find(img_pattern) != -1) and (elem.find(task) != -1) and (elem.find('mni') != -1)]
         
-        
+        """
+        raise OSError('Files not found, please check if data exists in '+str(path_file_dirs))
     else:
         print 'File corrected found ....'   
     
@@ -283,8 +432,34 @@ def load_dataset(path, subj, type, **kwargs):
             - ur : Upper Right Visual Quadrant
     '''
     
-    niftiFilez = load_wu_fmri_data(path, name = subj, task = type, el_vols = 0, **kwargs)
+    use_conc = 'False'
+    skip_vols = 0
     
+    for arg in kwargs:
+        if arg == 'skip_vols':
+            skip_vols = np.int(kwargs[arg])
+        if arg == 'use_conc':
+            use_conc = kwargs[arg]
+        if arg == 'conc_file':
+            conc_file = kwargs[arg]
+    
+    if use_conc == 'False':      
+        try:
+            niftiFilez = load_wu_fmri_data(path, name = subj, task = type, el_vols = skip_vols, **kwargs)
+        except OSError, err:
+            print err
+            return 0
+    else:
+        conc_file_list = read_conc(path, subj, conc_file)
+        conc_file_list = modify_conc_list(path, subj, conc_file_list)
+        try:
+            niftiFilez = load_conc_fmri_data(conc_file_list, el_vols = skip_vols, **kwargs)
+        except IOError, err:
+            print err
+            return 0
+        
+        kwargs = update_subdirs(conc_file_list, subj, **kwargs)
+        #print kwargs
 
     ### Code to substitute   
     [code, attr] = load_attributes(path, type, subj, **kwargs)        
@@ -361,7 +536,9 @@ def load_mask(path, subj, **kwargs):
         if (arg == 'mask_atlas'):
             mask_type = kwargs[arg]
         if (arg == 'mask_area'):
-            mask_area = kwargs[arg]    
+            mask_area = kwargs[arg]  
+        if (arg == 'mask_dir'):
+            path = kwargs[arg]  
             
             
     if (mask_type == 'wu'):
@@ -385,7 +562,6 @@ def load_mask_wu(path, subj, **kwargs):
         if (arg == 'mask_area'):
             mask_area = kwargs[arg].split(',')
   
-    
     #Mask issues    
     roi_folder = '1_single_ROIs'
     isScaled = False
@@ -434,7 +610,7 @@ def load_mask_wu(path, subj, **kwargs):
                      and (m[:3].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1)]
       
     
-    print 'Mask searched in '+mask_path
+    print 'Mask searched in '+mask_path+' Mask(s) found: '+str(len(mask_list))
     
     files = []
     if len(mask_list) == 0:
@@ -512,9 +688,13 @@ def load_attributes (path, task, subj, **kwargs):
     for dir in sub_dirs:
         if dir == 'none':
             dir = ''
+        if dir.find('/') != -1:
+            completeDirs.append(dir)
+            
         completeDirs.append(os.path.join(path,subj,dir))
     
     completeDirs.append(path)
+    completeDirs.append(os.path.join(path,subj))
     
     attrFiles = []
     for dir in completeDirs:
@@ -528,8 +708,8 @@ def load_attributes (path, task, subj, **kwargs):
         return [0, None]
     
     
+    #txtAttr = [f for f in attrFiles if f.find('.txt') != -1]
     txtAttr = [f for f in attrFiles if f.find('.txt') != -1]
-    
     
     attrFilename = ''
     if len(txtAttr) > 0:
@@ -548,8 +728,63 @@ def load_attributes (path, task, subj, **kwargs):
     
     attr = SampleAttributes(attrFilename)
     return [1, attr]
-    
 
+def modify_conc_list(path, subj, conc_filelist):
+    """
+    Function used to internally modify conc path, if remote directory is mounted at different
+    location, the new mounting directory is passed as parameter.
+    """
+    new_list = []
+    for file in conc_filelist:
+        
+        file = file[file.find(subj):-3]+'hdr'
+        new_list.append(os.path.join(path,file))
+        
+    del conc_filelist
+    return new_list
+
+
+def read_conc(path, subj, conc_file_patt):
+    
+    conc_file_list = os.listdir(os.path.join(path, subj))
+    conc_file_list = [f for f in conc_file_list if f.find('.conc') != -1 and f.find(conc_file_patt) != -1]
+    
+    c_file = conc_file_list[0]
+    
+    conc_file = open(os.path.join(path, subj, c_file), 'r')
+    s = conc_file.readline()
+    n_files = np.int(s.split(':')[1])
+    
+    i = 0
+    filename_list = []
+    while i < n_files:
+        name = conc_file.readline()
+        filename_list.append(name[name.find('/'):-1])
+        i = i + 1
+        
+    return filename_list
+
+
+
+def read_remote_configuration(path):
+        
+    import ConfigParser
+    config = ConfigParser.ConfigParser()
+    config.read(os.path.join(path,'remote.conf'))
+    
+    configuration = []
+    
+    for sec in config.sections():
+        
+        for item in config.items(sec):
+            configuration.append(item)
+            print item
+    
+    return dict(configuration) 
+    
+    
+    print 'Reading remote config file '+os.path.join(path,'remote.conf')
+    
 def read_configuration (path, experiment, type):
     
     import ConfigParser
@@ -764,6 +999,12 @@ def save_results_transfer_learning(path, results):
         
         plot_transfer_graph(results_dir, name, results[name])
         
+        c_m = results[name]['confusion_target']
+        fname = name+'_confusion_target.txt'
+        file = open(os.path.join(results_dir,fname), 'w')
+        file.write(str(c_m))
+        file.close()
+        
     return
 
 
@@ -788,6 +1029,23 @@ def save_results_clustering(path, results):
   
     return
 
-
+def update_subdirs(conc_file_list, subj, **kwargs):
+    
+    for arg in kwargs:
+        if (arg == 'sub_dir'):
+            sub_dirs = kwargs[arg].split(',')
+        
+    i = 0
+    for dir in conc_file_list:
+        s_dir = dir[dir.find(subj)+len(subj)+1:dir.rfind('/')]
+        sub_dirs[i] = s_dir
+        i = i + 1
+        
+    kwargs['sub_dir'] = ','.join(sub_dirs)
+    
+    return kwargs
+        
+    
+        
     
 

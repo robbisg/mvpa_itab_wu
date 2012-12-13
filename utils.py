@@ -218,7 +218,7 @@ def fidl2txt_2(fidlPath, outPath):
     print 'Converting fidl file '+fidlPath+' in '+outPath
     
     #Configuration field!
-    exp_end = 498.26
+    exp_end = 452.16
     
     fidlFile = open(fidlPath)
     
@@ -245,16 +245,23 @@ def fidl2txt_2(fidlPath, outPath):
         eventLabels.append(tokens[i][:])
     
     onset = np.append(onset, exp_end * TR)
+    
+    if onset[0] != 0:
+        f = 0
+        while f < np.rint(onset[0]/TR):
+            outFile.write('fixation 0\n')
+            f = f + 1
        
     for i in range(len(onset)-1):
         
         if i <= 1:
-            runArr = np.int_(np.ceil(np.bincount(np.int_(events[:2]))/2.) - 1)
+            runArr = np.array(np.ceil(np.bincount(np.int_(events[:2]))/2.) - 1, dtype=np.int)
         else:
-            runArr = np.int_(np.ceil(np.bincount(np.int_(events[:i+1]))/2.) - 1)
+            runArr = np.array(np.ceil(np.bincount(np.int_(events[:i+1]))/2.) - 1, dtype=np.int)
         j = 0
-        while j < np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR) :
-            if (j < np.rint(duration[i]/TR)-1):
+
+        while j < np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR):
+            if (j < np.rint(duration[i]/TR)):#-1
                 outFile.write(eventLabels[int(events[i])]+' '+str(runArr[int(events[i])])+'\n')
             else:
                 outFile.write('fixation '+str(runArr[int(events[i])])+'\n')

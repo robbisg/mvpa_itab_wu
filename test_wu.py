@@ -1,6 +1,6 @@
 from main_wu import *
 from io import *
-
+from mvpa2.clfs.transerror import ConfusionMatrix
 import os
     
     
@@ -117,26 +117,37 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     if source == 'task':
         target = 'rest'
     else:
-        target = 'task'
+        if source == 'rest':
+            target = 'task'
+    
+    if source == 'lip':
+        target = 'ffa'
+    else:
+        if source == 'ffa':
+            target = 'lip'
     
     conf_src = read_configuration(path, conf_file, source)
     conf_tar = read_configuration(path, conf_file, target)
-        
+    
+    ##############################################    
     ##############################################
-    conf_src['label_included'] = 'all'
-    conf_src['label_dropped'] = 'none'
-    conf_src['mean_samples'] = 'False'
+    ##    conf_src['label_included'] = 'all'    ##   
+    ##    conf_src['label_dropped'] = 'none'    ##
+    ##    conf_src['mean_samples'] = 'False'    ##
     ##############################################
+    ##############################################
+    
     for arg in kwargs:
         conf_src[arg] = kwargs[arg]
         conf_tar[arg] = kwargs[arg]
-        
+    
+    data_path = conf_src['data_path']
     total_results = dict()
     
     for subj in subjects:
         
-        ds_src = load_dataset(path, subj, source, **conf_src)
-        ds_tar = load_dataset(path, subj, target, **conf_tar)
+        ds_src = load_dataset(data_path, subj, source, **conf_src)
+        ds_tar = load_dataset(data_path, subj, target, **conf_tar)
         
         ds_src = preprocess_dataset(ds_src, source, **conf_src)
         ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
@@ -148,13 +159,20 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         
         r = transfer_learning(ds_src, ds_tar, analysis, **kwargs)
         
+        pred = np.array(r['classifier'].ca.predictions)
+        targets = r['targets']
+        
+        c_m = ConfusionMatrix(predictions=pred, targets=targets)
+        c_m.compute()
+        r['confusion_target'] = c_m
+        
         total_results[subj] = r
         
     conf_src['analysis_type'] = 'transfer_learning'
-    conf_src['analysis_task'] = 'task'
+    conf_src['analysis_task'] = source
     conf_src['analysis_func'] = analysis.func_name
     conf_src['classes'] = np.unique(ds_src.targets)
-    
+
     save_results(path, total_results, conf_src)
     
     return total_results

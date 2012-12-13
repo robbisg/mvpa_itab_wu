@@ -208,10 +208,10 @@ def spatial(ds, **kwargs):
     """   
     clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities', 'training_stats'])
     
-    fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  FractionTailSelector(0.1, mode = 'select', tail = 'upper'))    
-    fclf = FeatureSelectionClassifier(clf, fsel)
+    #fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  FractionTailSelector(0.1, mode = 'select', tail = 'upper'))    
+    #fclf = FeatureSelectionClassifier(clf, fsel)
     cv_storage = StoreResults()
-    cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = 2), callback=cv_storage,
+    cvte = CrossValidation(clf, NFoldPartitioner(cvtype = 1), #callback=cv_storage,
                            enable_ca=['stats', 'repetition_results'],
                            )
     
