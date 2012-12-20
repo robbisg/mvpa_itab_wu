@@ -7,6 +7,7 @@ from mvpa2.suite import find_events, fmri_dataset, SampleAttributes
 from itertools import cycle
 import cPickle as pickle
 from sklearn.linear_model import Ridge
+from scipy.interpolate import UnivariateSpline
 
 def get_time():
         #Time acquisition for file name!
@@ -47,13 +48,13 @@ def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
     ridge = Ridge()
     
     f = plt.figure(figsize=(11,8))
-    
+    f2 = plt.figure(figsize=(11,8))
     data = dict()
     
     for c in np.unique(lab):
         data[c] = []
     
-    for i in range(runs):
+    for i in range(12):
         if i < 6:
             add = 1
             l = '_pre'
@@ -62,22 +63,26 @@ def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
             l = '_post'
         for c in np.unique(pred):
             a = f.add_subplot(3,2,(c*2)+add)
+            a2 = f2.add_subplot(3,2,(c*2)+add)
             a.set_title(lab[c]+l)
             #v = prob[i*run_length:(i+1)*run_length]
             v = prob[i*run_length:(i+1)*run_length] * (pred[i*run_length:(i+1)*run_length] == c)
+            v[len(v)-1] = 0
             yy = v.copy()
-        
+            
             xx = np.linspace(0, len(v), len(v))
-        
+            s = UnivariateSpline(xx, yy, s=3)
+            ys = s(xx)
             try:
-                ridge.fit(np.vander(xx, 12), yy)
-                y_fit = ridge.predict(np.vander(xx, 12))
+                ridge.fit(np.vander(xx, 7), yy)
+                y_fit = ridge.predict(np.vander(xx, 7))
             except LinAlgError,err:
                 ridge.fit(np.vander(xx, 9), yy)
                 y_fit = ridge.predict(np.vander(xx, 9))
             
             data[lab[c]].append(y_fit) 
             a.plot(y_fit)
+            a2.plot(ys)
             
             
             a.set_ybound(upper=1.1, lower=-0.1)
@@ -86,9 +91,9 @@ def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
     fname = os.path.join(path,'0_results', 
                                analysis_folder, 
                                name, 
-                               name+'_values_fitted.png')
+                               name+'_values_fitted_ov.png')
     f.savefig(fname)
-    
+    f2.savefig(fname+'.2.png')
     return data
     
 
