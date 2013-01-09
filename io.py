@@ -49,11 +49,11 @@ def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
     
     f = plt.figure(figsize=(11,8))
     f2 = plt.figure(figsize=(11,8))
-    data = dict()
-    
+    data_sm = dict()
+    data_or = dict()
     for c in np.unique(lab):
-        data[c] = []
-    
+        data_sm[c] = []
+        data_or[c] = []
     for i in range(12):
         if i < 6:
             add = 1
@@ -61,6 +61,7 @@ def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
         else:
             add = 2
             l = '_post'
+        avg = []
         for c in np.unique(pred):
             a = f.add_subplot(3,2,(c*2)+add)
             a2 = f2.add_subplot(3,2,(c*2)+add)
@@ -70,8 +71,10 @@ def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
             v[len(v)-1] = 0
             yy = v.copy()
             
+            
+            
             xx = np.linspace(0, len(v), len(v))
-            s = UnivariateSpline(xx, yy, s=3)
+            s = UnivariateSpline(xx, yy, s=5)
             ys = s(xx)
             try:
                 ridge.fit(np.vander(xx, 7), yy)
@@ -80,21 +83,26 @@ def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
                 ridge.fit(np.vander(xx, 9), yy)
                 y_fit = ridge.predict(np.vander(xx, 9))
             
-            data[lab[c]].append(y_fit) 
+            data_sm[lab[c]].append(ys)
+            data_or[lab[c]].append(v)
+            
+            
+            
             a.plot(y_fit)
             a2.plot(ys)
             
             
             a.set_ybound(upper=1.1, lower=-0.1)
-    
+            a2.set_ybound(upper=1.1, lower=-0.1)
+            
     f.legend(a.get_lines()[:],range(runs), loc=0)
     fname = os.path.join(path,'0_results', 
                                analysis_folder, 
                                name, 
                                name+'_values_fitted_ov.png')
     f.savefig(fname)
-    f2.savefig(fname+'.2.png')
-    return data
+    f2.savefig(fname[:-3]+'smooth.png')
+    return data_sm, data_or
     
 
 
@@ -470,7 +478,7 @@ def load_dataset(path, subj, type, **kwargs):
     [code, attr] = load_attributes(path, type, subj, **kwargs)        
     if code == 0:
         del niftiFilez
-        return code
+        raise IOError('Attributes file not found')
         
     files = len(niftiFilez)  
     #Mask issues     
@@ -487,8 +495,8 @@ def load_dataset(path, subj, type, **kwargs):
 
     if volSum != len(attr.targets):
         del niftiFilez
-        print subj + ' *** ERROR: Attributes Length mismatch with fMRI volumes! ***'
-        return 0;       
+        print subj + ' *** ERROR: Attributes Length mismatches with fMRI volumes! ***'
+        raise ValueError('Attributes Length mismatches with fMRI volumes!')       
         
         
     try:
@@ -528,6 +536,8 @@ def load_mask(path, subj, **kwargs):
             - juelich : FSL standard Juelich Maps.
     @param mask_area: mask is a string indicating the area to be analyzed
             - total: the entire brain voxels;
+            - searchlight_3: mask from searchlight analysis exploited with radius equal to 3
+            - searchlight_5: mask from searchlight analysis exploited with radius equal to 5
             - visual or other (broca, ba1 ecc.): other masks (with mask_type = 'wu' the only field could be 'visual')
             - ll : Lower Left Visual Quadrant (it could be applied only with mask_type = 'wu')
             - lr : Lower Right Visual Quadrant (it could be applied only with mask_type = 'wu')
@@ -606,7 +616,14 @@ def load_mask_wu(path, subj, **kwargs):
         mask_list = os.listdir(mask_path)
         mask_to_find = subj+'_mask_mask'
         mask_list = [m for m in mask_list if m.find(mask_to_find) != -1]
-          
+    elif (mask_area == ['searchlight_3'] or mask_area == ['searchlight_5']):
+        mask_list = os.listdir(mask_path)
+        if mask_area == ['searchlight_3']:
+            mask_to_find = 'mask_sl_r_3_t_54'
+        else:
+            mask_to_find = 'mask_sl_r_5_t_54'
+        mask_list = [m for m in mask_list if m.find(mask_to_find) != -1]
+        
     else:
         mask_list_1 = os.listdir(mask_path)
         mask_list = []

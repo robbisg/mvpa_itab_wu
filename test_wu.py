@@ -16,8 +16,11 @@ def test_spatiotemporal(path, subjects, conf_file, type, **kwargs):
     total_results = dict()
     
     for subj in subjects:
-        
-        ds = load_dataset(path, subj, type, **conf)
+        try:
+            ds = load_dataset(path, subj, type, **conf)
+        except Exception, err:
+            print err
+            continue
         ds = preprocess_dataset(ds, type, **conf)
         
         if 'balance' in locals() and balance == True:
@@ -48,8 +51,12 @@ def test_spatial(path, subjects, conf_file, type, **kwargs):
     total_results = dict()
     
     for subj in subjects:
+        try:
+            ds = load_dataset(path, subj, type, **conf)
+        except Exception, err:
+            print err
+            continue
         
-        ds = load_dataset(path, subj, type, **conf)
         ds = preprocess_dataset(ds, type, **conf)
         
         r = spatial(ds, **kwargs)
@@ -87,9 +94,12 @@ def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs
     total_results = dict()
     
     for subj in subjects:
-        
-        ds_src = load_dataset(path, subj, source, **conf_src)
-        ds_tar = load_dataset(path, subj, target, **conf_tar)
+        try:
+            ds_src = load_dataset(path, subj, source, **conf_src)
+            ds_tar = load_dataset(path, subj, target, **conf_tar)
+        except Exception, err:
+            print err
+            continue
         
         ds_src = preprocess_dataset(ds_src, source, **conf_src)
         ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
@@ -145,10 +155,12 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     total_results = dict()
     
     for subj in subjects:
-        
-        ds_src = load_dataset(data_path, subj, source, **conf_src)
-        ds_tar = load_dataset(data_path, subj, target, **conf_tar)
-        
+        try:
+            ds_src = load_dataset(data_path, subj, source, **conf_src)
+            ds_tar = load_dataset(data_path, subj, target, **conf_tar)
+        except Exception, err:
+            print err
+            continue
         ds_src = preprocess_dataset(ds_src, source, **conf_src)
         ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
 
