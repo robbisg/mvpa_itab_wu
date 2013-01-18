@@ -51,6 +51,7 @@ def test_spatial(path, subjects, conf_file, type, **kwargs):
     total_results = dict()
     
     for subj in subjects:
+        print '------'
         try:
             ds = load_dataset(path, subj, type, **conf)
         except Exception, err:
@@ -155,6 +156,7 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     total_results = dict()
     
     for subj in subjects:
+        print '--------'
         try:
             ds_src = load_dataset(data_path, subj, source, **conf_src)
             ds_tar = load_dataset(data_path, subj, target, **conf_tar)

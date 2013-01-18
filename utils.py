@@ -214,11 +214,8 @@ def fidl2txt (fidlPath, outPath):
     outFile.close()
             
 
-def fidl2txt_2(fidlPath, outPath):
+def fidl2txt_2(fidlPath, outPath, exp_end=542):
     print 'Converting fidl file '+fidlPath+' in '+outPath
-    
-    #Configuration field!
-    exp_end = 452.16
     
     fidlFile = open(fidlPath)
     
@@ -255,9 +252,11 @@ def fidl2txt_2(fidlPath, outPath):
     for i in range(len(onset)-1):
         
         if i <= 1:
-            runArr = np.array(np.ceil(np.bincount(np.int_(events[:2]))/2.) - 1, dtype=np.int)
+            runArr = np.array(np.ceil(np.bincount(np.int_(events[:2]))/4.) - 1, dtype=np.int)
         else:
-            runArr = np.array(np.ceil(np.bincount(np.int_(events[:i+1]))/2.) - 1, dtype=np.int)
+            runArr = np.array(np.ceil(np.bincount(np.int_(events[:i+1]), 
+                                              minlength=noEvents)/4.) - 1, 
+                          dtype=np.int)
         j = 0
 
         while j < np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR):

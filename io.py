@@ -300,11 +300,6 @@ def plot_clusters_graph(path, name, results):
     rep.write(report)
     rep.close()
 
-def load_remote_dataset(path, conf_file):
-    
-    conf = read_remote_configuration(path)
-    return
-
 
 def load_conc_fmri_data(conc_file_list, el_vols = 0, **kwargs):
         
@@ -503,7 +498,7 @@ def load_dataset(path, subj, type, **kwargs):
         print 'Loading dataset...'
         ds = fmri_dataset(niftiFilez, targets = attr.targets, chunks = attr.chunks, mask = mask) 
         print  'Dataset loaded...'
-        del niftiFilez
+        
             
     except ValueError, e:
         print subj + ' *** ERROR: '+ str(e)
@@ -522,10 +517,13 @@ def load_dataset(path, subj, type, **kwargs):
     
     f_list = []
     for i in range(files):
-        for j in range(len(ds)/files):
+        for j in range(niftiFilez[i].get_shape()[-1:][0]):
                 f_list.append(i+1)
 
     ds.sa['file'] = f_list
+    
+    del niftiFilez
+    
     return ds    
 
 
@@ -722,11 +720,14 @@ def load_attributes (path, task, subj, **kwargs):
     for dir in completeDirs:
         attrFiles = attrFiles + os.listdir(dir)
 
-    attrFiles = [f for f in attrFiles if f.find(event_file) != -1]
+    attrFiles = [f for f in attrFiles if f.find(subj) != -1 and f.find(event_file) != -1]
+    
+    #print '---------------------'
+    #print attrFiles
     
     if len(attrFiles) == 0:
         print ' *******       ERROR: No attribute file found!        *********'
-        print ' *** Check in '+os.path.join(path, subj)+' or '+os.path.join(path)+' ******'
+        print ' ***** Check in '+str(completeDirs)+' ********'
         return [0, None]
     
     
@@ -1051,6 +1052,37 @@ def save_results_clustering(path, results):
   
     return
 
+def write_all_subjects_map(path, dir):
+    
+    res_path = os.path.join(path, '0_results', dir)
+    
+    subjects = os.listdir(res_path)
+    subjects = [s for s in subjects if s.find('.') == -1]
+    
+    img_list = []
+    
+    for s in subjects:
+        
+        s_path = os.path.join(res_path, s)
+        map_list = os.listdir(s_path)
+        
+        map_list = [m for m in map_list if m.find('mean_map') != -1]
+        
+        img = ni.load(os.path.join(s_path, map_list[0]))
+        
+        img_list.append(img.get_data().squeeze())
+        
+    stack_img = np.array(img_list)
+    m_img = np.mean(stack_img, axis=0)
+    
+    img_ni = ni.Nifti1Image(m_img, img.get_affine())
+    
+    filename = os.path.join(res_path, 'all_subjects_mean_map.nii.gz')
+    ni.save(img_ni, filename)
+    
+    return
+
+
 def update_subdirs(conc_file_list, subj, **kwargs):
     
     for arg in kwargs:
@@ -1060,14 +1092,14 @@ def update_subdirs(conc_file_list, subj, **kwargs):
     i = 0
     for dir in conc_file_list:
         s_dir = dir[dir.find(subj)+len(subj)+1:dir.rfind('/')]
-        sub_dirs[i] = s_dir
+        if sub_dirs[i].find('/') != -1 or i > len(sub_dirs):
+            sub_dirs.append(s_dir)
+        else:
+            sub_dirs[i] = s_dir
         i = i + 1
         
     kwargs['sub_dir'] = ','.join(sub_dirs)
     
     return kwargs
-        
-    
-        
-    
+            
 
