@@ -4,8 +4,11 @@ import nibabel as ni
 import time
 
 from mvpa2.suite import *
+
 from sklearn.manifold import MDS
 from sklearn.cluster import KMeans
+from sklearn.svm import SVC
+
 from scipy.spatial.distance import *
 
 import matplotlib.pyplot as plt
@@ -203,31 +206,36 @@ def spatial(ds, **kwargs):
         if arg == 'enable_results':
             enable_results = kwargs[arg]
     
-    """
+    
     [fclf, cvte, cv_storer] = setup_classifier(**kwargs)
-    """   
+    
+    """
+    Previous version
+    ----------------------
     clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities', 'training_stats'])
     
     #fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  FractionTailSelector(0.1, mode = 'select', tail = 'upper'))    
     #fclf = FeatureSelectionClassifier(clf, fsel)
     cv_storage = StoreResults()
-    cvte = CrossValidation(clf, NFoldPartitioner(cvtype = 1), #callback=cv_storage,
+    cvte = CrossValidation(clf, NFoldPartitioner(cvtype = 1), callback=cv_storage,
                            enable_ca=['stats', 'repetition_results'],
                            )
+    """
     
-  
     print 'Cross validation is performing ...'
     res = cvte(ds)
          
     print cvte.ca.stats    
     
     # Building sensitivities map.
-    """ Not needed if setup_classifier"""
+    """ Not needed if setup_classifier
     if 'fclf' in locals():
         sensana = fclf.get_sensitivity_analyzer()
     else:
         sensana = clf.get_sensitivity_analyzer()
-        
+    """
+    
+    sensana = fclf.get_sensitivity_analyzer()   
     res_sens = sensana(ds)
     
     sens_comb = res_sens.get_mapped(mean_sample())
@@ -245,15 +253,16 @@ def spatial(ds, **kwargs):
     # Packing results    (to be sobstitute with a function)
     results = dict()
     
-    """ Not needed if setup_classifier"""
+    """ Not needed if setup_classifier
     if 'fclf' in locals():
         classifier = fclf
     else:
         classifier = clf
-    
+    """
+    classifier = fclf
     
     allowed_keys = ['map', 'sensitivities', 'stats', 'mapper', 'classifier',  'cv']
-    allowed_results = [l_maps, res_sens, cvte.ca.stats, ds.a.mapper, classifier, cv_storage]
+    allowed_results = [l_maps, res_sens, cvte.ca.stats, ds.a.mapper, classifier, cv_storer]
     
     results_dict = dict(zip(allowed_keys, allowed_results))
     
@@ -580,11 +589,16 @@ def setup_classifier(**kwargs):
     
     ################# Classifier #######################
     if clf_type == 'SVM':
-        clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
+        clf = LinearCSVMC(C=3, probability=1, enable_ca=['probabilities'])
     elif clf_type == 'GNB':
         clf = GNB()
     elif clf_type == 'LDA':
         clf = LDA()
+    elif clf_type == 'SMLR':
+        clf = SMLR()
+    elif clf_type == 'RbfSVM':
+        sk_clf = SVC(gamma=0.1, C=1)
+        clf = SKLLearnerAdapter(sk_clf, enable_ca=['probabilities'])
     else:
         clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
     
@@ -603,13 +617,13 @@ def setup_classifier(**kwargs):
     cv_storer = StoreResults()
     if cv_approach == 'n_fold':
         if cv_type in locals():
-            cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = cv_type), callback=cv_storer,
+            cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = cv_type), #callback=cv_storer,
                                    enable_ca=['stats', 'repetition_results'])
         else:
-            cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = 1), callback=cv_storer,
+            cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = 1), #callback=cv_storer,
                                    enable_ca=['stats', 'repetition_results'])
     else:
-        cvte = CrossValidation(fclf, HalfPartitioner(), callback=cv_storer,
+        cvte = CrossValidation(fclf, HalfPartitioner(), #callback=cv_storer,
                                    enable_ca=['stats', 'repetition_results'])
         
     print 'Classifier set...'
