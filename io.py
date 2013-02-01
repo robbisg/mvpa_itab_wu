@@ -209,7 +209,7 @@ def plot_transfer_graph(path, name, results):
         f_pred.savefig(fname)
     
     
-    rep_txt = name+'_stats.txt'   
+    rep_txt = name+'_stats_probab.txt'   
     
     rep = open(os.path.join(path, rep_txt), 'w')
     rep.write(report)
@@ -526,6 +526,38 @@ def load_dataset(path, subj, type, **kwargs):
     
     return ds    
 
+def load_spatiotemporal_dataset(ds, **kwargs):
+    
+    onset = 0
+    
+    for arg in kwargs:
+        if (arg == 'onset'):
+            onset = kwargs[arg]
+        if (arg == 'duration'):
+            duration = kwargs[arg]
+        if (arg == 'enable_results'):
+            enable_results = kwargs[arg]
+        
+        
+        
+    events = find_events(targets = ds.sa.targets, chunks = ds.sa.chunks)   
+    
+    #task_events = [e for e in events if e['targets'] in ['Vipassana','Samatha']]
+    
+    if 'duration' in locals():
+        events = [e for e in events if e['duration'] >= duration]
+    else:
+        duration = np.min([ev['duration'] for ev in events])
+
+    for e in events:
+        e['onset'] += onset           
+        e['duration'] = duration
+        
+    evds = eventrelated_dataset(ds, events = events)
+    
+    return evds
+
+
 
 def load_mask(path, subj, **kwargs):
     '''
@@ -720,7 +752,10 @@ def load_attributes (path, task, subj, **kwargs):
     for dir in completeDirs:
         attrFiles = attrFiles + os.listdir(dir)
 
-    attrFiles = [f for f in attrFiles if f.find(subj) != -1 and f.find(event_file) != -1]
+    attrFiles = [f for f in attrFiles if f.find(event_file) != -1]
+    
+    if len(attrFiles) > 2:
+        attrFiles = [f for f in attrFiles if f.find(subj) != -1]
     
     #print '---------------------'
     #print attrFiles
@@ -1020,7 +1055,7 @@ def save_results_transfer_learning(path, results):
         pickle.dump(obj, file)
         file.close()
         
-        plot_transfer_graph(results_dir, name, results[name])
+        #plot_transfer_graph(results_dir, name, results[name])
         
         c_m = results[name]['confusion_target']
         fname = name+'_confusion_target.txt'

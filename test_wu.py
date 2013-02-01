@@ -14,10 +14,10 @@ def test_spatiotemporal(path, subjects, conf_file, type, **kwargs):
             balance = kwargs[arg]
     
     total_results = dict()
-    
+    data_path = conf['data_path']
     for subj in subjects:
         try:
-            ds = load_dataset(path, subj, type, **conf)
+            ds = load_dataset(data_path, subj, type, **conf)
         except Exception, err:
             print err
             continue
@@ -50,17 +50,19 @@ def test_spatial(path, subjects, conf_file, type, **kwargs):
     
     total_results = dict()
     
+    data_path = conf['data_path']
+    
     for subj in subjects:
         print '------'
         try:
-            ds = load_dataset(path, subj, type, **conf)
+            ds = load_dataset(data_path, subj, type, **conf)
         except Exception, err:
             print err
             continue
         
         ds = preprocess_dataset(ds, type, **conf)
         
-        r = spatial(ds, **kwargs)
+        r = spatial(ds, **conf)
         
         total_results[subj] = r
     
@@ -94,10 +96,12 @@ def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs
         
     total_results = dict()
     
+    data_path = conf_src['data_path']
+    
     for subj in subjects:
         try:
-            ds_src = load_dataset(path, subj, source, **conf_src)
-            ds_tar = load_dataset(path, subj, target, **conf_tar)
+            ds_src = load_dataset(data_apath, subj, source, **conf_src)
+            ds_tar = load_dataset(data_path, subj, target, **conf_tar)
         except Exception, err:
             print err
             continue
@@ -171,7 +175,7 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
                 print 'Balancing dataset...'
                 ds_src = balance_dataset(ds_src, 'fixation')        
         
-        r = transfer_learning(ds_src, ds_tar, analysis, **kwargs)
+        r = transfer_learning(ds_src, ds_tar, analysis, **conf_src)
         
         pred = np.array(r['classifier'].ca.predictions)
         targets = r['targets']
