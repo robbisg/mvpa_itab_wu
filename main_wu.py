@@ -585,6 +585,8 @@ def setup_classifier(**kwargs):
         clf = GNB()
     elif clf_type == 'LDA':
         clf = LDA()
+    elif clf_type == 'SMLR':
+        clf = SMLR()
     else:
         clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
     
@@ -600,21 +602,21 @@ def setup_classifier(**kwargs):
         
         fclf = clf
     
-    cv_storer = StoreResults()
+    #cv_storer = StoreResults()
     if cv_approach == 'n_fold':
         if cv_type in locals():
-            cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = cv_type), callback=cv_storer,
+            cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = cv_type), #callback=cv_storer,
                                    enable_ca=['stats', 'repetition_results'])
         else:
-            cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = 1), callback=cv_storer,
+            cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = 1), #callback=cv_storer,
                                    enable_ca=['stats', 'repetition_results'])
     else:
-        cvte = CrossValidation(fclf, HalfPartitioner(), callback=cv_storer,
+        cvte = CrossValidation(fclf, HalfPartitioner(), #callback=cv_storer,
                                    enable_ca=['stats', 'repetition_results'])
         
     print 'Classifier set...'
     
-    return [fclf, cvte, cv_storer]
+    return [fclf, cvte]
 
 
 def clustering (ds, n_clusters=6):
