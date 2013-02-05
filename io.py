@@ -1026,15 +1026,6 @@ def save_results_transfer_learning(path, results):
         os.system(command)
         
         results_dir = os.path.join(path, name)        
-        
-        m_mean = results[name]['map'].pop()
-        fname = name+'_mean_map.nii.gz'
-        ni.save(m_mean, os.path.join(results_dir,fname))
-        
-        for map, t in zip(results[name]['map'], results[name]['sensitivities'].sa.targets):
-                    cl = '_'.join(t)
-                    fname = name+'_'+cl+'_map.nii.gz'
-                    ni.save(map, os.path.join(results_dir,fname))
 
         
         stats = results[name]['stats']
@@ -1062,6 +1053,17 @@ def save_results_transfer_learning(path, results):
         file = open(os.path.join(results_dir,fname), 'w')
         file.write(str(c_m))
         file.close()
+        
+        
+        if results[name]['map'] != None:
+            m_mean = results[name]['map'].pop()
+            fname = name+'_mean_map.nii.gz'
+            ni.save(m_mean, os.path.join(results_dir,fname))
+        
+            for map, t in zip(results[name]['map'], results[name]['sensitivities'].sa.targets):
+                    cl = '_'.join(t)
+                    fname = name+'_'+cl+'_map.nii.gz'
+                    ni.save(map, os.path.join(results_dir,fname))
         
     return
 

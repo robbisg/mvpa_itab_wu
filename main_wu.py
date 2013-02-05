@@ -203,8 +203,10 @@ def spatial(ds, **kwargs):
 #    gc.set_debug(gc.DEBUG_LEAK)      
         
     for arg in kwargs:
+        if arg == 'clf_type':
+            clf_type = kwargs[arg]
         if arg == 'enable_results':
-            enable_results = kwargs[arg]
+            enable_results = kwargs[arg].split(',')
     
     
     [fclf, cvte, cv_storer] = setup_classifier(**kwargs)
@@ -222,6 +224,14 @@ def spatial(ds, **kwargs):
                            )
     """
     
+    if clf_type == 'GP':
+        i = 0
+        for t in np.unique(ds.targets):
+            m = ds.targets == t
+            ds.targets[m] = i
+            i = i + 1
+        ds.targets = np.array(ds.targets, dtype=np.int)
+    
     print 'Cross validation is performing ...'
     res = cvte(ds)
          
@@ -235,7 +245,25 @@ def spatial(ds, **kwargs):
         sensana = clf.get_sensitivity_analyzer()
     """
     
-    sensana = fclf.get_sensitivity_analyzer()   
+    '''
+    If classifier didn't have sensitivity
+    '''
+    try:
+        sensana = fclf.get_sensitivity_analyzer()
+    except Exception, err:
+        allowed_keys = ['map', 'sensitivities', 'stats', 'mapper', 'classifier',  'cv']
+        allowed_results = [None, None, cvte.ca.stats, ds.a.mapper, fclf, cv_storer]
+        results_dict = dict(zip(allowed_keys, allowed_results))
+        results = dict()
+        if not 'enable_results' in locals():
+            enable_results = allowed_keys[:]
+        for elem in enable_results:
+            if elem in allowed_keys:
+                results[elem] = results_dict[elem]
+                
+        return results
+            
+            
     res_sens = sensana(ds)
     
     sens_comb = res_sens.get_mapped(mean_sample())
@@ -589,21 +617,26 @@ def setup_classifier(**kwargs):
     
     ################# Classifier #######################
     if clf_type == 'SVM':
-        clf = LinearCSVMC(C=3, probability=1, enable_ca=['probabilities'])
+        clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
     elif clf_type == 'GNB':
         clf = GNB()
     elif clf_type == 'LDA':
         clf = LDA()
+    elif clf_type == 'QDA':
+        clf = QDA()
     elif clf_type == 'SMLR':
         clf = SMLR()
     elif clf_type == 'RbfSVM':
         sk_clf = SVC(gamma=0.1, C=1)
         clf = SKLLearnerAdapter(sk_clf, enable_ca=['probabilities'])
+    elif clf_type == 'GP':
+        clf = GPR()
     else:
         clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
     
     ############## Feature Selection #########################    
     if f_sel == 'True':
+        print 'Feature Selection selected.'
         fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  
                                                 FractionTailSelector(0.1, 
                                                                      mode = 'select', 
