@@ -2,8 +2,6 @@ import os
 import datetime as ora
 import nibabel as ni
 import numpy as np
-import nipype.pipeline.engine as pe
-import nipype.interfaces.fsl as fsl
 import cPickle as pickle
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -125,27 +123,6 @@ def loadMask(index):
         return maskList[index-1]
     else:
         return 
-
-
-
-
-
-
-def maskExtractor(funcfile, outfile):
-    
-    
-        print 'Extracting mask from '+funcfile+' ...'
-    
-        meanfuncmask = pe.Node(interface=fsl.BET(mask = True,
-                                             no_output=True,
-                                             frac = 0.5),
-                                             name = 'meanfuncmask')
-        meanfuncmask.inputs.in_file = funcfile
-        meanfuncmask.inputs.out_file = outfile
-        
-        meanfuncmask.run()
-        
-        return outfile
 
 
 def fidl_convert(fidlPath, outPath, type):

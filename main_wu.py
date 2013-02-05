@@ -647,7 +647,7 @@ def setup_classifier(**kwargs):
         
         fclf = clf
     
-    cv_storer = StoreResults()
+    #cv_storer = StoreResults()
     if cv_approach == 'n_fold':
         if cv_type in locals():
             cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = cv_type), #callback=cv_storer,
@@ -661,7 +661,7 @@ def setup_classifier(**kwargs):
         
     print 'Classifier set...'
     
-    return [fclf, cvte, cv_storer]
+    return [fclf, cvte]
 
 
 def clustering (ds, n_clusters=6):
