@@ -100,7 +100,7 @@ def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs
     
     for subj in subjects:
         try:
-            ds_src = load_dataset(data_apath, subj, source, **conf_src)
+            ds_src = load_dataset(data_path, subj, source, **conf_src)
             ds_tar = load_dataset(data_path, subj, target, **conf_tar)
         except Exception, err:
             print err
@@ -135,11 +135,13 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         if source == 'rest':
             target = 'task'
     
-    if source == 'lip':
-        target = 'ffa'
+    
+    if source == 'saccade':
+        target = 'face'
     else:
-        if source == 'ffa':
-            target = 'lip'
+        if source == 'face':
+            target = 'saccade'
+    
     
     conf_src = read_configuration(path, conf_file, source)
     conf_tar = read_configuration(path, conf_file, target)
@@ -167,6 +169,7 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         except Exception, err:
             print err
             continue
+        
         ds_src = preprocess_dataset(ds_src, source, **conf_src)
         ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
 
@@ -177,12 +180,25 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         
         r = transfer_learning(ds_src, ds_tar, analysis, **conf_src)
         
+        
+        
         pred = np.array(r['classifier'].ca.predictions)
         targets = r['targets']
         
         c_m = ConfusionMatrix(predictions=pred, targets=targets)
         c_m.compute()
         r['confusion_target'] = c_m
+        print c_m
+        
+        tr_pred = similarity_measure_mahalanobis(r['ds_tar'], r['ds_src'], r)
+        r['mahalanobis_similarity'] = tr_pred
+        
+        print tr_pred
+        
+        c_mat_mahala = ConfusionMatrix(predictions=tr_pred.T[1], targets=tr_pred.T[0])
+        c_mat_mahala.compute()
+        r['confusion_mahala'] = c_mat_mahala
+        
         
         total_results[subj] = r
         
@@ -190,10 +206,11 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     conf_src['analysis_task'] = source
     conf_src['analysis_func'] = analysis.func_name
     conf_src['classes'] = np.unique(ds_src.targets)
-
+    
+    
     save_results(path, total_results, conf_src)
     
-    return total_results
+    return [total_results, r['ds_src'], r['ds_tar']]
 
 
 def test_searchlight(path, subjects, conf_file, type, **kwargs):
@@ -205,10 +222,10 @@ def test_searchlight(path, subjects, conf_file, type, **kwargs):
         conf[arg] = kwargs[arg]
     
     total_results = dict()
-    
+    data_path = conf['data_path']
     for subj in subjects:
         
-        ds = load_dataset(path, subj, type, **conf)
+        ds = load_dataset(data_path, subj, type, **conf)
         ds = preprocess_dataset(ds, type, **conf)
         
         r = searchlight(ds, **kwargs)
@@ -223,4 +240,233 @@ def test_searchlight(path, subjects, conf_file, type, **kwargs):
     
     return total_results
 #####################################################################
+
+def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     
+    from scipy.spatial.distance import mahalanobis
+    from sklearn.covariance import LedoitWolf
+    
+    #classifier = results['classifier']
+    
+    #Get classifier from results
+    classifier = results['fclf']
+
+    #Make prediction on training set, to understand data distribution
+    prediction_src = classifier.predict(ds_src)
+    #prediction_src = results['predictions_ds']
+    true_predictions = np.array(prediction_src) == ds_src.targets
+    
+    example_dist = dict()
+    
+    #Extract feature selected from each dataset
+    if isinstance(classifier, FeatureSelectionClassifier):
+        f_selection = results['fclf'].mapper
+        ds_tar = f_selection(ds_tar)
+        ds_src = f_selection(ds_src)
+    
+    
+    '''
+    Get class distribution information: mean and covariance
+    '''
+    
+    for label in np.unique(ds_src.targets):
+        
+        #Get examples correctly classified
+        mask = ds_src.targets == label
+        example_dist[label] = dict()
+        true_ex = ds_src.samples[mask * true_predictions]
+        
+        #Get Mean and Covariance to draw the distribution
+        mean_ = np.mean(true_ex, axis=0)
+        example_dist[label]['mean'] = mean_
+        '''
+        cov_ = np.cov(true_ex.T)
+        example_dist[label]['cov'] = cov_
+        '''
+        
+        cov_ = LedoitWolf(block_size = 10000).fit(true_ex).covariance_
+        example_dist[label]['i_cov'] = scipy.linalg.inv(cov_)
+        #print cov_.shape
+        #print true_ex.shape
+        #print cov_
+        #print example_dist[label]['i_cov']
+        
+    #Get target predictions (unlabelled)
+    prediction_target = results['predictions']
+    
+    
+    #Test of data prediction
+    mahalanobis_values = []
+    for l, ex in zip(prediction_target, ds_tar.samples):
+        #Keep mahalanobis distance between examples and class distribution
+        mahalanobis_values.append(mahalanobis(example_dist[l]['mean'], ex, example_dist[l]['i_cov']))
+    
+    '''
+    Squared Mahalanobis distance is similar to a chi square distribution with 
+    degrees of freedom equal to the number of features.
+    '''
+    
+    
+    mahalanobis_values = np.array(mahalanobis_values) ** 2
+    #Get no. of features
+    df = ds_tar.samples.shape[1]
+    #print df
+    #Set a chi squared distribution
+    c_squared = scipy.stats.chi2(df)
+    #Set the p-value and the threshold value to validate predictions
+    m_value = c_squared.isf(p_value)
+    print m_value
+    #Mask true predictions
+    true_predictions = (mahalanobis_values < m_value)
+    
+    '''
+    Get some data
+    '''
+    full_data = np.array(zip(ds_tar.targets, prediction_target, mahalanobis_values))
+    
+    true_data = full_data[true_predictions]
+    
+    #print full_data
+    return true_data
+    
+    
+##################################################################################
+def similarity_confidence(ds_src, ds_tar, results):
+    
+    classifier = results['classifier']
+    
+    sensana = classifier.get_sensitivity_analyzer()
+    weights = sensana(ds_src)
+    
+        
+    prediction_src = classifier.predict(ds_src)
+    true_predictions = prediction_src == ds_src.targets
+    
+    example_dist = dict()
+    new_examples = dict()
+    
+    ##############################################################
+    def calculate_examples(mean, sigma, weights, c = 2):
+        from scipy.linalg import norm
+        
+        mean_p = mean + c * (weights/norm(weights)) * norm(sigma)
+        mean_m = mean - c * (weights/norm(weights)) * norm(sigma)
+        
+        return np.array([mean_p, mean_m])
+    ##############################################################
+    
+    il = 0
+    values_est = dict()
+    for label in np.unique(ds_src.targets):
+        
+        mask = ds_src.targets == label
+        example_dist[label] = dict()
+        new_examples[label] = []
+        true_ex = ds_src.samples[mask * true_predictions]
+        
+        #Calculate examples average
+        mean_ = np.mean(true_ex, axis=0)
+        example_dist[label]['mean'] = mean_
+        
+        #Calculate examples standard deviation
+        var_ = np.var(true_ex, axis=0)
+        example_dist[label]['std'] = var_
+        
+        cov_ = np.cov(true_ex.T)
+        example_dist[label]['cov'] = cov_
+        
+        mask_weights = np.array([s[0] == label or s[1] == label for s in weights.targets])    
+        labels = np.array([s for s in weights.targets[mask_weights]])
+        
+        labels = labels[labels != label]
+        weights_ = weights.samples[mask_weights]
+        
+        i = 0
+        for l in labels:
+            example_dist[label][l] = weights_[i]
+            vec = calculate_examples(mean_, var_, weights_[i], 2)
+            new_examples[label].append(vec)
+            i = i + 1
+            
+        new_examples[label] = np.vstack(new_examples[label])
+        
+        predictions = classifier.predict(new_examples[label])  
+        
+        print predictions
+        
+        #predictions.reverse()
+        
+        values_est[label] = []
+        for el in classifier.ca.estimates:
+            k_list = []
+            #p = predictions.pop()
+            for k in el.keys():
+                if k[0] == il:
+                    if el[k] >= 1:
+                        k_list.append(el[k])
+                    else:
+                        k_list.append(1)
+                        
+            values_est[label].append(k_list)
+            
+        il = il + 1
+        
+    
+    predictions_tar = classifier.predict(ds_tar)
+    
+    
+def get_merged_ds(path, subjects, analysis,  conf_file, source='task', **kwargs):
+    
+    if source == 'task':
+        target = 'rest'
+    else:
+        if source == 'rest':
+            target = 'task'
+    
+    
+    if source == 'saccade':
+        target = 'face'
+    else:
+        if source == 'face':
+            target = 'saccade'
+    
+    
+    conf_src = read_configuration(path, conf_file, source)
+    conf_tar = read_configuration(path, conf_file, target)
+    
+    ##############################################    
+    ##############################################
+    ##    conf_src['label_included'] = 'all'    ##   
+    ##    conf_src['label_dropped'] = 'none'    ##
+    ##    conf_src['mean_samples'] = 'False'    ##
+    ##############################################
+    ##############################################
+    
+    for arg in kwargs:
+        conf_src[arg] = kwargs[arg]
+        conf_tar[arg] = kwargs[arg]
+    
+    data_path = conf_src['data_path']
+    
+    for subj in subjects:
+        print '--------'
+        try:
+            ds_src = load_dataset(data_path, subj, source, **conf_src)
+            ds_tar = load_dataset(data_path, subj, target, **conf_tar)
+        except Exception, err:
+            print err
+            continue
+        
+        ds_src = preprocess_dataset(ds_src, source, **conf_src)
+        ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
+        
+        ds_merged = vstack((ds_src, ds_tar))
+        methods = ['iso', 'pca', 'forest', 'embedding', 'mds']
+        
+        for m, i in zip(methods, range(len(methods))):
+            plot_scatter_2d(ds_merged, method=m, fig_number=i+1)
+    
+    
+    
+    
+           

@@ -8,6 +8,7 @@ from itertools import cycle
 import cPickle as pickle
 from sklearn.linear_model import Ridge
 from scipy.interpolate import UnivariateSpline
+from sklearn import decomposition, manifold, lda, ensemble
 
 def get_time():
         #Time acquisition for file name!
@@ -156,7 +157,8 @@ def plot_transfer_graph(path, name, results):
     
     r_targets = np.array(results['targets'])
     r_prediction = np.array(results['classifier'].ca.predictions)
-    r_probabilities = np.array(results['classifier'].ca.probabilities)
+    if str(results['classifier'].find('SVM') != -1):
+        r_probabilities = np.array(results['classifier'].ca.probabilities)
     r_values = np.array(results['classifier'].ca.estimates)      
 
     p_probabilities = np.array([p[1][p[0]] for p in r_probabilities])
@@ -299,6 +301,96 @@ def plot_clusters_graph(path, name, results):
     rep = open(os.path.join(path, rep_txt), 'w')
     rep.write(report)
     rep.close()
+
+def plot_cv_results(cv, err, title):
+    # make new figure
+    pl.figure()
+    colors = cycle('bgrcmykbgrcmykbgrcmykbgrcmyk')
+    # null distribution samples
+    dist_samples = np.asarray(cv.null_dist.ca.dist_samples)
+    for i in range(len(err)):
+        c = colors.next()
+        # histogram of all computed errors from permuted data per CV-fold
+        pl.hist(np.ravel(dist_samples[i]), bins=20, color=c,
+                label='CV-fold %i' %i, alpha=0.5,
+                range=(dist_samples.min(), dist_samples.max()))
+        # empirical error
+        pl.axvline(np.asscalar(err[i]), color=c)
+
+    # chance-level for a binary classification with balanced samples
+    pl.axvline(0.5, color='black', ls='--')
+    # scale x-axis to full range of possible error values
+    pl.xlim(0,1)
+    pl.xlabel(title)
+
+
+def plot_scatter_2d(ds_merged, method='mds', fig_number = 1):
+    
+    """
+    methods: 'mds', 'pca', 'iso', 'forest', 'embedding'
+    """
+    
+    data = ds_merged.samples
+    
+    stringa=''
+    if method == 'pca':
+        clf = decomposition.RandomizedPCA(n_components=2)
+        stringa = 'Principal Component Analysis'
+    ########    
+    elif method == 'iso':
+        clf = manifold.Isomap(30, n_components=2)
+        stringa = 'Iso surfaces '
+    #########    
+    elif method == 'forest':
+        hasher = ensemble.RandomTreesEmbedding(n_estimators=200, random_state=0,
+                                       max_depth=5)
+        data = hasher.fit_transform(data)
+        clf = decomposition.RandomizedPCA(n_components=2)
+        stringa = 'Random Forests'
+    ########
+    elif method == 'embedding':
+        clf = manifold.SpectralEmbedding(n_components=2, random_state=0,
+                                      eigen_solver="arpack")
+        stringa = 'Spectral Embedding'
+    #########
+    else:
+        clf = MDS(n_components=2, n_init=1, max_iter=100)
+        stringa = 'Multidimensional scaling'
+        
+        
+    ###########################
+    #dist_matrix = squareform(pdist(data, 'euclidean'))
+
+    print stringa+' is performing...'
+
+    pos = clf.fit_transform(data)
+
+    colors = cycle('bgrymkybgrcmybgrcmybgrcmy')
+    
+    f = plt.figure()
+    a = f.add_subplot(111)
+    a.set_title(stringa)
+    for label in np.unique(ds_merged.targets):
+        m = ds_merged.targets == label
+        data_m = pos[m]
+        c = colors.next()
+        a.scatter(data_m.T[0].mean(), data_m.T[1].mean(), label=label, color=c, s=120)
+        a.scatter(data_m.T[0][::2], data_m.T[1][::2], color=c)
+        '''
+        cov_ = np.cov(data_m.T)
+        v, w = np.linalg.eigh(cov_)
+        u = w[0] / np.linalg.norm(w[0])
+        angle = np.arctan2(u[1], u[0])
+        angle = 180 * angle / np.pi  # convert to degrees
+        v *= 0.5
+        ell = mpl.patches.Ellipse(np.mean(data_m, axis=0), v[0], v[1],
+                                  180 + angle, color=c)
+        ell.set_clip_box(a.bbox)
+        ell.set_alpha(0.2)
+        a.add_artist(ell)
+        '''
+    a.legend()
+    return
 
 
 def load_conc_fmri_data(conc_file_list, el_vols = 0, **kwargs):
@@ -753,12 +845,10 @@ def load_attributes (path, task, subj, **kwargs):
         attrFiles = attrFiles + os.listdir(dir)
 
     attrFiles = [f for f in attrFiles if f.find(event_file) != -1]
-    
+    #print attrFiles
     if len(attrFiles) > 2:
         attrFiles = [f for f in attrFiles if f.find(subj) != -1]
-    
-    #print '---------------------'
-    #print attrFiles
+        
     
     if len(attrFiles) == 0:
         print ' *******       ERROR: No attribute file found!        *********'
@@ -868,7 +958,7 @@ def read_configuration (path, experiment, type):
         
         for item in config.items(sec):
             configuration.append(item)
-            print item
+            #print item
     
     return dict(configuration)   
 
@@ -890,10 +980,12 @@ def save_results(path, results, configuration):
         save_results_searchlight(parent_dir, results)
     elif analysis == 'transfer_learning':
         save_results_transfer_learning(parent_dir, results)
+        write_all_subjects_map(path, new_dir)
     elif analysis == 'clustering':
         save_results_clustering(parent_dir, results)
     else:
-        save_results_basic(parent_dir, results)  
+        save_results_basic(parent_dir, results)
+        write_all_subjects_map(path, new_dir)  
     '''
     for key in results:
         
@@ -956,19 +1048,19 @@ def save_results_searchlight (path, results):
         if len(map.get_data().shape) > 3:
             mean_map = map.get_data().mean(axis=3)
             mean_img = ni.Nifti1Image(mean_map, affine=map.get_affine())
-            fname = name+'_radius_'+str(radius)+'searchlight_mean_map.nii.gz'
+            fname = name+'_radius_'+str(radius)+'_searchlight_mean_map.nii.gz'
             ni.save(mean_img, os.path.join(results_dir,fname))
         else:
             mean_map = map.get_data()
             
-        fname = name+'_radius_'+str(radius)+'searchlight_map.nii.gz'
+        fname = name+'_radius_'+str(radius)+'_searchlight_map.nii.gz'
         ni.save(map, os.path.join(results_dir,fname))
         
         total_map.append(mean_map)
     
-    total_map = np.array(total_map).mean()
+    total_map = np.array(total_map).mean(axis=0)
     total_img = ni.Nifti1Image(total_map, affine=map.get_affine())
-    fname = 'accuracy_map_radius_'+str(radius)+'searchlight_all_subj.nii.gz'
+    fname = 'accuracy_map_radius_'+str(radius)+'_searchlight_all_subj.nii.gz'
     ni.save(total_img, os.path.join(path,fname))
                    
     print 'Results writed in '+path    
@@ -989,14 +1081,18 @@ def save_results_basic(path, results):
         for key in results[name]:
             
             if key == 'map':
+                
                 m_mean = results[name]['map'].pop()
                 fname = name+'_mean_map.nii.gz'
+                m_mean._data = (m_mean._data - np.mean(m_mean._data))/np.std(m_mean._data)
                 ni.save(m_mean, os.path.join(results_dir,fname))
                 
                 for map, t in zip(results[name][key], results[name]['sensitivities'].sa.targets):
                     cl = '_'.join(t)
                     fname = name+'_'+cl+'_map.nii.gz'
+                    map._data = (map._data - np.mean(map._data))/np.std(map._data)
                     ni.save(map, os.path.join(results_dir,fname))
+                    
             elif key == 'stats':
                 stats = results[name][key]
                 fname = name+'_stats.txt'
@@ -1013,6 +1109,7 @@ def save_results_basic(path, results):
                 file.close()
      
     ###################################################################          
+    
     
     print 'Result saved in '+parent_dir
     
@@ -1032,6 +1129,12 @@ def save_results_transfer_learning(path, results):
         fname = name+'_stats.txt'
         file = open(os.path.join(results_dir,fname), 'w')
         file.write(str(stats))
+        p_value = results[name]['p-value']
+        file.write('\n\n p-values for each fold \n')
+        for v in p_value:
+            file.write(str(v)+'\n')
+        file.write('\n\n Mean each fold p-value: '+str(p_value.mean()))
+        file.write('\n\n Mean null dist total accuracy value: '+str(results[name]['p']))
         file.close()
         
         obj = results[name]['classifier'].ca
@@ -1054,17 +1157,48 @@ def save_results_transfer_learning(path, results):
         file.write(str(c_m))
         file.close()
         
+        t_mahala = results[name]['mahalanobis_similarity']
+        fname = name+'_mahalanobis_data.txt'
+        file = open(os.path.join(results_dir,fname), 'w')
+        
+        for tar in np.unique(t_mahala.T[0]): 
+            t_pred_mask = t_mahala.T[0] == tar
+            t_m_data = t_mahala[t_pred_mask]
+            for lab in np.unique(t_m_data.T[1]):
+                m_maha = t_m_data.T[1] == lab
+                true_vec = t_m_data[m_maha]
+                num = len(true_vec)
+                mean_maha = np.mean(np.float_(true_vec.T[2]))
+                #print tar+' '+lab+' '+str(num)+' '+str(mean_maha)
+                file.write(tar+' '+lab+' '+str(num)+' '+str(mean_maha)+'\n')
+        file.close()
+        
+        cmatrix_mahala = results[name]['confusion_mahala']
+        fname = name+'_confusion_mahala.txt'
+        file = open(os.path.join(results_dir,fname), 'w')
+        try:
+            file.write(str(cmatrix_mahala))
+        except ValueError,err:
+            file.write('None')
+            print err
+        
+        file.close()
+        
         
         if results[name]['map'] != None:
             m_mean = results[name]['map'].pop()
             fname = name+'_mean_map.nii.gz'
+            m_mean._data = (m_mean._data - np.mean(m_mean._data))/np.std(m_mean._data)
             ni.save(m_mean, os.path.join(results_dir,fname))
         
             for map, t in zip(results[name]['map'], results[name]['sensitivities'].sa.targets):
                     cl = '_'.join(t)
                     fname = name+'_'+cl+'_map.nii.gz'
+                    map._data = (map._data - np.mean(map._data))/np.std(map._data)
                     ni.save(map, os.path.join(results_dir,fname))
         
+    
+    
     return
 
 

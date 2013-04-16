@@ -698,6 +698,12 @@ def searchlight_to_mni(path, subj):
 def mask_searchlight(path, input, min):
     
     sl_map = ni.load(os.path.join(path, input))
+    
+    
+def map_to_mni(path, matrix):
+    
+    
+    return
  
 '''
 def plot_matrix(matrix, labels, name):

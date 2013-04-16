@@ -169,9 +169,12 @@ def preprocess_dataset(ds, type, **kwargs):
             label_included = kwargs[arg].split(',')
         if (arg == 'label_dropped'):
             label_dropped = kwargs[arg] 
+        if (arg == 'img_dim'):
+            img_dim = int(kwargs[arg])
                 
     print 'Dataset preprocessing: Detrending and Z-Scoring...'
-    poly_detrend(ds, polyord = 1, chunks_attr = 'file');
+    if img_dim == 4:
+        poly_detrend(ds, polyord = 1, chunks_attr = 'file');
     poly_detrend(ds, polyord = 1, chunks_attr = 'chunks');
     
     
@@ -180,11 +183,9 @@ def preprocess_dataset(ds, type, **kwargs):
         print 'Averaging samples...'
         avg_mapper = mean_group_sample(['events_number']) 
         ds = ds.get_mapped(avg_mapper)     
-                
-                
 
-    
-    zscore(ds, chunks_attr='file')
+    if img_dim == 4:
+        zscore(ds, chunks_attr='file')
     zscore(ds)#, param_est=('targets', ['fixation']))
    
     if  label_dropped != 'none':
@@ -209,41 +210,27 @@ def spatial(ds, **kwargs):
             enable_results = kwargs[arg].split(',')
     
     
-    [fclf, cvte, cv_storer] = setup_classifier(**kwargs)
+    [fclf, cvte] = setup_classifier(**kwargs)
     
-    """
-    Previous version
-    ----------------------
-    clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities', 'training_stats'])
-    
-    #fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  FractionTailSelector(0.1, mode = 'select', tail = 'upper'))    
-    #fclf = FeatureSelectionClassifier(clf, fsel)
-    cv_storage = StoreResults()
-    cvte = CrossValidation(clf, NFoldPartitioner(cvtype = 1), callback=cv_storage,
-                           enable_ca=['stats', 'repetition_results'],
-                           )
-    """
-    
-    if clf_type == 'GP':
-        i = 0
-        for t in np.unique(ds.targets):
-            m = ds.targets == t
-            ds.targets[m] = i
-            i = i + 1
-        ds.targets = np.array(ds.targets, dtype=np.int)
     
     print 'Cross validation is performing ...'
-    res = cvte(ds)
-         
-    print cvte.ca.stats    
+    error_ = cvte(ds)
     
-    # Building sensitivities map.
-    """ Not needed if setup_classifier
-    if 'fclf' in locals():
-        sensana = fclf.get_sensitivity_analyzer()
-    else:
-        sensana = clf.get_sensitivity_analyzer()
-    """
+    
+    print cvte.ca.stats    
+    #print error_.samples
+
+    #Plot permutations
+    #plot_cv_results(cvte, error_, 'Permutations analysis')
+    dist_len = len(cvte.null_dist.dists())
+    err_arr = np.zeros(dist_len)
+    for i in range(dist_len):
+        err_arr[i] = 1 - cvte.ca.stats.stats['ACC']
+    
+    total_p_value = np.mean(cvte.null_dist.p(err_arr))
+    
+    
+    predictions_ds = fclf.predict(ds)
     
     '''
     If classifier didn't have sensitivity
@@ -251,8 +238,14 @@ def spatial(ds, **kwargs):
     try:
         sensana = fclf.get_sensitivity_analyzer()
     except Exception, err:
-        allowed_keys = ['map', 'sensitivities', 'stats', 'mapper', 'classifier',  'cv']
-        allowed_results = [None, None, cvte.ca.stats, ds.a.mapper, fclf, cv_storer]
+        allowed_keys = ['map', 'sensitivities', 'stats', 
+                        'mapper', 'classifier', 'ds', 
+                        'p-value', 'p']
+        
+        allowed_results = [None, None, cvte.ca.stats, 
+                           ds.a.mapper, fclf, ds, 
+                           cvte.ca.null_prob.samples, total_p_value]
+        
         results_dict = dict(zip(allowed_keys, allowed_results))
         results = dict()
         if not 'enable_results' in locals():
@@ -262,7 +255,7 @@ def spatial(ds, **kwargs):
                 results[elem] = results_dict[elem]
                 
         return results
-            
+    
             
     res_sens = sensana(ds)
     
@@ -278,19 +271,18 @@ def spatial(ds, **kwargs):
     
     
     l_maps.append(mean_map)
+    
     # Packing results    (to be sobstitute with a function)
     results = dict()
-    
-    """ Not needed if setup_classifier
-    if 'fclf' in locals():
-        classifier = fclf
-    else:
-        classifier = clf
-    """
+
     classifier = fclf
     
-    allowed_keys = ['map', 'sensitivities', 'stats', 'mapper', 'classifier',  'cv']
-    allowed_results = [l_maps, res_sens, cvte.ca.stats, ds.a.mapper, classifier, cv_storer]
+    allowed_keys = ['map', 'sensitivities', 'stats', 
+                    'mapper', 'classifier', 'ds', 
+                    'p-value' , 'p']
+    allowed_results = [l_maps, res_sens, cvte.ca.stats, 
+                       ds.a.mapper, classifier, ds, 
+                       cvte.ca.null_prob.samples, total_p_value]
     
     results_dict = dict(zip(allowed_keys, allowed_results))
     
@@ -378,82 +370,6 @@ for list in lf_sl_total:
     print command
     os.system(command)
 '''
-     
-def spatiotemporal_(ds, **kwargs):
-    onset = 0
-    
-    for arg in kwargs:
-        if (arg == 'onset'):
-            onset = kwargs[arg]
-        if (arg == 'duration'):
-            duration = kwargs[arg]
-        if (arg == 'enable_results'):
-            enable_results = kwargs[arg]
-        
-        
-    events = find_events(targets = ds.sa.targets, chunks = ds.sa.chunks)   
-        
-    if 'duration' in locals():
-        events = [e for e in events if e['duration'] >= duration]
-    else:
-        duration = np.min([ev['duration'] for ev in events])
-
-        
-    evds = build_events_ds(ds, duration)
-    
-    """
-    [fclf, cvte] = setup_classifier(**kwargs)
-    """ 
-    clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
-    
-    fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  FractionTailSelector(0.1, mode = 'select', tail = 'upper'))    
-    fclf = FeatureSelectionClassifier(clf, fsel)    
-    
-    
-    print 'Cross validation...'
-    cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = 1), enable_ca=['stats', 'repetition_results'])
-    train_err = cvte(evds)
-    print cvte.ca.stats
-    
-    
-    """ Not needed if setup_classifier"""
-    if 'fclf' in locals():
-        sensana = fclf.get_sensitivity_analyzer()
-    else:
-        sensana = clf.get_sensitivity_analyzer()
-
-    
-    res_sens = sensana(evds)
-    map = evds.a.mapper.reverse(res_sens.samples)
-    
-
-    # Packing results    (to be sobstitute with a function)
-    results = dict()
-    if not 'enable_results' in locals():
-        enable_results = ['map', 'sensitivities', 'stats', 'mapper', 'classifier', 'cv']
-        
-    allowed_keys = ['map', 'sensitivities', 'stats', 'mapper', 'classifier', 'cv']
-    
-    
-    """ Not needed if setup_classifier"""
-    if 'fclf' in locals():
-        classifier = fclf
-    else:
-        classifier = clf
-    
-        
-    allowed_results = [map, res_sens, cvte.ca.stats, evds.a.mapper, classifier, cvte]
-    
-    results_dict = dict(zip(allowed_keys, allowed_results))
-    
-    for elem in enable_results:
-        
-        if elem in allowed_keys:
-            results[elem] = results_dict[elem]
-        else:
-            print '******** '+elem+' result is not allowed! *********'
-
-    return results
 
 def spatiotemporal(ds, **kwargs):
       
@@ -466,12 +382,8 @@ def spatiotemporal(ds, **kwargs):
             duration = kwargs[arg]
         if (arg == 'enable_results'):
             enable_results = kwargs[arg]
-        
-        
-        
+       
     events = find_events(targets = ds.sa.targets, chunks = ds.sa.chunks)   
-    
-    #task_events = [e for e in events if e['targets'] in ['Vipassana','Samatha']]
     
     if 'duration' in locals():
         events = [e for e in events if e['duration'] >= duration]
@@ -484,36 +396,52 @@ def spatiotemporal(ds, **kwargs):
         
     evds = eventrelated_dataset(ds, events = events) 
     
-    """
+    
     [fclf, cvte] = setup_classifier(**kwargs)
-    """ 
-    #clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
-    clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities', 'training_stats'])
-    fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  FractionTailSelector(0.1, mode = 'select', tail = 'upper'))    
-    fclf = FeatureSelectionClassifier(clf, fsel)    
     
-    cv_storage = StoreResults()
-    print 'Cross validation...'
-    cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = 1), callback=cv_storage, 
-                           enable_ca=['stats', 'repetition_results'])
-    train_err = cvte(evds)
-    print cvte.ca.stats
+    print 'Cross validation is performing ...'
+    res = cvte(evds)
+    
+    print cvte.ca.stats 
+    print cvte.ca.null_prob.samples
+    
+    dist_len = len(cvte.null_dist.dists())
+    err_arr = np.zeros(dist_len)
+    for i in range(dist_len):
+        err_arr[i] = 1 - cvte.ca.stats.stats['ACC']
+    
+    total_p_value = np.mean(cvte.null_dist.p(err_arr))
     
     
-    """ Not needed if setup_classifier"""
-    if 'fclf' in locals():
+    try:
         sensana = fclf.get_sensitivity_analyzer()
-    else:
-        sensana = clf.get_sensitivity_analyzer()
-
+    except Exception, err:
+        allowed_keys = ['map', 'sensitivities', 'stats', 
+                        'mapper', 'classifier', 'ds', 
+                        'p-value', 'p']
+        
+        allowed_results = [None, None, cvte.ca.stats, 
+                           evds.a.mapper, fclf, evds, 
+                           cvte.ca.null_prob.samples, total_p_value]
+        
+        results_dict = dict(zip(allowed_keys, allowed_results))
+        results = dict()
+        if not 'enable_results' in locals():
+            enable_results = allowed_keys[:]
+        for elem in enable_results:
+            if elem in allowed_keys:
+                results[elem] = results_dict[elem]
+                
+        return results
     
     res_sens = sensana(evds)
+    
     sens_comb = res_sens.get_mapped(mean_sample())
     mean_map = map2nifti(evds, evds.a.mapper.reverse1(sens_comb))
         
     l_maps = []
     for m in res_sens:
-        maps = evds.a.mapper.reverse1(m)
+        maps = ds.a.mapper.reverse1(m)
         nifti = map2nifti(evds, maps)
         l_maps.append(nifti)
     
@@ -521,19 +449,17 @@ def spatiotemporal(ds, **kwargs):
     # Packing results    (to be sobstitute with a function)
     results = dict()
     if not 'enable_results' in locals():
-        enable_results = ['map', 'sensitivities', 'stats', 'mapper', 'classifier', 'cv']
+        enable_results = ['map', 'sensitivities', 'stats', 
+                          'mapper', 'classifier', 'ds', 
+                          'p-value', 'p']
         
-    allowed_keys = ['map', 'sensitivities', 'stats', 'mapper', 'classifier', 'cv']
+    allowed_keys = ['map', 'sensitivities', 'stats', 
+                    'mapper', 'classifier', 'ds', 
+                    'p-value', 'p']       
     
-    
-    """ Not needed if setup_classifier"""
-    if 'fclf' in locals():
-        classifier = fclf
-        
-    else:
-        classifier = clf   
-        
-    allowed_results = [l_maps, res_sens, cvte.ca.stats, evds.a.mapper, classifier, cv_storage]
+    allowed_results = [l_maps, res_sens, cvte.ca.stats, 
+                       evds.a.mapper, fclf, evds, 
+                       cvte.ca.null_prob.samples, total_p_value]
     
     results_dict = dict(zip(allowed_keys, allowed_results))
     
@@ -576,16 +502,25 @@ def transfer_learning(ds_src, ds_tar, analysis, **kwargs):
     results = dict()
     #del enable_results
     if 'enable_results' not in locals():
-        enable_results = ['targets', 'classifier', 'map', 'stats', 'sensitivities', 'mapper']
+        enable_results = ['targets', 'classifier', 'map', 
+                          'stats', 'sensitivities', 'mapper', 
+                          'predictions','fclf', 'ds_src', 'ds_tar', 'p-value', 'p']
         
-    allowed_keys = ['targets', 'classifier', 'map', 'stats', 'sensitivities', 'mapper']
+    allowed_keys = ['targets', 'classifier', 'map', 
+                    'stats', 'sensitivities', 'mapper', 
+                    'predictions','fclf', 'ds_src', 'ds_tar', 'p-value', 'p']
+    
     
     if isinstance(classifier, FeatureSelectionClassifier):
-        classifier = classifier.clf
-
+        classifier_s = classifier.clf
+    else:
+        classifier_s = classifier
         
-    allowed_results = [ds_tar.targets, classifier, src_result['map'], 
-                       src_result['stats'], src_result['sensitivities'], src_result['mapper']]
+    allowed_results = [ds_tar.targets, classifier_s, src_result['map'], 
+                       src_result['stats'], src_result['sensitivities'], 
+                       src_result['mapper'], predictions, 
+                       classifier, src_result['ds'], ds_tar, src_result['p-value'],
+                       src_result['p'] ]
     
     results_dict = dict(zip(allowed_keys, allowed_results))
     
@@ -612,7 +547,9 @@ def setup_classifier(**kwargs):
         if arg == 'cv_type':
             cv_approach = kwargs[arg]
         if arg == 'cv_folds':
-            cv_type = kwargs[arg]    
+            cv_type = kwargs[arg] 
+        if arg == 'permutations':
+            permutations = np.int(kwargs[arg])
     
     
     ################# Classifier #######################
@@ -643,21 +580,61 @@ def setup_classifier(**kwargs):
                                                                      tail = 'upper'))
         fclf = FeatureSelectionClassifier(clf, fsel)
     
+    elif f_sel == 'Fixed':
+        print 'Fixed Feature Selection selected.'
+        fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  
+                                                FixedNElementTailSelector(50, 
+                                                                     mode = 'select',
+                                                                     tail = 'upper'))
+        fclf = FeatureSelectionClassifier(clf, fsel)
     else:
         
         fclf = clf
     
-    #cv_storer = StoreResults()
+    #########################################################################
+    
+    if permutations != 0:
+        if __debug__:
+            debug.active += ["STATMC"]
+        repeater = Repeater(count= permutations)
+        permutator = AttributePermutator('targets', limit={'partitions': 1}, count=1)
+        partitioner = NFoldPartitioner()
+        null_cv = CrossValidation(
+                                  clf,
+                                  ChainNode([partitioner, permutator], 
+                                            space=partitioner.get_space()),
+                                  errorfx=mean_mismatch_error)
+        
+        distr_est = MCNullDist(repeater, tail='left', measure=null_cv,
+                               enable_ca=['dist_samples'])
+        #postproc = mean_sample()
+    else:
+        distr_est = None
+        #postproc = None
+    
+    ##########################################################################    
     if cv_approach == 'n_fold':
         if cv_type in locals():
-            cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = cv_type), #callback=cv_storer,
+            cvte = CrossValidation(fclf, 
+                                   NFoldPartitioner(cvtype = cv_type), 
+                                   #postproc = postproc,
+                                   errorfx=mean_mismatch_error,
+                                   null_dist=distr_est,
                                    enable_ca=['stats', 'repetition_results'])
         else:
-            cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = 1), #callback=cv_storer,
+            cvte = CrossValidation(fclf, 
+                                   NFoldPartitioner(cvtype = 1), 
+                                   #postproc = postproc,
+                                   errorfx=mean_mismatch_error,
+                                   null_dist=distr_est,
                                    enable_ca=['stats', 'repetition_results'])
     else:
-        cvte = CrossValidation(fclf, HalfPartitioner(), #callback=cv_storer,
-                                   enable_ca=['stats', 'repetition_results'])
+        cvte = CrossValidation(fclf, 
+                               HalfPartitioner(), 
+                               #postproc = postproc,
+                               errorfx=mean_mismatch_error,
+                               null_dist=distr_est,
+                               enable_ca=['stats', 'repetition_results'])
         
     print 'Classifier set...'
     
@@ -934,7 +911,81 @@ def transfer_learning_fixation(path, subjects):
             pickle.dump(targets, open(os.path.join(path, '0_results', subj+'_src_'+source+'_transfLearn_targets_.pyobj'), 'w'))
             pickle.dump(values, open(os.path.join(path, '0_results', subj+'_src_'+source+'_transfLearn_values_.pyobj'), 'w'))
 
+def spatiotemporal_(ds, **kwargs):
+    onset = 0
+    
+    for arg in kwargs:
+        if (arg == 'onset'):
+            onset = kwargs[arg]
+        if (arg == 'duration'):
+            duration = kwargs[arg]
+        if (arg == 'enable_results'):
+            enable_results = kwargs[arg]
+        
+        
+    events = find_events(targets = ds.sa.targets, chunks = ds.sa.chunks)   
+        
+    if 'duration' in locals():
+        events = [e for e in events if e['duration'] >= duration]
+    else:
+        duration = np.min([ev['duration'] for ev in events])
 
+        
+    evds = build_events_ds(ds, duration)
+    
+    """
+    [fclf, cvte] = setup_classifier(**kwargs)
+    """ 
+    clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
+    
+    fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  FractionTailSelector(0.1, mode = 'select', tail = 'upper'))    
+    fclf = FeatureSelectionClassifier(clf, fsel)    
+    
+    
+    print 'Cross validation...'
+    cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = 1), enable_ca=['stats', 'repetition_results'])
+    train_err = cvte(evds)
+    print cvte.ca.stats
+    
+    
+    """ Not needed if setup_classifier"""
+    if 'fclf' in locals():
+        sensana = fclf.get_sensitivity_analyzer()
+    else:
+        sensana = clf.get_sensitivity_analyzer()
+
+    
+    res_sens = sensana(evds)
+    map = evds.a.mapper.reverse(res_sens.samples)
+    
+
+    # Packing results    (to be sobstitute with a function)
+    results = dict()
+    if not 'enable_results' in locals():
+        enable_results = ['map', 'sensitivities', 'stats', 'mapper', 'classifier', 'cv']
+        
+    allowed_keys = ['map', 'sensitivities', 'stats', 'mapper', 'classifier', 'cv']
+    
+    
+    """ Not needed if setup_classifier"""
+    if 'fclf' in locals():
+        classifier = fclf
+    else:
+        classifier = clf
+    
+        
+    allowed_results = [map, res_sens, cvte.ca.stats, evds.a.mapper, classifier, cvte]
+    
+    results_dict = dict(zip(allowed_keys, allowed_results))
+    
+    for elem in enable_results:
+        
+        if elem in allowed_keys:
+            results[elem] = results_dict[elem]
+        else:
+            print '******** '+elem+' result is not allowed! *********'
+
+    return results
 def clustering_analysis_(ds, classifier, clusters=6):
     """ Deprecated """
     
