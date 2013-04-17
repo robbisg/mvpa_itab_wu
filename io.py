@@ -437,9 +437,13 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
             sub_dirs = kwargs[arg].split(',')
         if (arg == 'runs'):
             runs = int(kwargs[arg])
+        if (arg == 'use_task_name'):
+            use_task_name = kwargs[arg]
 
     path_file_dirs = []
-
+    
+    if use_task_name == 'False':
+        task = ''
     
     for dir in sub_dirs:
         if dir == 'none':
@@ -462,7 +466,7 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     else:
         fileL = [elem for elem in fileL if elem.find(img_pattern) != -1 and elem.find(task) != -1 and elem.find('mni') != -1]
 
-    
+    #print fileL
     #if no file are found I perform previous analysis!        
     if (len(fileL) < runs and len(fileL) >= 0):
         """
@@ -503,13 +507,14 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
         else:
             pathF = os.path.join(path_file_dirs[1], img)
             
-            
-        print 'Now loading... '+pathF        
-        im = ni.load(pathF)
+        if (str(len(imgList))) < 10:
+            print 'Now loading... '+pathF        
         
+        im = ni.load(pathF)
         data = im.get_data()
         
-        print data.shape
+        if (str(len(imgList))) < 10:
+            print data.shape
         
         new_im = ni.Nifti1Image(data[:,:,:,el_vols:], affine = im.get_affine(), header = im.get_header()) 
         
@@ -736,8 +741,9 @@ def load_mask_wu(path, subj, **kwargs):
     elif (mask_area == ['total']):
         mask_path = os.path.join(path, subj)
         mask_list = os.listdir(mask_path)
-        mask_to_find = subj+'_mask_mask'
-        mask_list = [m for m in mask_list if m.find(mask_to_find) != -1]
+        mask_to_find1 = subj+'_mask_mask'
+        mask_to_find2 = 'mask_'+subj+'_mask'
+        mask_list = [m for m in mask_list if m.find(mask_to_find1) != -1 or m.find(mask_to_find2) != -1]
     elif (mask_area == ['searchlight_3'] or mask_area == ['searchlight_5']):
         mask_list = os.listdir(mask_path)
         if mask_area == ['searchlight_3']:
@@ -845,7 +851,7 @@ def load_attributes (path, task, subj, **kwargs):
         attrFiles = attrFiles + os.listdir(dir)
 
     attrFiles = [f for f in attrFiles if f.find(event_file) != -1]
-    #print attrFiles
+    print attrFiles
     if len(attrFiles) > 2:
         attrFiles = [f for f in attrFiles if f.find(subj) != -1]
         
