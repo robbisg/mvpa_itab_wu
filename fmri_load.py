@@ -1,7 +1,6 @@
 import nibabel as ni
 import os
-import wu_toolbox.utils as utils
-
+import utils
 from mvpa2.suite import fmri_dataset, SampleAttributes, debug
 
 def load_fmri_dataset_3d(path, name, attr_p):

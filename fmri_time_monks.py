@@ -1,7 +1,6 @@
-from mvpa.suite import *
+from mvpa2.suite import *
 import nibabel as ni
 import datetime as ora
-from papyon.util.iso8601.iso8601 import frac
 
 
 def analyzeMonkTime(fmri4d, path, attrib, mask):
