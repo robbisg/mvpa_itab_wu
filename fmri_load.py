@@ -5,6 +5,8 @@ from mvpa2.suite import fmri_dataset, SampleAttributes, debug
 
 def load_fmri_dataset_3d(path, name, attr_p):
     
+    '''Deprecated'''
+    
     if __debug__:
         debug.active += ['VERBOSE']
     
@@ -31,7 +33,7 @@ def load_fmri_dataset_3d(path, name, attr_p):
         mask = mask_out
     else:
         print 'Extracting mask...'
-        utils.maskExtractor(filePath, mask)
+        #utils.maskExtractor(filePath, mask)
         mask = mask_out
     
     attr = SampleAttributes(attr_p)

@@ -547,11 +547,15 @@ def setup_classifier(**kwargs):
         if arg == 'cv_type':
             cv_approach = kwargs[arg]
         if arg == 'cv_folds':
-            cv_type = kwargs[arg] 
+            if np.int(kwargs[arg]) == 0:
+                cv_type =  np.float(kwargs[arg])
+            else:
+                cv_type = np.int(kwargs[arg])
         if arg == 'permutations':
             permutations = np.int(kwargs[arg])
     
-    
+    cv_n = cv_type
+            
     ################# Classifier #######################
     if clf_type == 'SVM':
         clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
@@ -598,7 +602,7 @@ def setup_classifier(**kwargs):
             debug.active += ["STATMC"]
         repeater = Repeater(count= permutations)
         permutator = AttributePermutator('targets', limit={'partitions': 1}, count=1)
-        partitioner = NFoldPartitioner()
+        partitioner = NFoldPartitioner(cvtype=cv_n)
         null_cv = CrossValidation(
                                   clf,
                                   ChainNode([partitioner, permutator], 
@@ -614,7 +618,7 @@ def setup_classifier(**kwargs):
     
     ##########################################################################    
     if cv_approach == 'n_fold':
-        if cv_type in locals():
+        if cv_type != 0:
             cvte = CrossValidation(fclf, 
                                    NFoldPartitioner(cvtype = cv_type), 
                                    #postproc = postproc,
@@ -806,237 +810,6 @@ def query_log (path, **kwargs):
 
 
 ################ Deprecated ###########################################
-
-def transfer_learning_ (path, subjects, source, conf_src, conf_tar):
-    #Source = dataset to train on the classifier
-    """
-    Deprecated
-    """
-    datetime = get_time()
-    
-    if source == 'rest':
-        target = 'task'
-    else:
-        target = 'rest'
-        
-    res = []
-    
-    for subj in subjects:
-        
-        print ' ---------- Analyzing '+subj+' ----------------'
-        
-        print 'Loading source dataset: '+source
-        ds_r = load_dataset(path, subj, source, **conf_src)
-        
-        print 'Loading target dataset.: '+target
-        ds_t = load_dataset(path, subj, target, **conf_tar)
-        
-        if (ds_r == 0) or (ds_t == 0):
-            continue;
-        else:
-            print 'Preprocessing...'
-            ds_r = preprocess_dataset(ds_r, 'task', **conf_src)
-            ds_t = preprocess_dataset(ds_t, 'rest', **conf_tar) 
-            
-            clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
-            #fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  FractionTailSelector(0.1, mode = 'select', tail = 'upper')) 
-        
-            #fclf = FeatureSelectionClassifier(clf, fsel)  
-            cvte = CrossValidation(clf, NFoldPartitioner(cvtype = 1), enable_ca=['stats', 'repetition_results'])
-            
-            print 'Training...'
-            train_err = cvte(ds_r)
-            
-            print 'Predicting...'
-            predictions = clf.predict(ds_t)
-            targets = ds_t.sa.targets
-            values = clf.ca.estimates
-            probabilities = clf.ca.probabilities
-            
-            
-            print 'Saving results...'
-            res.append(dict({'name':subj,
-                        'predictions':predictions,
-                        'targets':targets,
-                        'values':values,
-                        'training_error':train_err,
-                        'stats': cvte.ca.stats,
-                        'probabilities':probabilities,
-                        'classifier': clf}))
-            #pickle.dump(predictions, open(os.path.join(path, '0_results', subj+'_src_'+source+'_transfLearn_predict_no_fix.pyobj'), 'w'))
-            #pickle.dump(targets, open(os.path.join(path, '0_results', subj+'_src_'+source+'_transfLearn_targets_no_fix.pyobj'), 'w'))
-            #pickle.dump(values, open(os.path.join(path, '0_results', subj+'_src_'+source+'_transfLearn_values_no_fix.pyobj'), 'w'))
-            #pickle.dump(values, open(os.path.join(path, '0_results', subj+'_src_'+source+'_transfLearn_values_no_fix.pyobj'), 'w'))
-    
-    area = conf_src['mask_area']      
-    #pickle.dump(res, open(os.path.join(path, '0_results', datetime+'_res_'+source+'_'+area+'_transLearn_.pyobj'), 'w'))
-    return res
-    
-def transfer_learning_fixation(path, subjects):
-
-
-    for subj in subjects:
-        
-        print ' ---------- Analyzing '+subj+' ----------------'
-        
-        print 'Loading dataset...'
-        ds_r = load_dataset(path, subj, 'task')
-        ds_t = load_dataset(path, subj, 'task')
-        
-        if (ds_r == 0):
-            continue;
-        else:
-            print 'Preprocessing...'
-            ds_r = preprocess_dataset(ds_r, 'task')
-            ds_t = preprocess_dataset(ds_t, 'rest') #Is rest because I need fixation volumes
-            
-            ds_t = ds_t[ds_t.sa.targets == 'fixation']
-            
-            clf = LinearCSVMC(C=1, probability=1)
-            #fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  FractionTailSelector(0.1, mode = 'select', tail = 'upper')) 
-        
-            #fclf = FeatureSelectionClassifier(clf, fsel)  
-            cvte = CrossValidation(clf, NFoldPartitioner(cvtype = 1), enable_ca=['stats', 'repetition_results'])
-            print 'Training...'
-            train_err = cvte(ds_r)
-            
-            print 'Predicting...'
-            predictions = clf.predict(ds_t)
-            targets = ds_t.sa.targets
-            values = clf.ca.estimates
-            
-            print 'Saving results...'
-            source = 'fixation'
-            pickle.dump(predictions, open(os.path.join(path, '0_results', subj+'_src_'+source+'_transfLearn_predict_.pyobj'), 'w'))
-            pickle.dump(targets, open(os.path.join(path, '0_results', subj+'_src_'+source+'_transfLearn_targets_.pyobj'), 'w'))
-            pickle.dump(values, open(os.path.join(path, '0_results', subj+'_src_'+source+'_transfLearn_values_.pyobj'), 'w'))
-
-def spatiotemporal_(ds, **kwargs):
-    onset = 0
-    
-    for arg in kwargs:
-        if (arg == 'onset'):
-            onset = kwargs[arg]
-        if (arg == 'duration'):
-            duration = kwargs[arg]
-        if (arg == 'enable_results'):
-            enable_results = kwargs[arg]
-        
-        
-    events = find_events(targets = ds.sa.targets, chunks = ds.sa.chunks)   
-        
-    if 'duration' in locals():
-        events = [e for e in events if e['duration'] >= duration]
-    else:
-        duration = np.min([ev['duration'] for ev in events])
-
-        
-    evds = build_events_ds(ds, duration)
-    
-    """
-    [fclf, cvte] = setup_classifier(**kwargs)
-    """ 
-    clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
-    
-    fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  FractionTailSelector(0.1, mode = 'select', tail = 'upper'))    
-    fclf = FeatureSelectionClassifier(clf, fsel)    
-    
-    
-    print 'Cross validation...'
-    cvte = CrossValidation(fclf, NFoldPartitioner(cvtype = 1), enable_ca=['stats', 'repetition_results'])
-    train_err = cvte(evds)
-    print cvte.ca.stats
-    
-    
-    """ Not needed if setup_classifier"""
-    if 'fclf' in locals():
-        sensana = fclf.get_sensitivity_analyzer()
-    else:
-        sensana = clf.get_sensitivity_analyzer()
-
-    
-    res_sens = sensana(evds)
-    map = evds.a.mapper.reverse(res_sens.samples)
-    
-
-    # Packing results    (to be sobstitute with a function)
-    results = dict()
-    if not 'enable_results' in locals():
-        enable_results = ['map', 'sensitivities', 'stats', 'mapper', 'classifier', 'cv']
-        
-    allowed_keys = ['map', 'sensitivities', 'stats', 'mapper', 'classifier', 'cv']
-    
-    
-    """ Not needed if setup_classifier"""
-    if 'fclf' in locals():
-        classifier = fclf
-    else:
-        classifier = clf
-    
-        
-    allowed_results = [map, res_sens, cvte.ca.stats, evds.a.mapper, classifier, cvte]
-    
-    results_dict = dict(zip(allowed_keys, allowed_results))
-    
-    for elem in enable_results:
-        
-        if elem in allowed_keys:
-            results[elem] = results_dict[elem]
-        else:
-            print '******** '+elem+' result is not allowed! *********'
-
-    return results
-def clustering_analysis_(ds, classifier, clusters=6):
-    """ Deprecated """
-    
-    data = ds.samples
-    
-    #clusters = inertia_clustering_analysis(ds, max_clusters = 13)
-              
-    kmeans = KMeans(init='k-means++', n_clusters=clusters, n_init=10)
-    
-    cluster_label = kmeans.fit_predict(data)
-    
-    ################################################
-    dist = squareform(pdist(data, 'euclidean'))
-    
-    mds = MDS(n_components=2, max_iter=3000,
-                   eps=1e-9, random_state=seed,
-                   n_jobs=1)
-    pos = mds.fit_transform(dist)
-    ###############################################
-    
-        
-    f = plt.figure()
-    a = f.add_subplot(111) 
-    
-    f_pr = plt.figure()
-    a_pr = f_pr.add_subplot(111)
-    ##################################################
-    colors = cycle('bgrcmykbgrmykbgrcmykbgrcmyk')
-    
-    for cluster in np.unique(cluster_label):
-        cl_mask = cluster_label == cluster
-        c_pos = pos[cl_mask]
-        col = colors.next()
-        a.scatter(c_pos.T[0], c_pos.T[1], color = col)
-        
-        d_cl = ds[cl_mask]
-        predictions = classifier.predict(d_cl)
-        predictions = np.array(predictions)
-        print 'Cluster n.: '+str(cluster)
-    #####################################################
-        for label in np.unique(predictions):
-            p_mask = predictions == label
-            labelled = np.count_nonzero(predictions == label)
-            perc = np.float(labelled)/np.count_nonzero(cl_mask)
-            a_pr.scatter(c_pos.T[0][p_mask], c_pos.T[1][p_mask], color = col, 
-                         marker = markers[label])
-            print label+' : '+str(perc*100)
-    
-    a.legend(np.unique(cluster_label))
-    a_pr.legend(np.unique(cluster_label))
-    plt.show()
 
 
 

@@ -246,10 +246,6 @@ def fidl2txt_2(fidlPath, outPath, exp_end=542):
     outFile.close()
 
 
-    
-
-
-
 def roi_wu_data(path, name, task, init_vol=0):
     
     imgFiles = os.listdir(path+'/'+name+'/'+task) 

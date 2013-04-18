@@ -193,7 +193,7 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         tr_pred = similarity_measure_mahalanobis(r['ds_tar'], r['ds_src'], r)
         r['mahalanobis_similarity'] = tr_pred
         
-        print tr_pred
+        #print tr_pred
         
         c_mat_mahala = ConfusionMatrix(predictions=tr_pred.T[1], targets=tr_pred.T[0])
         c_mat_mahala.compute()
@@ -240,6 +240,43 @@ def test_searchlight(path, subjects, conf_file, type, **kwargs):
     
     return total_results
 #####################################################################
+
+def d_prime_statistics(predictions, targets, map_list):
+    
+    '''
+    map_list =  two-element list, is what we expect the classifier did first element
+                first element is the prediction
+                second element is the label of second ds to be predicted
+    '''
+    
+    mask_predictions = np.array(predictions) == map_list[0]
+    mask_targets = np.array(targets) == map_list[1]
+    
+    new_predictions = np.array(predictions, dtype='|S20').copy()
+    new_targets = np.array(targets, dtype='|S20').copy()
+    
+    new_label_1 = map_list[0]+'-'+map_list[1]
+    new_label_2 = np.unique(new_predictions[~mask_predictions])[0]+'-'+ \
+                    np.unique(new_targets[~mask_targets])[0]
+    
+    new_predictions[mask_predictions] = new_label_1
+    new_targets[mask_targets] = new_label_1
+    
+    new_predictions[~mask_predictions] = new_label_2
+    new_targets[~mask_targets] = new_label_2
+    
+    
+    c_matrix = ConfusionMatrix(predictions=new_predictions, targets=new_targets)
+    c_matrix.compute()
+    
+    from scipy.stats import norm
+    
+    d_prime = norm.ppf(c_matrix.stats['TP']/float(c_matrix.stats['P'])) - \
+                norm.ppf(c_matrix.stats['FP']/float(c_matrix.stats['N']))
+    
+        
+    return [c_matrix, d_prime]
+
 
 def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     
@@ -315,7 +352,7 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     c_squared = scipy.stats.chi2(df)
     #Set the p-value and the threshold value to validate predictions
     m_value = c_squared.isf(p_value)
-    print m_value
+    #print m_value
     #Mask true predictions
     true_predictions = (mahalanobis_values < m_value)
     
@@ -461,12 +498,14 @@ def get_merged_ds(path, subjects, analysis,  conf_file, source='task', **kwargs)
         ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
         
         ds_merged = vstack((ds_src, ds_tar))
+        
+        '''
         methods = ['iso', 'pca', 'forest', 'embedding', 'mds']
         
         for m, i in zip(methods, range(len(methods))):
             plot_scatter_2d(ds_merged, method=m, fig_number=i+1)
+        '''
+        r = spatial(ds_merged, **conf_src)
     
-    
-    
-    
+    return r
            

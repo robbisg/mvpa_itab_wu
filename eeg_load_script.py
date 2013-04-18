@@ -1,4 +1,5 @@
 import numpy as np
+from eeg_load import calSignalFeatures
 from mvpa2.suite import Dataset, SampleAttributes
 path = '/home/robbis/Share/'
 filename = 'monaco50002_Noch_1-45'

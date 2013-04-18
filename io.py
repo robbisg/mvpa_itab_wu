@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from mvpa2.suite import find_events, fmri_dataset, SampleAttributes
 from itertools import cycle
 import cPickle as pickle
+
 from sklearn.linear_model import Ridge
 from scipy.interpolate import UnivariateSpline
 from sklearn import decomposition, manifold, lda, ensemble
@@ -744,6 +745,7 @@ def load_mask_wu(path, subj, **kwargs):
         mask_to_find1 = subj+'_mask_mask'
         mask_to_find2 = 'mask_'+subj+'_mask'
         mask_list = [m for m in mask_list if m.find(mask_to_find1) != -1 or m.find(mask_to_find2) != -1]
+    
     elif (mask_area == ['searchlight_3'] or mask_area == ['searchlight_5']):
         mask_list = os.listdir(mask_path)
         if mask_area == ['searchlight_3']:
@@ -772,8 +774,9 @@ def load_mask_wu(path, subj, **kwargs):
         files = files + os.listdir(os.path.join(path, subj, dir))
             
         first = files.pop()
-        maskExtractor( os.path.join(path, subj, dir, first), 
-                                        os.path.join(path, subj, subj+'_mask.nii.gz'))       
+        
+        bet_wu_data_(path, subj, dir)
+    
         mask_list = [subj+'_mask_mask.nii.gz']
     
     
@@ -851,7 +854,7 @@ def load_attributes (path, task, subj, **kwargs):
         attrFiles = attrFiles + os.listdir(dir)
 
     attrFiles = [f for f in attrFiles if f.find(event_file) != -1]
-    print attrFiles
+    #print attrFiles
     if len(attrFiles) > 2:
         attrFiles = [f for f in attrFiles if f.find(subj) != -1]
         
@@ -1155,6 +1158,12 @@ def save_results_transfer_learning(path, results):
         pickle.dump(obj, file)
         file.close()
         
+        print 'Saving predictions...'
+        obj = results[name]['predictions']
+        fname = name+'_'+'predictions'+'.pyobj'          
+        file = open(os.path.join(results_dir,fname), 'w')
+        pickle.dump(obj, file)
+        file.close()
         #plot_transfer_graph(results_dir, name, results[name])
         
         c_m = results[name]['confusion_target']
@@ -1267,8 +1276,8 @@ def update_subdirs(conc_file_list, subj, **kwargs):
             sub_dirs = kwargs[arg].split(',')
         
     i = 0
-    for dir in conc_file_list:
-        s_dir = dir[dir.find(subj)+len(subj)+1:dir.rfind('/')]
+    for directory in conc_file_list:
+        s_dir = directory[directory.find(subj)+len(subj)+1:directory.rfind('/')]
         if sub_dirs[i].find('/') != -1 or i > len(sub_dirs):
             sub_dirs.append(s_dir)
         else:
