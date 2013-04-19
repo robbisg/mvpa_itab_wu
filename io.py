@@ -1145,7 +1145,7 @@ def save_results_transfer_learning(path, results):
         file.write('\n\n Mean each fold p-value: '+str(p_value.mean()))
         file.write('\n\n Mean null dist total accuracy value: '+str(results[name]['p']))
         file.write('\nd-prime coefficient: '+str(results[name]['d_prime']))
-        file.write('\n\nd-prime mahalanobis coeff: '+str(results[name]['d_prime_maha']))
+        #file.write('\n\nd-prime mahalanobis coeff: '+str(results[name]['d_prime_maha']))
         file.close()
         
         obj = results[name]['classifier'].ca
@@ -1203,7 +1203,7 @@ def save_results_transfer_learning(path, results):
         except ValueError,err:
             file.write('None')
             print err
-        
+        '''
         cmatrix_mahala = results[name]['confusion_tot_maha']
         fname = name+'_confusion_total_mahala.txt'
         file = open(os.path.join(results_dir,fname), 'w')
@@ -1212,7 +1212,7 @@ def save_results_transfer_learning(path, results):
         except ValueError,err:
             file.write('None')
             print err  
-        
+        '''
         
         file.close()
         

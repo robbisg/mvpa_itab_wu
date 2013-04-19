@@ -208,9 +208,11 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         r['d_prime'] = d_prime
         r['confusion_total'] = c_new
         
+        '''
         d_prime_maha, c_new_maha = d_prime_statistics(tr_pred.T[1], tr_pred.T[0], map_list)
         r['d_prime_maha'] = d_prime_maha
         r['confusion_tot_maha'] = c_new_maha
+        '''
         
         total_results[subj] = r
         
@@ -283,8 +285,8 @@ def d_prime_statistics(predictions, targets, map_list):
     
     from scipy.stats import norm
     
-    d_prime = norm.ppf(c_matrix.stats['TP']/float(c_matrix.stats['P'])) - \
-                norm.ppf(c_matrix.stats['FP']/float(c_matrix.stats['N']))
+    d_prime = norm.ppf(c_matrix.stats['TP']/np.float_(c_matrix.stats['P'])) - \
+                norm.ppf(c_matrix.stats['FP']/np.float_(c_matrix.stats['N']))
     
         
     return [c_matrix, d_prime]
