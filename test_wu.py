@@ -289,7 +289,7 @@ def d_prime_statistics(predictions, targets, map_list):
                 norm.ppf(c_matrix.stats['FP']/np.float_(c_matrix.stats['N']))
     
         
-    return [c_matrix, d_prime]
+    return d_prime, c_matrix
 
 
 def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
