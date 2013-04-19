@@ -1144,6 +1144,8 @@ def save_results_transfer_learning(path, results):
             file.write(str(v)+'\n')
         file.write('\n\n Mean each fold p-value: '+str(p_value.mean()))
         file.write('\n\n Mean null dist total accuracy value: '+str(results[name]['p']))
+        file.write('\nd-prime coefficient: '+str(results[name]['d_prime']))
+        file.write('\n\nd-prime mahalanobis coeff: '+str(results[name]['d_prime_maha']))
         file.close()
         
         obj = results[name]['classifier'].ca
@@ -1158,7 +1160,6 @@ def save_results_transfer_learning(path, results):
         pickle.dump(obj, file)
         file.close()
         
-        print 'Saving predictions...'
         obj = results[name]['predictions']
         fname = name+'_'+'predictions'+'.pyobj'          
         file = open(os.path.join(results_dir,fname), 'w')
@@ -1171,6 +1172,12 @@ def save_results_transfer_learning(path, results):
         file = open(os.path.join(results_dir,fname), 'w')
         file.write(str(c_m))
         file.close()
+        
+        c_m = results[name]['confusion_total']
+        fname = name+'_confusion_total.txt'
+        file = open(os.path.join(results_dir,fname), 'w')
+        file.write(str(c_m))
+        file.close()        
         
         t_mahala = results[name]['mahalanobis_similarity']
         fname = name+'_mahalanobis_data.txt'
@@ -1196,6 +1203,16 @@ def save_results_transfer_learning(path, results):
         except ValueError,err:
             file.write('None')
             print err
+        
+        cmatrix_mahala = results[name]['confusion_tot_maha']
+        fname = name+'_confusion_total_mahala.txt'
+        file = open(os.path.join(results_dir,fname), 'w')
+        try:
+            file.write(str(cmatrix_mahala))
+        except ValueError,err:
+            file.write('None')
+            print err  
+        
         
         file.close()
         

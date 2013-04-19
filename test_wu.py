@@ -157,6 +157,8 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     for arg in kwargs:
         conf_src[arg] = kwargs[arg]
         conf_tar[arg] = kwargs[arg]
+        if arg == 'map_list':
+            map_list = kwargs[arg].split(',')
     
     data_path = conf_src['data_path']
     total_results = dict()
@@ -199,6 +201,13 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         c_mat_mahala.compute()
         r['confusion_mahala'] = c_mat_mahala
         
+        d_prime, c_new = d_prime_statistics(pred, targets, map_list)
+        r['d_prime'] = d_prime
+        r['confusion_total'] = c_new
+        
+        d_prime_maha, c_new_maha = d_prime_statistics(tr_pred.T[1], tr_pred.T[0], map_list)
+        r['d_prime_maha'] = d_prime_maha
+        r['confusion_tot_maha'] = c_new_maha
         
         total_results[subj] = r
         
