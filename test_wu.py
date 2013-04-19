@@ -157,8 +157,11 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     for arg in kwargs:
         conf_src[arg] = kwargs[arg]
         conf_tar[arg] = kwargs[arg]
+    
+    for arg in conf_src:
         if arg == 'map_list':
             map_list = conf_src[arg].split(',')
+    
     
     data_path = conf_src['data_path']
     total_results = dict()
