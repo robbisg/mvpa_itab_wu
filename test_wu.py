@@ -28,7 +28,7 @@ def test_spatiotemporal(path, subjects, conf_file, type, **kwargs):
                 conf['label_dropped'] == 'none':
                 ds = balance_dataset(ds, 'fixation')
         
-        r = spatiotemporal(ds, **kwargs)
+        r = spatiotemporal(ds, **conf)
         
         total_results[subj] = r
     
@@ -65,6 +65,8 @@ def test_spatial(path, subjects, conf_file, type, **kwargs):
         r = spatial(ds, **conf)
         
         total_results[subj] = r
+        
+        
     
     conf['analysis_type'] = 'spatial'
     conf['analysis_task'] = type
@@ -204,8 +206,10 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         c_mat_mahala.compute()
         r['confusion_mahala'] = c_mat_mahala
         
-        d_prime, c_new = d_prime_statistics(pred, targets, map_list)
+        d_prime, beta, c, c_new = signal_detection_measures(pred, targets, map_list)
         r['d_prime'] = d_prime
+        r['beta'] = beta
+        r['c'] = c
         r['confusion_total'] = c_new
         
         '''
@@ -253,9 +257,32 @@ def test_searchlight(path, subjects, conf_file, type, **kwargs):
     save_results(path, total_results, conf)
     
     return total_results
+
+
+def test_group_mvpa(path, subjects, analysis,  conf_file, source='task', **kwargs):
+    
+    conf = read_configuration(path, conf_file, type)
+    
+    for arg in kwargs:
+        conf[arg] = kwargs[arg]
+    
+    total_results = dict()
+    data_path = conf['data_path']
+    for subj in subjects:
+        
+        ds = load_dataset(data_path, subj, type, **conf)
+        ds = preprocess_dataset(ds, type, **conf)
+        
+        
+        r = searchlight(ds, **kwargs)
+        
+        total_results[subj] = r       
+    
+
+
 #####################################################################
 
-def d_prime_statistics(predictions, targets, map_list):
+def signal_detection_measures(predictions, targets, map_list):
     
     '''
     map_list =  two-element list, is what we expect the classifier did first element
@@ -285,11 +312,17 @@ def d_prime_statistics(predictions, targets, map_list):
     
     from scipy.stats import norm
     
-    d_prime = norm.ppf(c_matrix.stats['TP']/np.float_(c_matrix.stats['P'])) - \
-                norm.ppf(c_matrix.stats['FP']/np.float_(c_matrix.stats['N']))
+    hit_rate = c_matrix.stats['TP']/np.float_(c_matrix.stats['P'])
+    false_rate = c_matrix.stats['FP']/np.float_(c_matrix.stats['N'])
     
-        
-    return d_prime, c_matrix
+    d_prime = norm.ppf(hit_rate) - norm.ppf(false_rate)
+    
+    beta = - d_prime[0] * 0.5 * (norm.ppf(hit_rate) + norm.ppf(false_rate)) 
+    
+    c = - 0.5 * (norm.ppf(hit_rate) + norm.ppf(false_rate))
+    
+       
+    return d_prime[0], beta[0], c[0], c_matrix
 
 
 def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):

@@ -93,3 +93,66 @@ for label in np.unique(ds.targets):
                                  color=color[label], linestyles='dashed')
     #robust_contour_2 = a.contour(xx, yy, np.sqrt(cov),
     #                             cmap=pl.cm.YlOrBr_r, linestyles='dotted')
+    
+    
+######################## Mean functional images script ######################################
+
+s_tot = 0
+l_tot = 0
+
+for exp in ['Carlo_MDM', 'Annalisa_DecisionValue']:
+    
+    if exp == 'Carlo_MDM':
+        path = '/media/DATA/fmri/buildings_faces/Carlo_MDM/'
+        
+        subjects = os.listdir('/media/DATA/fmri/buildings_faces/Carlo_MDM/0_results/20130309_052128_transfer_learning_L_PPA_saccade/')
+    else:
+        path = '/media/DATA/fmri/buildings_faces/Annalisa_DecisionValue/'
+        subjects = os.listdir('/media/DATA/fmri/buildings_faces/Annalisa_DecisionValue/0_results/20130131_124058_transfer_learning_FFA,PPA_ffa/')
+    conf_file = exp+'.conf'
+    
+    subjects = [s for s in subjects if s.find('.') == -1]
+    
+    for task in ['face', 'saccade']:
+        conf = read_configuration(path, conf_file, task)
+    
+        for arg in kwargs:
+            conf[arg] = kwargs[arg]  
+         
+        for arg in conf:
+            if arg == 'skip_vols':
+                skip_vols = np.int(conf[arg])
+            if arg == 'use_conc':
+                use_conc = conf[arg]
+            if arg == 'conc_file':
+                conc_file = conf[arg]    
+    
+            data_path = conf['data_path']    
+    
+        tot = 0
+    
+        for subj in subjects:
+        
+        
+            conc_file_list = read_conc(data_path, subj, conc_file)
+            conc_file_list = modify_conc_list(data_path, subj, conc_file_list)
+            try:
+                nifti_list = load_conc_fmri_data(conc_file_list, el_vols = skip_vols, **kwargs)
+            except IOError, err:
+                print err
+                #return 0
+            i = 0
+            for n in nifti_list:
+                if i == 0:
+                    a = n.get_data()
+                else:
+                    a = np.concatenate((a, n.get_data()), axis=3)
+                i = i + 1
+        
+            a = a.mean(axis=3)
+        
+            s_tot = s_tot + a
+        
+        l_tot = l_tot + len(subjects)
+
+s_tot = s_tot / l_tot

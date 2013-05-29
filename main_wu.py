@@ -396,7 +396,6 @@ def spatiotemporal(ds, **kwargs):
         
     evds = eventrelated_dataset(ds, events = events) 
     
-    
     [fclf, cvte] = setup_classifier(**kwargs)
     
     print 'Cross validation is performing ...'

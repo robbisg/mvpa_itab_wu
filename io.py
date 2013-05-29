@@ -667,6 +667,8 @@ def load_mask(path, subj, **kwargs):
             - searchlight_3: mask from searchlight analysis exploited with radius equal to 3
             - searchlight_5: mask from searchlight analysis exploited with radius equal to 5
             - visual or other (broca, ba1 ecc.): other masks (with mask_type = 'wu' the only field could be 'visual')
+            - v3a7 : Visual Cortex areas V3 V3a V7
+            - intersect : intersection of v3a7 and searchlight 5
             - ll : Lower Left Visual Quadrant (it could be applied only with mask_type = 'wu')
             - lr : Lower Right Visual Quadrant (it could be applied only with mask_type = 'wu')
             - ul : Upper Left Visual Quadrant (it could be applied only with mask_type = 'wu')
@@ -731,7 +733,7 @@ def load_mask_wu(path, subj, **kwargs):
     mask_path = os.path.join(path, roi_folder)
     
     scaled = ''
-    
+    #print mask_area
     if isScaled == 'True':
         scaled = 'scaled'
     
@@ -752,14 +754,14 @@ def load_mask_wu(path, subj, **kwargs):
             mask_to_find = 'mask_sl_r_3_t_54'
         else:
             mask_to_find = 'mask_sl_r_5_t_54'
-        mask_list = [m for m in mask_list if m.find(mask_to_find) != -1]
-        
+        mask_list = [m for m in mask_list if m.find(mask_to_find) != -1]      
     else:
         mask_list_1 = os.listdir(mask_path)
         mask_list = []
         for m_ar in mask_area:
-            mask_list = mask_list + [m for m in mask_list_1 if m.find(scaled) != -1 and m.find('hdr')!=-1 
-                     and (m[:3].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1)]
+            mask_list = mask_list + [m for m in mask_list_1 if #(m.find('nii.gz') != -1 and m.find(m_ar)!=-1) or
+                      ((m[:3].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('nii.gz') != -1) or
+                      ((m[:3].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('hdr') != -1)]
       
     
     print 'Mask searched in '+mask_path+' Mask(s) found: '+str(len(mask_list))
@@ -995,41 +997,56 @@ def save_results(path, results, configuration):
     else:
         save_results_basic(parent_dir, results)
         write_all_subjects_map(path, new_dir)  
-    '''
-    for key in results:
-        
-        name = key
-        command = 'mkdir '+os.path.join(parent_dir, name)
-        os.system(command)
-        
-        results_dir = os.path.join(parent_dir, name)
-        
-        for key in results[name]:
-            
-            if key == 'map':
-                map = results[name][key]
-                fname = name+'_map.nii.gz'
-                ni.save(map, os.path.join(results_dir,fname))
-            elif key == 'stats':
-                stats = results[name][key]
-                fname = name+'_stats.txt'
-                file = open(os.path.join(results_dir,fname), 'w')
-                file.write(stats)
-                file.close()
-            else:
-                obj = results[name][key]
-                if key == 'classifier':
-                    obj = results[name][key].ca
-                fname = name+'_'+key+'.pyobj'          
-                file = open(os.path.join(results_dir,fname), 'w')
-                pickle.dump(obj, file)
-                file.close()
-    ''' 
+
     ###################################################################        
     import csv
     w = csv.writer(open(os.path.join(parent_dir, 'configuration.csv'), "w"))
     for key, val in configuration.items():
-        w.writerow([key, val])   
+        w.writerow([key, val])
+        
+    #######################################################################
+    
+    if analysis == 'searchlight':
+        print 'Result saved in '+parent_dir
+        return 'OK'
+    else:
+        file_summary = open(os.path.join(parent_dir, 'analysis_summary.txt'), "w")
+        res_list = []
+    
+        for subj in results.keys():
+        
+            list = [subj]
+            file_summary.write(subj+'\t')
+            
+            r = results[subj]
+        
+            list.append(r['stats'].stats['ACC'])
+            list.append(r['p'])
+            
+            file_summary.write(str(r['stats'].stats['ACC'])+'\t')
+            file_summary.write(str(r['p'])+'\t')
+            
+            if analysis == 'transfer_learning':
+                list.append(r['confusion_total'].stats['ACC'])
+                list.append(r['d_prime'])
+                list.append(r['beta'])
+                list.append(r['c'])
+                
+                file_summary.write(str(r['confusion_total'].stats['ACC'])+'\t')
+                file_summary.write(str(r['d_prime'])+'\t')
+                file_summary.write(str(r['beta'])+'\t')
+                file_summary.write(str(r['c'])+'\t')
+                
+            file_summary.write('\n')
+            
+        res_list.append(list)
+        
+        file_summary.close()
+        
+
+        
+        
+    
     
     print 'Result saved in '+parent_dir
     
@@ -1145,6 +1162,8 @@ def save_results_transfer_learning(path, results):
         file.write('\n\n Mean each fold p-value: '+str(p_value.mean()))
         file.write('\n\n Mean null dist total accuracy value: '+str(results[name]['p']))
         file.write('\nd-prime coefficient: '+str(results[name]['d_prime']))
+        file.write('\nbeta coefficient: '+str(results[name]['beta']))
+        file.write('\nc coefficient: '+str(results[name]['c']))
         #file.write('\n\nd-prime mahalanobis coeff: '+str(results[name]['d_prime_maha']))
         file.close()
         
