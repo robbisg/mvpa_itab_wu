@@ -1,3 +1,9 @@
+#######################################################
+#     Copyright (c) 2013 Roberto Guidotti
+#
+#     See the file license.txt for copying permission.
+########################################################
+
 import numpy as np
 from matplotlib.pylab import *
 import cPickle as pickle

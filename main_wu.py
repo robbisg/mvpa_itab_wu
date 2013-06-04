@@ -1,3 +1,9 @@
+#######################################################
+#     Copyright (c) 2013 Roberto Guidotti
+#
+#     See the file license.txt for copying permission.
+########################################################
+
 import os
 import cPickle as pickle
 import nibabel as ni
@@ -552,6 +558,8 @@ def setup_classifier(**kwargs):
                 cv_type = np.int(kwargs[arg])
         if arg == 'permutations':
             permutations = np.int(kwargs[arg])
+        if arg == 'cv_attribute':
+            attribute = kwargs[arg]
     
     cv_n = cv_type
             
@@ -594,7 +602,7 @@ def setup_classifier(**kwargs):
         
         fclf = clf
     
-    #########################################################################
+    ######################### Permutations #############################
     
     if permutations != 0:
         if __debug__:
@@ -619,21 +627,21 @@ def setup_classifier(**kwargs):
     if cv_approach == 'n_fold':
         if cv_type != 0:
             cvte = CrossValidation(fclf, 
-                                   NFoldPartitioner(cvtype = cv_type), 
+                                   NFoldPartitioner(cvtype = cv_type, attr = attribute), 
                                    #postproc = postproc,
                                    errorfx=mean_mismatch_error,
                                    null_dist=distr_est,
                                    enable_ca=['stats', 'repetition_results'])
         else:
             cvte = CrossValidation(fclf, 
-                                   NFoldPartitioner(cvtype = 1), 
+                                   NFoldPartitioner(cvtype = 1, attr = attribute), 
                                    #postproc = postproc,
                                    errorfx=mean_mismatch_error,
                                    null_dist=distr_est,
                                    enable_ca=['stats', 'repetition_results'])
     else:
         cvte = CrossValidation(fclf, 
-                               HalfPartitioner(), 
+                               HalfPartitioner(attr = attribute), 
                                #postproc = postproc,
                                errorfx=mean_mismatch_error,
                                null_dist=distr_est,

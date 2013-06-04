@@ -1,3 +1,9 @@
+#######################################################
+#     Copyright (c) 2013 Roberto Guidotti
+#
+#     See the file license.txt for copying permission.
+########################################################
+
 import numpy as np
 from eeg_load import calSignalFeatures
 from mvpa2.suite import Dataset, SampleAttributes

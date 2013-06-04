@@ -1,3 +1,10 @@
+#######################################################
+#     Copyright (c) 2013 Roberto Guidotti
+#
+#     See the file license.txt for copying permission.
+########################################################
+
+
 import os
 import datetime as ora
 import nibabel as ni
@@ -192,6 +199,9 @@ def fidl2txt (fidlPath, outPath):
             
 
 def fidl2txt_2(fidlPath, outPath, exp_end=542):
+    '''
+    exp_end = ???
+    '''
     print 'Converting fidl file '+fidlPath+' in '+outPath
     
     fidlFile = open(fidlPath)

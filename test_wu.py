@@ -1,3 +1,9 @@
+#######################################################
+#     Copyright (c) 2013 Roberto Guidotti
+#
+#     See the file license.txt for copying permission.
+########################################################
+
 from main_wu import *
 from io import *
 from mvpa2.clfs.transerror import ConfusionMatrix
@@ -259,25 +265,10 @@ def test_searchlight(path, subjects, conf_file, type, **kwargs):
     return total_results
 
 
-def test_group_mvpa(path, subjects, analysis,  conf_file, source='task', **kwargs):
+def test_group_mvpa(path, subjects, analysis,  conf_file, type='task', **kwargs):
     
-    conf = read_configuration(path, conf_file, type)
-    
-    for arg in kwargs:
-        conf[arg] = kwargs[arg]
-    
-    total_results = dict()
-    data_path = conf['data_path']
-    for subj in subjects:
-        
-        ds = load_dataset(data_path, subj, type, **conf)
-        ds = preprocess_dataset(ds, type, **conf)
-        
-        
-        r = searchlight(ds, **kwargs)
-        
-        total_results[subj] = r       
-    
+       
+    return 'no'
 
 
 #####################################################################
@@ -498,6 +489,33 @@ def similarity_confidence(ds_src, ds_tar, results):
     
     predictions_tar = classifier.predict(ds_tar)
     
+def get_group_ds(path, subjects, conf_file, task, **kwargs):
+    
+    
+    conf = read_configuration(path, conf_file, task)
+   
+    for arg in kwargs:
+        conf[arg] = kwargs[arg]
+    
+    data_path = conf['data_path']
+    
+    i = 0
+    for subj in subjects:
+        
+        ds = load_dataset(data_path, subj, task, **conf)
+        ds = preprocess_dataset(ds, task, **conf)
+        
+        if i == 0:
+            ds_merged = ds.copy()
+        else:
+            ds_merged = vstack((ds_merged, ds))
+               
+        i = i + 1
+        
+        del ds
+
+    return ds_merged
+
     
 def get_merged_ds(path, subjects, analysis,  conf_file, source='task', **kwargs):
     

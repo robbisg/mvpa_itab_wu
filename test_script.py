@@ -1,3 +1,9 @@
+#######################################################
+#     Copyright (c) 2013 Roberto Guidotti
+#
+#     See the file license.txt for copying permission.
+########################################################
+
 from main_wu import *
 from io import *
 path = '/media/DATA/fmri/learning'

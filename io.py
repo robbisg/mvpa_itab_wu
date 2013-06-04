@@ -1,3 +1,10 @@
+#######################################################
+#     Copyright (c) 2013 Roberto Guidotti
+#
+#     See the file license.txt for copying permission.
+########################################################
+
+
 import nibabel as ni
 import os
 from main_wu import *
@@ -10,6 +17,8 @@ import cPickle as pickle
 from sklearn.linear_model import Ridge
 from scipy.interpolate import UnivariateSpline
 from sklearn import decomposition, manifold, lda, ensemble
+
+
 
 def get_time():
         #Time acquisition for file name!
@@ -467,7 +476,7 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     else:
         fileL = [elem for elem in fileL if elem.find(img_pattern) != -1 and elem.find(task) != -1 and elem.find('mni') != -1]
 
-    #print fileL
+    print fileL
     #if no file are found I perform previous analysis!        
     if (len(fileL) < runs and len(fileL) >= 0):
         """
@@ -609,9 +618,11 @@ def load_dataset(path, subj, type, **kwargs):
     for i in range(len(events)):
         duration = events[i]['duration']
         for j in range(duration):
-            ev_list.append(i+1)               
+            ev_list.append(i+1)
+               
     ds.a['events'] = events
     ds.sa['events_number'] = ev_list
+    ds.sa['name'] = [subj for i in range(len(ds.sa.chunks))]
     
     f_list = []
     for i in range(files):
@@ -1010,7 +1021,7 @@ def save_results(path, results, configuration):
         print 'Result saved in '+parent_dir
         return 'OK'
     else:
-        file_summary = open(os.path.join(parent_dir, 'analysis_summary.txt'), "w")
+        file_summary = open(os.path.join(parent_dir, 'analysis_summary_'+mask+'_'+task+'.txt'), "w")
         res_list = []
     
         for subj in results.keys():

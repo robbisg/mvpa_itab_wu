@@ -1,3 +1,9 @@
+#######################################################
+#     Copyright (c) 2013 Roberto Guidotti
+#
+#     See the file license.txt for copying permission.
+########################################################
+
 import numpy as np
 import scipy.signal as ssig
 import scipy.stats as sstat
