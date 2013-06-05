@@ -135,7 +135,7 @@ def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs
     return total_results
 
 
-def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', **kwargs):
+def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', analysis_type='single', **kwargs):
     
     if source == 'task':
         target = 'rest'
@@ -150,10 +150,7 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         if source == 'face':
             target = 'saccade'
     
-    
-    conf_src = read_configuration(path, conf_file, source)
-    conf_tar = read_configuration(path, conf_file, target)
-    
+   
     ##############################################    
     ##############################################
     ##    conf_src['label_included'] = 'all'    ##   
@@ -161,28 +158,52 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     ##    conf_src['mean_samples'] = 'False'    ##
     ##############################################
     ##############################################
+
+    if analysis_type == 'group':
+        
+        if path.__class__ == conf_file.__class__ == list:  
+            ds_src, _, conf_src = sources_merged_ds(path, subjects, conf_file, source, **kwargs)
+            ds_tar, subjects, conf_tar = sources_merged_ds(path, subjects, conf_file, target, **kwargs)
+            
+            conf_src['permutations'] = 1
+            conf_tar['permutations'] = 1
+        else:
+            print 'In group analysis path, subjects and conf_file must be lists: \
+                    Check configuration file and/or parameters!!'
+            return 0
     
-    for arg in kwargs:
-        conf_src[arg] = kwargs[arg]
-        conf_tar[arg] = kwargs[arg]
+    else:
+        
+        conf_src = read_configuration(path, conf_file, source)
+        conf_tar = read_configuration(path, conf_file, target)
+    
+        for arg in kwargs:
+            conf_src[arg] = kwargs[arg]
+            conf_tar[arg] = kwargs[arg]
+        
+        
+        data_path = conf_src['data_path']
+    
     
     for arg in conf_src:
         if arg == 'map_list':
             map_list = conf_src[arg].split(',')
     
     
-    data_path = conf_src['data_path']
     total_results = dict()
     
     for subj in subjects:
-        print '--------'
-        try:
-            ds_src = load_dataset(data_path, subj, source, **conf_src)
-            ds_tar = load_dataset(data_path, subj, target, **conf_tar)
-        except Exception, err:
-            print err
-            continue
+        print '-----------'
         
+        if len(subjects) > 1:
+            try:
+                ds_src = load_dataset(data_path, subj, source, **conf_src)
+                ds_tar = load_dataset(data_path, subj, target, **conf_tar)
+            except Exception, err:
+                print err
+                continue
+         
+            #Evaluate if is correct to do further normalization after merging two ds. 
         ds_src = preprocess_dataset(ds_src, source, **conf_src)
         ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
 
@@ -231,6 +252,8 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     conf_src['analysis_func'] = analysis.func_name
     conf_src['classes'] = np.unique(ds_src.targets)
     
+    if (analysis_type=='group'):
+        path = path[0]
     
     save_results(path, total_results, conf_src)
     
@@ -489,7 +512,7 @@ def similarity_confidence(ds_src, ds_tar, results):
     
     predictions_tar = classifier.predict(ds_tar)
     
-def get_group_ds(path, subjects, conf_file, task, **kwargs):
+def subjects_merged_ds(path, subjects, conf_file, task, **kwargs):
     
     
     conf = read_configuration(path, conf_file, task)
@@ -500,6 +523,9 @@ def get_group_ds(path, subjects, conf_file, task, **kwargs):
     data_path = conf['data_path']
     
     i = 0
+
+    print 'Merging subjects from '+data_path
+    
     for subj in subjects:
         
         ds = load_dataset(data_path, subj, task, **conf)
@@ -514,9 +540,26 @@ def get_group_ds(path, subjects, conf_file, task, **kwargs):
         
         del ds
 
-    return ds_merged
+    return ds_merged, ['group'], conf
 
+
+def sources_merged_ds(path_list, subjects_list, conf_list, task, **kwargs):
     
+    ds_list = []
+    for path, subjects, conf in zip(path_list, subjects_list, conf_list):
+        
+        ds, _, conf_n = subjects_merged_ds(path, subjects, conf, task, **kwargs)
+        
+        ds_list.append(ds)
+        
+    
+    ds_new = vstack(ds_list)    
+    print 'Merging from different sources ended... '
+    print 'The number of subjects merged are '+str(len(np.unique(ds_new.sa.name)))
+    
+    return ds_new, ['group'], conf_n
+
+   
 def get_merged_ds(path, subjects, analysis,  conf_file, source='task', **kwargs):
     
     if source == 'task':
