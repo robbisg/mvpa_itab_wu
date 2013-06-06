@@ -1,4 +1,4 @@
-mvpa_itab_wu
+Multivariate Pattern Analysis at ITAB
 ============
 
 Multivariate Pattern Analysis routines for fMRI
