@@ -626,27 +626,26 @@ def setup_classifier(**kwargs):
     ##########################################################################    
     if cv_approach == 'n_fold':
         if cv_type != 0:
-            cvte = CrossValidation(fclf, 
-                                   NFoldPartitioner(cvtype = cv_type, attr = attribute), 
-                                   #postproc = postproc,
-                                   errorfx=mean_mismatch_error,
-                                   null_dist=distr_est,
-                                   enable_ca=['stats', 'repetition_results'])
+            
+            splitter_used = NFoldPartitioner(cvtype = cv_type, attr = attribute)
         else:
-            cvte = CrossValidation(fclf, 
-                                   NFoldPartitioner(cvtype = 1, attr = attribute), 
-                                   #postproc = postproc,
-                                   errorfx=mean_mismatch_error,
-                                   null_dist=distr_est,
-                                   enable_ca=['stats', 'repetition_results'])
+            splitter_used = NFoldPartitioner(cvtype = 1, attr = attribute)
     else:
-        cvte = CrossValidation(fclf, 
-                               HalfPartitioner(attr = attribute), 
-                               #postproc = postproc,
-                               errorfx=mean_mismatch_error,
-                               null_dist=distr_est,
+        splitter_used = HalfPartitioner(attr = attribute)
+
+    ############################################################################
+    if distr_est == None:
+        cvte = CrossValidation(fclf,
+                               splitter = splitter_used, 
                                enable_ca=['stats', 'repetition_results'])
-        
+    else:
+        cvte = CrossValidation(fclf,
+                               splitter = splitter_used, 
+                               errorfx=mean_mismatch_error,
+                               null_dist=distr_est,                               
+                               enable_ca=['stats', 'repetition_results'])
+    
+       
     print 'Classifier set...'
     
     return [fclf, cvte]

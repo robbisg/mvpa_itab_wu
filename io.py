@@ -1178,6 +1178,14 @@ def save_results_transfer_learning(path, results):
         #file.write('\n\nd-prime mahalanobis coeff: '+str(results[name]['d_prime_maha']))
         file.close()
         
+        if name == 'group':
+            fname = name+'_fold_stats.txt'
+            file = open(os.path.join(results_dir,fname), 'w')
+            for m in stats.matrices:
+                file.write(str(m.stats['ACC']))
+                file.write('\n')
+            file.close()
+                
         obj = results[name]['classifier'].ca
         fname = name+'_'+'classifier'+'.pyobj'          
         file = open(os.path.join(results_dir,fname), 'w')
