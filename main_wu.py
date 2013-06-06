@@ -565,7 +565,7 @@ def setup_classifier(**kwargs):
             
     ################# Classifier #######################
     if clf_type == 'SVM':
-        clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
+a        clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
     elif clf_type == 'GNB':
         clf = GNB()
     elif clf_type == 'LDA':
@@ -636,11 +636,11 @@ def setup_classifier(**kwargs):
     ############################################################################
     if distr_est == None:
         cvte = CrossValidation(fclf,
-                               splitter = splitter_used, 
+                               splitter_used, 
                                enable_ca=['stats', 'repetition_results'])
     else:
         cvte = CrossValidation(fclf,
-                               splitter = splitter_used, 
+                               splitter_used, 
                                errorfx=mean_mismatch_error,
                                null_dist=distr_est,                               
                                enable_ca=['stats', 'repetition_results'])
