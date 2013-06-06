@@ -565,7 +565,7 @@ def setup_classifier(**kwargs):
             
     ################# Classifier #######################
     if clf_type == 'SVM':
-a        clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
+        clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
     elif clf_type == 'GNB':
         clf = GNB()
     elif clf_type == 'LDA':
