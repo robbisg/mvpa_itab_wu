@@ -165,8 +165,8 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
             ds_src, _, conf_src = sources_merged_ds(path, subjects, conf_file, source, **kwargs)
             ds_tar, subjects, conf_tar = sources_merged_ds(path, subjects, conf_file, target, **kwargs)
             
-            conf_src['permutations'] = 1
-            conf_tar['permutations'] = 1
+            conf_src['permutations'] = 0
+            conf_tar['permutations'] = 0
         else:
             print 'In group analysis path, subjects and conf_file must be lists: \
                     Check configuration file and/or parameters!!'

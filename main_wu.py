@@ -609,7 +609,7 @@ def setup_classifier(**kwargs):
             debug.active += ["STATMC"]
         repeater = Repeater(count= permutations)
         permutator = AttributePermutator('targets', limit={'partitions': 1}, count=1)
-        partitioner = NFoldPartitioner(cvtype=cv_n)
+        partitioner = NFoldPartitioner(cvtype=cv_n, attr = attribute)
         null_cv = CrossValidation(
                                   clf,
                                   ChainNode([partitioner, permutator], 
