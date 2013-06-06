@@ -626,7 +626,7 @@ def load_dataset(path, subj, type, **kwargs):
     
     f_list = []
     for i in range(files):
-        for j in range(niftiFilez[i].get_shape()[-1:][0]):
+        for j in range(niftiFilez[i].shape[-1:][0]):
                 f_list.append(i+1)
 
     ds.sa['file'] = f_list
