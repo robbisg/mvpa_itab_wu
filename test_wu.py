@@ -8,6 +8,7 @@ from main_wu import *
 from io import *
 from mvpa2.clfs.transerror import ConfusionMatrix
 import os
+import copy
     
     
 def test_spatiotemporal(path, subjects, conf_file, type, **kwargs):
@@ -535,7 +536,7 @@ def subjects_merged_ds(path, subjects, conf_file, task, **kwargs):
             ds_merged = ds.copy()
         else:
             ds_merged = vstack((ds_merged, ds))
-               
+            ds_merged.a.update(ds.a)
         i = i + 1
         
         del ds
@@ -553,7 +554,8 @@ def sources_merged_ds(path_list, subjects_list, conf_list, task, **kwargs):
         ds_list.append(ds)
         
     
-    ds_new = vstack(ds_list)    
+    ds_new = vstack(ds_list)
+    ds_new.a.update(ds_list[0].a) 
     print 'Merging from different sources ended... '
     print 'The number of subjects merged are '+str(len(np.unique(ds_new.sa.name)))
     
@@ -616,4 +618,151 @@ def get_merged_ds(path, subjects, analysis,  conf_file, source='task', **kwargs)
         r = spatial(ds_merged, **conf_src)
     
     return r
-           
+        
+def _group_transfer_learning(path, subjects, analysis,  conf_file, source='task', analysis_type='single', **kwargs):
+    
+    if source == 'task':
+        target = 'rest'
+    else:
+        if source == 'rest':
+            target = 'task'
+    
+    
+    if source == 'saccade':
+        target = 'face'
+    else:
+        if source == 'face':
+            target = 'saccade'
+    
+   
+    ##############################################    
+    ##############################################
+    ##    conf_src['label_included'] = 'all'    ##   
+    ##    conf_src['label_dropped'] = 'none'    ##
+    ##    conf_src['mean_samples'] = 'False'    ##
+    ##############################################
+    ##############################################
+
+    if analysis_type == 'group':
+        
+        if path.__class__ == conf_file.__class__ == list:  
+            ds_src, s, conf_src = sources_merged_ds(path, subjects, conf_file, source, **kwargs)
+            
+            conf_src['permutations'] = 0
+            
+        else:
+            print 'In group analysis path, subjects and conf_file must be lists: \
+                    Check configuration file and/or parameters!!'
+            return 0
+    
+    else:
+        
+        conf_src = read_configuration(path, conf_file, source)
+        
+    
+    
+    for arg in conf_src:
+        if arg == 'map_list':
+            map_list = conf_src[arg].split(',')
+    
+    
+    r_group = spatial(ds_src, **conf_src)
+    
+    total_results = dict()
+    total_results['group'] = r_group
+    
+    clf = r_group['classifier']
+    
+    for subj_, conf_, path_ in zip(subjects, conf_file, path):
+        for subj in subj_:
+            print '-----------'
+            r = dict()
+            if len(subjects) > 1:
+                conf_tar = read_configuration(path_, conf_, target)
+        
+                for arg in kwargs:
+                    
+                    conf_tar[arg] = kwargs[arg]
+            
+            
+                data_path = conf_tar['data_path']
+                try:
+                    ds_tar = load_dataset(data_path, subj, target, **conf_tar)
+                except Exception, err:
+                    print err
+                    continue
+    
+            
+            ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
+    
+            if conf_src['label_included'] == 'all' and \
+               conf_src['label_dropped'] != 'fixation':
+                    print 'Balancing dataset...'
+                    ds_src = balance_dataset(ds_src, 'fixation')       
+                    
+             
+            
+            predictions = clf.predict(ds_tar)
+            
+            
+            
+            pred = np.array(predictions)
+            targets = ds_tar.targets
+            
+            
+            for arg in r_group.keys():
+                r[arg] = copy.copy(r_group[arg])
+            
+            r['targets'] = targets
+            r['predictions'] = predictions
+            
+            r['fclf'] = clf
+            
+            c_m = ConfusionMatrix(predictions=pred, targets=targets)
+            c_m.compute()
+            r['confusion_target'] = c_m
+            print c_m
+            
+            tr_pred = similarity_measure_mahalanobis(ds_tar, ds_src, r)
+            r['mahalanobis_similarity'] = tr_pred
+            
+            #print tr_pred
+            
+            c_mat_mahala = ConfusionMatrix(predictions=tr_pred.T[1], targets=tr_pred.T[0])
+            c_mat_mahala.compute()
+            r['confusion_mahala'] = c_mat_mahala
+            
+            d_prime, beta, c, c_new = signal_detection_measures(pred, targets, map_list)
+            r['d_prime'] = d_prime
+            print d_prime
+            r['beta'] = beta
+            r['c'] = c
+            r['confusion_total'] = c_new
+            
+            '''
+            d_prime_maha, c_new_maha = d_prime_statistics(tr_pred.T[1], tr_pred.T[0], map_list)
+            r['d_prime_maha'] = d_prime_maha
+            r['confusion_tot_maha'] = c_new_maha
+            '''
+            
+            total_results[subj] = r
+            
+    group_k = set(total_results['group'].keys())
+    subj_k = set(total_results[subj].keys())
+    
+    for k in subj_k.difference(group_k):
+        total_results['group'][k] = copy.copy(total_results[subj][k])
+    
+    #total_results['group']['map'] = None   
+    conf_src['analysis_type'] = 'transfer_learning'
+    conf_src['analysis_task'] = source
+    conf_src['analysis_func'] = analysis.func_name
+    conf_src['classes'] = np.unique(ds_src.targets)
+    
+    if (analysis_type=='group'):
+        path = path[0]
+    
+    save_results(path, total_results, conf_src)
+    
+    return total_results
+    

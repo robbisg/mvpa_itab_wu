@@ -14,6 +14,8 @@ from mvpa2.suite import find_events, fmri_dataset, SampleAttributes
 from itertools import cycle
 import cPickle as pickle
 
+from memory_profiler import profile
+
 from sklearn.linear_model import Ridge
 from scipy.interpolate import UnivariateSpline
 from sklearn import decomposition, manifold, lda, ensemble
@@ -425,7 +427,7 @@ def load_conc_fmri_data(conc_file_list, el_vols = 0, **kwargs):
         
         return imgList
 
-    
+#@profile    
 def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     """
     returns imgList
@@ -476,7 +478,7 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     else:
         fileL = [elem for elem in fileL if elem.find(img_pattern) != -1 and elem.find(task) != -1 and elem.find('mni') != -1]
 
-    print fileL
+    #print fileL
     #if no file are found I perform previous analysis!        
     if (len(fileL) < runs and len(fileL) >= 0):
         """
@@ -536,6 +538,7 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     del fileL
     return imgList
 
+#@profile
 def load_dataset(path, subj, type, **kwargs):
     '''
     @param mask: mask is a string indicating the area to be analyzed
@@ -550,6 +553,8 @@ def load_dataset(path, subj, type, **kwargs):
     use_conc = 'False'
     skip_vols = 0
     
+    #print kwargs
+    
     for arg in kwargs:
         if arg == 'skip_vols':
             skip_vols = np.int(kwargs[arg])
@@ -557,6 +562,8 @@ def load_dataset(path, subj, type, **kwargs):
             use_conc = kwargs[arg]
         if arg == 'conc_file':
             conc_file = kwargs[arg]
+    
+    
     
     if use_conc == 'False':      
         try:
@@ -771,8 +778,8 @@ def load_mask_wu(path, subj, **kwargs):
         mask_list = []
         for m_ar in mask_area:
             mask_list = mask_list + [m for m in mask_list_1 if #(m.find('nii.gz') != -1 and m.find(m_ar)!=-1) or
-                      ((m[:3].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('nii.gz') != -1) or
-                      ((m[:3].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('hdr') != -1)]
+                      ((m[:].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('nii.gz') != -1) or
+                      ((m[:].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('hdr') != -1)]
       
     
     print 'Mask searched in '+mask_path+' Mask(s) found: '+str(len(mask_list))
@@ -1161,6 +1168,8 @@ def save_results_transfer_learning(path, results):
         
         results_dir = os.path.join(path, name)        
 
+        print '----------------------------'
+                
         
         stats = results[name]['stats']
         fname = name+'_stats.txt'
@@ -1256,9 +1265,11 @@ def save_results_transfer_learning(path, results):
         
         
         if results[name]['map'] != None:
+            
             m_mean = results[name]['map'].pop()
             fname = name+'_mean_map.nii.gz'
-            m_mean._data = (m_mean._data - np.mean(m_mean._data))/np.std(m_mean._data)
+            mask_ = m_mean._data != 0
+            m_mean._data[mask_ ] = (m_mean._data[mask_ ] - np.mean(m_mean._data[mask_ ]))/np.std(m_mean._data[mask_ ])
             ni.save(m_mean, os.path.join(results_dir,fname))
         
             for map, t in zip(results[name]['map'], results[name]['sensitivities'].sa.targets):
@@ -1301,7 +1312,13 @@ def write_all_subjects_map(path, dir):
     subjects = [s for s in subjects if s.find('.') == -1]
     
     img_list = []
+    i = 0
+    list_t = []
     
+    min_t = 1000
+    max_t = 0
+    
+    #Get data from path
     for s in subjects:
         
         s_path = os.path.join(res_path, s)
@@ -1311,14 +1328,48 @@ def write_all_subjects_map(path, dir):
         
         img = ni.load(os.path.join(s_path, map_list[0]))
         
-        img_list.append(img.get_data().squeeze())
+        #Store maximum and minimum if maps are dimension mismatching
         
-    stack_img = np.array(img_list)
-    m_img = np.mean(stack_img, axis=0)
+        if img.get_data().shape[-1] < min_t:
+            min_t = img.get_data().shape[-1]
+        
+        if img.get_data().shape[-1] > max_t:
+            max_t = img.get_data().shape[-1]
+            
+        img_list.append(img)
+        list_t.append(img.get_data().shape[-1])
+        i = i + 1
+        
+    dim_mask = np.array(list_t) == min_t
+    img_list_ = np.array(img_list)
     
-    img_ni = ni.Nifti1Image(m_img, img.get_affine())
+    #compensate for dimension mismatching
+    n_list = []
+    if dim_mask.all() == False:
+        img_m = img_list_[dim_mask]
+        n_list = []
+        for img in img_m:
+            data = img.get_data()
+            for i in range(max_t - data.shape[-1]):
+                add_img = np.mean(data, axis=len(data.shape)-1)
+                add_img =  np.expand_dims(add_img, axis=len(data.shape)-1)
+                data = np.concatenate((data, add_img), axis=len(data.shape)-1)
+            n_list.append(data)   
+        v1 = np.expand_dims(img_list_[~dim_mask][0].get_data(), axis=0)
+    else:
+        v1 = np.expand_dims(img_list_[dim_mask][0].get_data(), axis=0)
     
-    filename = os.path.join(res_path, 'all_subjects_mean_map.nii.gz')
+    for img in img_list_[~dim_mask][1:]:
+        v1 = np.vstack((v1,np.expand_dims(img.get_data(), axis=0)))
+    
+    for img_data in n_list:
+        v1 = np.vstack((v1,np.expand_dims(img_data, axis=0)))
+        
+    m_img = np.mean(v1, axis=0)
+    
+    img_ni = ni.Nifti1Image(m_img.squeeze(), img.get_affine())
+    
+    filename = os.path.join(res_path, 'all_subjects_mean_map_prova.nii.gz')
     ni.save(img_ni, filename)
     
     return

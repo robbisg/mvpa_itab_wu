@@ -214,6 +214,9 @@ def spatial(ds, **kwargs):
             clf_type = kwargs[arg]
         if arg == 'enable_results':
             enable_results = kwargs[arg].split(',')
+        
+        if arg == 'permutations':
+            permutations = int(kwargs[arg])
     
     
     [fclf, cvte] = setup_classifier(**kwargs)
@@ -228,13 +231,19 @@ def spatial(ds, **kwargs):
 
     #Plot permutations
     #plot_cv_results(cvte, error_, 'Permutations analysis')
-    dist_len = len(cvte.null_dist.dists())
-    err_arr = np.zeros(dist_len)
-    for i in range(dist_len):
-        err_arr[i] = 1 - cvte.ca.stats.stats['ACC']
     
-    total_p_value = np.mean(cvte.null_dist.p(err_arr))
+    if permutations != 0:
+        dist_len = len(cvte.null_dist.dists())
+        err_arr = np.zeros(dist_len)
+        for i in range(dist_len):
+            err_arr[i] = 1 - cvte.ca.stats.stats['ACC']
     
+        total_p_value = np.mean(cvte.null_dist.p(err_arr))
+        p_value = cvte.ca.null_prob.samples
+        
+    else:
+        p_value = np.array([0, 0])
+        total_p_value = 0
     
     predictions_ds = fclf.predict(ds)
     
@@ -250,7 +259,7 @@ def spatial(ds, **kwargs):
         
         allowed_results = [None, None, cvte.ca.stats, 
                            ds.a.mapper, fclf, ds, 
-                           cvte.ca.null_prob.samples, total_p_value]
+                           p_value, total_p_value]
         
         results_dict = dict(zip(allowed_keys, allowed_results))
         results = dict()
@@ -288,7 +297,7 @@ def spatial(ds, **kwargs):
                     'p-value' , 'p']
     allowed_results = [l_maps, res_sens, cvte.ca.stats, 
                        ds.a.mapper, classifier, ds, 
-                       cvte.ca.null_prob.samples, total_p_value]
+                       p_value, total_p_value]
     
     results_dict = dict(zip(allowed_keys, allowed_results))
     
@@ -388,6 +397,8 @@ def spatiotemporal(ds, **kwargs):
             duration = kwargs[arg]
         if (arg == 'enable_results'):
             enable_results = kwargs[arg]
+        if (arg == 'permutations'):
+            permutations = int(kwargs[arg])
        
     events = find_events(targets = ds.sa.targets, chunks = ds.sa.chunks)   
     
@@ -408,14 +419,20 @@ def spatiotemporal(ds, **kwargs):
     res = cvte(evds)
     
     print cvte.ca.stats 
-    print cvte.ca.null_prob.samples
     
-    dist_len = len(cvte.null_dist.dists())
-    err_arr = np.zeros(dist_len)
-    for i in range(dist_len):
-        err_arr[i] = 1 - cvte.ca.stats.stats['ACC']
     
-    total_p_value = np.mean(cvte.null_dist.p(err_arr))
+    if permutations != 0:
+        print cvte.ca.null_prob.samples
+        dist_len = len(cvte.null_dist.dists())
+        err_arr = np.zeros(dist_len)
+        for i in range(dist_len):
+            err_arr[i] = 1 - cvte.ca.stats.stats['ACC']
+    
+        total_p_value = np.mean(cvte.null_dist.p(err_arr))
+        p_value = cvte.ca.null_prob.samples
+    else:
+        total_p_value = 0.
+        p_value = np.array([0,0])
     
     
     try:
@@ -427,7 +444,7 @@ def spatiotemporal(ds, **kwargs):
         
         allowed_results = [None, None, cvte.ca.stats, 
                            evds.a.mapper, fclf, evds, 
-                           cvte.ca.null_prob.samples, total_p_value]
+                           p_value, total_p_value]
         
         results_dict = dict(zip(allowed_keys, allowed_results))
         results = dict()
@@ -464,7 +481,7 @@ def spatiotemporal(ds, **kwargs):
     
     allowed_results = [l_maps, res_sens, cvte.ca.stats, 
                        evds.a.mapper, fclf, evds, 
-                       cvte.ca.null_prob.samples, total_p_value]
+                       p_value, total_p_value]
     
     results_dict = dict(zip(allowed_keys, allowed_results))
     
