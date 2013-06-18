@@ -14,7 +14,7 @@ from mvpa2.suite import find_events, fmri_dataset, SampleAttributes
 from itertools import cycle
 import cPickle as pickle
 
-from memory_profiler import profile
+#from memory_profiler import profile
 
 from sklearn.linear_model import Ridge
 from scipy.interpolate import UnivariateSpline
