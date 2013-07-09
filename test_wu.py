@@ -196,7 +196,7 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     for subj in subjects:
         print '-----------'
         
-        if len(subjects) > 1:
+        if (len(subjects) > 1) or (subj != 'group'):
             try:
                 ds_src = load_dataset(data_path, subj, source, **conf_src)
                 ds_tar = load_dataset(data_path, subj, target, **conf_tar)
@@ -382,8 +382,11 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
         cov_ = np.cov(true_ex.T)
         example_dist[label]['cov'] = cov_
         '''
-        
-        cov_ = LedoitWolf(block_size = 10000).fit(true_ex).covariance_
+        try:
+            cov_ = LedoitWolf(block_size = 10000).fit(true_ex).covariance_
+        except MemoryError, err:
+            cov_ = LedoitWolf(block_size = 15000).fit(true_ex).covariance_
+            
         example_dist[label]['i_cov'] = scipy.linalg.inv(cov_)
         #print cov_.shape
         #print true_ex.shape
@@ -417,11 +420,12 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     #print m_value
     #Mask true predictions
     true_predictions = (mahalanobis_values < m_value)
+    p_values = 1 - c_squared.cdf(mahalanobis_values)
     
     '''
     Get some data
     '''
-    full_data = np.array(zip(ds_tar.targets, prediction_target, mahalanobis_values))
+    full_data = np.array(zip(ds_tar.targets, prediction_target, mahalanobis_values, p_values))
     
     true_data = full_data[true_predictions]
     
@@ -677,7 +681,7 @@ def _group_transfer_learning(path, subjects, analysis,  conf_file, source='task'
         for subj in subj_:
             print '-----------'
             r = dict()
-            if len(subjects) > 1:
+            if len(subj_) > 1:
                 conf_tar = read_configuration(path_, conf_, target)
         
                 for arg in kwargs:

@@ -702,7 +702,9 @@ def load_mask(path, subj, **kwargs):
             mask_area = kwargs[arg]  
         if (arg == 'mask_dir'):
             path = kwargs[arg]  
-            
+    
+    if mask_area == 'none':
+        return None        
             
     if (mask_type == 'wu'):
         mask = load_mask_wu(path, subj, **kwargs)
@@ -962,7 +964,7 @@ def read_remote_configuration(path):
     
     print 'Reading remote config file '+os.path.join(path,'remote.conf')
     
-def read_configuration (path, experiment, type):
+def read_configuration (path, experiment, section):
     
     import ConfigParser
     
@@ -975,8 +977,8 @@ def read_configuration (path, experiment, type):
     
     types = config.get('path', 'types').split(',')
     
-    if types.count(type) > 0:
-        types.remove(type)
+    if types.count(section) > 0:
+        types.remove(section)
     
     for typ in types:
         config.remove_section(typ)
@@ -1238,8 +1240,9 @@ def save_results_transfer_learning(path, results):
                 true_vec = t_m_data[m_maha]
                 num = len(true_vec)
                 mean_maha = np.mean(np.float_(true_vec.T[2]))
+                mean_p = np.mean(np.float_(true_vec.T[3]))
                 #print tar+' '+lab+' '+str(num)+' '+str(mean_maha)
-                file.write(tar+' '+lab+' '+str(num)+' '+str(mean_maha)+'\n')
+                file.write(tar+' '+lab+' '+str(num)+' '+str(mean_maha)+' '+str(mean_p)+'\n')
         file.close()
         
         cmatrix_mahala = results[name]['confusion_mahala']
