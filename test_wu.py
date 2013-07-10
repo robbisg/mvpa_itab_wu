@@ -136,7 +136,8 @@ def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs
     return total_results
 
 
-def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', analysis_type='single', **kwargs):
+def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', \
+                           analysis_type='single', calculateSimilarity='True', **kwargs):
     
     if source == 'task':
         target = 'rest'
@@ -225,15 +226,20 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         r['confusion_target'] = c_m
         print c_m
         
-        tr_pred = similarity_measure_mahalanobis(r['ds_tar'], r['ds_src'], r)
-        r['mahalanobis_similarity'] = tr_pred
         
-        #print tr_pred
+        if calculateSimilarity == 'True':
+            tr_pred = similarity_measure_mahalanobis(r['ds_tar'], r['ds_src'], r)
+            r['mahalanobis_similarity'] = tr_pred
+            #print tr_pred
         
-        c_mat_mahala = ConfusionMatrix(predictions=tr_pred.T[1], targets=tr_pred.T[0])
-        c_mat_mahala.compute()
-        r['confusion_mahala'] = c_mat_mahala
+            c_mat_mahala = ConfusionMatrix(predictions=tr_pred.T[1], targets=tr_pred.T[0])
+            c_mat_mahala.compute()
+            r['confusion_mahala'] = c_mat_mahala
         
+        else:
+            r['mahalanobis_similarity'] = []
+            r['confusion_mahala'] = 'Null'
+            
         d_prime, beta, c, c_new = signal_detection_measures(pred, targets, map_list)
         r['d_prime'] = d_prime
         r['beta'] = beta
