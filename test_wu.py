@@ -572,7 +572,7 @@ def sources_merged_ds(path_list, subjects_list, conf_list, task, **kwargs):
     return ds_new, ['group'], conf_n
 
    
-def get_merged_ds(path, subjects, analysis,  conf_file, source='task', **kwargs):
+def get_merged_ds(path, subjects, conf_file, source='task', **kwargs):
     
     if source == 'task':
         target = 'rest'
@@ -587,7 +587,7 @@ def get_merged_ds(path, subjects, analysis,  conf_file, source='task', **kwargs)
         if source == 'face':
             target = 'saccade'
     
-    
+    ds_merged_list = []
     conf_src = read_configuration(path, conf_file, source)
     conf_tar = read_configuration(path, conf_file, target)
     
@@ -618,17 +618,21 @@ def get_merged_ds(path, subjects, analysis,  conf_file, source='task', **kwargs)
         ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
         
         ds_merged = vstack((ds_src, ds_tar))
+        ds_merged.a.update(ds_src.a)
         
+        ds_merged_list.append(ds_merged)
         '''
         methods = ['iso', 'pca', 'forest', 'embedding', 'mds']
         
         for m, i in zip(methods, range(len(methods))):
             plot_scatter_2d(ds_merged, method=m, fig_number=i+1)
-        '''
-        r = spatial(ds_merged, **conf_src)
-    
-    return r
         
+        r = spatial(ds_merged, **conf_src)
+        
+    return r
+    '''
+    return ds_merged_list
+    
 def _group_transfer_learning(path, subjects, analysis,  conf_file, source='task', analysis_type='single', **kwargs):
     
     if source == 'task':
