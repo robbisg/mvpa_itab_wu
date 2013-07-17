@@ -1062,11 +1062,6 @@ def save_results(path, results, configuration):
         res_list.append(list)
         
         file_summary.close()
-        
-
-        
-        
-    
     
     print 'Result saved in '+parent_dir
     
@@ -1164,6 +1159,18 @@ def save_results_basic(path, results):
 
 def save_results_transfer_learning(path, results):
     
+    p = results[results.keys()[0]]['mahalanobis_similarity'][0].T[1]
+    r = results[results.keys()[0]]['mahalanobis_similarity'][0].T[0]
+    
+    hist_sum = dict()
+    
+    for t in np.unique(r):
+        hist_sum[t] = dict()
+        for l in np.unique(p):
+            hist_sum[t][l] = dict()
+            hist_sum[t][l]['dist'] = []
+            hist_sum[t][l]['p'] = []
+    
     for name in results:
         command = 'mkdir '+os.path.join(path, name)
         os.system(command)
@@ -1228,21 +1235,71 @@ def save_results_transfer_learning(path, results):
         file.write(str(c_m))
         file.close()        
         
-        t_mahala = results[name]['mahalanobis_similarity']
+        full_data = results[name]['mahalanobis_similarity'][0]
+        true_pred = results[name]['mahalanobis_similarity'][1]
+        t_mahala = full_data[true_pred]
         fname = name+'_mahalanobis_data.txt'
         file = open(os.path.join(results_dir,fname), 'w')
         
-        for tar in np.unique(t_mahala.T[0]): 
-            t_pred_mask = t_mahala.T[0] == tar
-            t_m_data = t_mahala[t_pred_mask]
-            for lab in np.unique(t_m_data.T[1]):
-                m_maha = t_m_data.T[1] == lab
-                true_vec = t_m_data[m_maha]
-                num = len(true_vec)
-                mean_maha = np.mean(np.float_(true_vec.T[2]))
-                mean_p = np.mean(np.float_(true_vec.T[3]))
-                #print tar+' '+lab+' '+str(num)+' '+str(mean_maha)
-                file.write(tar+' '+lab+' '+str(num)+' '+str(mean_maha)+' '+str(mean_p)+'\n')
+        n_src_label = len(np.unique(full_data.T[1]))
+        n_tar_label = len(np.unique(full_data.T[0]))
+        
+        plot_list = dict()
+        
+        
+        for t in np.unique(full_data.T[1]):
+            f, ax = plt.subplots(2, 1)
+            plot_list[t] = [f, ax]
+
+        for tar in np.unique(full_data.T[0]): 
+            
+            t_pred_mask = full_data.T[0] == tar
+            t_m_data = full_data[t_pred_mask * true_pred]
+            
+            
+            for lab in np.unique(full_data.T[1]):
+                
+                histo_fname = name+'_histo_'+lab+'_'+tar+'_dist.txt'
+                histo_p_fname = name+'_histo_'+lab+'_'+tar+'_p.txt'
+                all_vec = full_data[(full_data.T[1] == lab) * t_pred_mask]
+                
+                if len(t_m_data) != 0:
+                    m_maha = t_m_data.T[1] == lab
+                    true_vec = t_m_data[m_maha]
+                    num = len(true_vec)
+                    mean_maha = np.mean(np.float_(true_vec.T[2]))
+                    mean_p = np.mean(np.float_(true_vec.T[3]))
+                else:
+                    num = 0
+                    mean_maha = np.mean(np.float_(all_vec.T[2]))
+                    mean_p = np.mean(np.float_(all_vec.T[3]))
+                
+                tot_mean = np.mean(np.float_(all_vec.T[2]))
+                tot_p = np.mean(np.float_(all_vec.T[3]))
+                               
+                file.write(tar+' '+lab+' '+str(num)+' '+str(mean_maha)+' '+str(mean_p)+' '+str(tot_mean)+' '+str(tot_p)+'\n')
+                
+                np.savetxt(os.path.join(results_dir,histo_fname), np.float_(all_vec.T[2]))
+                np.savetxt(os.path.join(results_dir,histo_p_fname), np.float_(all_vec.T[3]))
+                
+                #bin_d = np.linspace(mn_d, mx_d, 25)
+                #bin_p = np.linspace(0, 1, 25)
+                
+                plot_list[lab][1][0].hist(np.float_(all_vec.T[2]), bins=35, label=tar, alpha=0.5)
+                plot_list[lab][1][1].hist(np.float_(all_vec.T[3]), bins=35, label=tar, alpha=0.5)          
+                
+                hist_sum[tar][lab]['dist'].append(np.float_(all_vec.T[2]))
+                hist_sum[tar][lab]['p'].append(np.float_(all_vec.T[3]))
+        
+        for k in plot_list.keys():
+            plot_list[k][1][0].legend()
+            plot_list[k][1][1].legend()
+            fig_name = os.path.join(results_dir,name+'_histogram_'+k+'.png')
+            plot_list[k][0].savefig(fig_name)
+        
+        
+            
+                
         file.close()
         
         cmatrix_mahala = results[name]['confusion_mahala']
@@ -1266,7 +1323,7 @@ def save_results_transfer_learning(path, results):
         
         file.close()
         
-        
+    
         if results[name]['map'] != None:
             
             m_mean = results[name]['map'].pop()
@@ -1280,9 +1337,29 @@ def save_results_transfer_learning(path, results):
                     fname = name+'_'+cl+'_map.nii.gz'
                     map._data = (map._data - np.mean(map._data))/np.std(map._data)
                     ni.save(map, os.path.join(results_dir,fname))
+    
+    
+    plot_list = dict()
+    for t in hist_sum[hist_sum.keys()[0]].keys():
+        f, ax = plt.subplots(2, 1)
+        plot_list[t] = [f, ax]
+    
+    for k1 in hist_sum:
         
-    
-    
+        for k2 in hist_sum[k1]:
+            
+            for measure in hist_sum[k1][k2]:
+                hist_sum[k1][k2][measure] = np.hstack(hist_sum[k1][k2][measure])
+                
+        
+            plot_list[k2][1][0].hist(hist_sum[k1][k2]['dist'], bins=35, label = k1, alpha=0.5)
+            plot_list[k2][1][1].hist(hist_sum[k1][k2]['p'], bins=35, label = k1, alpha=0.5)
+   
+    for t in hist_sum[hist_sum.keys()[0]].keys():
+        plot_list[t][1][0].legend()
+        plot_list[t][1][1].legend()
+        plot_list[t][0].savefig(os.path.join(path,'total_histogram_'+t+'.png'))
+        
     return
 
 

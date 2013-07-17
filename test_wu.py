@@ -190,6 +190,9 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     for arg in conf_src:
         if arg == 'map_list':
             map_list = conf_src[arg].split(',')
+        if arg == 'p_dist':
+            p = float(conf_src[arg])
+            print p
     
     
     total_results = dict()
@@ -228,11 +231,14 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         
         
         if calculateSimilarity == 'True':
-            tr_pred = similarity_measure_mahalanobis(r['ds_tar'], r['ds_src'], r)
-            r['mahalanobis_similarity'] = tr_pred
+            if 'p' not in locals():
+                p = 0.01
+            mahala_data = similarity_measure_mahalanobis(r['ds_tar'], r['ds_src'], r, p_value=p)
+            r['mahalanobis_similarity'] = mahala_data
             #print tr_pred
         
-            c_mat_mahala = ConfusionMatrix(predictions=tr_pred.T[1], targets=tr_pred.T[0])
+            c_mat_mahala = ConfusionMatrix(predictions=mahala_data[0][mahala_data[1]].T[1], 
+                                           targets=mahala_data[0][mahala_data[1]].T[0])
             c_mat_mahala.compute()
             r['confusion_mahala'] = c_mat_mahala
         
@@ -351,6 +357,7 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     from scipy.spatial.distance import mahalanobis
     from sklearn.covariance import LedoitWolf
     
+    print 'Computing Mahalanobis similarity...'
     #classifier = results['classifier']
     
     #Get classifier from results
@@ -388,16 +395,14 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
         cov_ = np.cov(true_ex.T)
         example_dist[label]['cov'] = cov_
         '''
+        print 'Estimation of covariance matrix for '+label+' class...'
         try:
             cov_ = LedoitWolf(block_size = 10000).fit(true_ex).covariance_
         except MemoryError, err:
             cov_ = LedoitWolf(block_size = 15000).fit(true_ex).covariance_
             
         example_dist[label]['i_cov'] = scipy.linalg.inv(cov_)
-        #print cov_.shape
-        #print true_ex.shape
-        #print cov_
-        #print example_dist[label]['i_cov']
+
         
     #Get target predictions (unlabelled)
     prediction_target = results['predictions']
@@ -414,16 +419,17 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     degrees of freedom equal to the number of features.
     '''
     
-    
     mahalanobis_values = np.array(mahalanobis_values) ** 2
+    
     #Get no. of features
     df = ds_tar.samples.shape[1]
-    #print df
+
     #Set a chi squared distribution
     c_squared = scipy.stats.chi2(df)
+    
     #Set the p-value and the threshold value to validate predictions
     m_value = c_squared.isf(p_value)
-    #print m_value
+    
     #Mask true predictions
     true_predictions = (mahalanobis_values < m_value)
     p_values = 1 - c_squared.cdf(mahalanobis_values)
@@ -433,10 +439,9 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     '''
     full_data = np.array(zip(ds_tar.targets, prediction_target, mahalanobis_values, p_values))
     
-    true_data = full_data[true_predictions]
-    
-    #print full_data
-    return true_data
+    #true_data = full_data[true_predictions]
+
+    return full_data, true_predictions
     
     
 ##################################################################################
