@@ -162,3 +162,76 @@ for exp in ['Carlo_MDM', 'Annalisa_DecisionValue']:
         l_tot = l_tot + len(subjects)
 
 s_tot = s_tot / l_tot
+
+################################# Mahala Histograms ########################################
+
+r_dir = ''
+path = '/media/DATA/fmri/learning/'
+
+res_path = os.path.join(path, '0_results', r_dir)
+
+classes = ['fixation', 'trained', 'untrained']
+targets = ['RestPre', 'RestPost']
+
+d = dict()
+
+for c in classes:
+    d[c] = dict()
+    for t in targets:
+        d[c][t] = []
+
+
+for s in subjects:
+    r_dir_s = os.path.join(res_path, s)
+    for c in classes:
+        for t in targets:
+            fname = os.path.join(r_dir_s, s+'_histo_'+c+'_'+t+'_dist.txt')
+            data = np.loadtxt(fname)
+            d[c][t].append(data)
+            
+
+f = open(os.path.join(r_dir_s, s+'_mahalanobis_data.txt'), 'r')
+for l in f:
+    continue
+threshold = np.float(l.split(' ')[1])
+q = r_dir.split('_')[-2]
+for c in classes:
+    f = plt.figure()
+    a = f.add_subplot(111)
+    for t in targets:
+        d[c][t] = np.hstack(d[c][t])
+        if (t == 'RestPre'):
+            mx = np.max(d[c][t])
+            mn = np.min(d[c][t])
+            bins = np.linspace(mn, mx, 50)
+        a.hist(d[c][t], bins=bins, alpha = 0.5, label=t)
+    
+    a.axvline(x=threshold, ymax=a.get_ylim()[1], color='r', linestyle='--', linewidth=2)
+    a.legend()
+
+    f.savefig(os.path.join(res_path, q+'_total_histogram_dist_'+c+'.png'))
+    
+###################################################################################
+        
+        
+classes = ['trained', 'untrained']
+targets = ['RestPost', 'RestPre']
+tp = np.dtype([('targets','S20'), ('classes','S20'), ('number','i4'), ('distance','f4'), 
+               ('norm_distance','f4'), ('tot_distance','f4'), ('norm_tot_distance','f4')])
+stringa = ''
+for s in subjects:
+    fname = os.path.join(path, '0_results', r_dir,s, s+'_mahalanobis_data.txt')
+    data_np = np.genfromtxt(fname, dtype=tp, skip_footer=1)
+    stringa = stringa + s
+    for c in classes:
+        m = data_np['classes'] == c
+        for k in tp.names[2:-2]:
+            stringa = stringa + ' ' + str(data_np[m][k][0]) + ' ' + str(data_np[m][k][1])
+    
+    stringa = stringa + '\n'
+
+file = open(os.path.join(path, '0_results',r_dir,'mahalanobis_summary.txt'), 'w')
+file.write(stringa)
+file.close()
+    
+    

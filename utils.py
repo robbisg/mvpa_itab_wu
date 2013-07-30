@@ -159,7 +159,7 @@ def fidl2txt (fidlPath, outPath):
     
     lastElem = tokens[0]
     
-    runs = int(lastElem[-2:-1])
+    runs = int(lastElem[-1])
     
     noEvents = len(tokens)/int(runs)
     
@@ -167,7 +167,7 @@ def fidl2txt (fidlPath, outPath):
     
     tokens.reverse()
     for i in range(noEvents):
-        eventLabels.append(tokens[i][:])#eventLabels.append(tokens[i][:-1])
+        eventLabels.append(tokens[i][:-1])#eventLabels.append(tokens[i][:-1])
         
     
     fidlFile.close()

@@ -519,14 +519,14 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
         else:
             pathF = os.path.join(path_file_dirs[1], img)
             
-        if (str(len(imgList))) < 10:
-            print 'Now loading... '+pathF        
+        #if (str(len(imgList))) < 1:
+        print 'Now loading... '+pathF        
         
         im = ni.load(pathF)
         data = im.get_data()
         
-        if (str(len(imgList))) < 10:
-            print data.shape
+        #if (str(len(imgList))) < 1:
+        print data.shape
         
         new_im = ni.Nifti1Image(data[:,:,:,el_vols:], affine = im.get_affine(), header = im.get_header()) 
         
@@ -1237,6 +1237,8 @@ def save_results_transfer_learning(path, results):
         
         full_data = results[name]['mahalanobis_similarity'][0]
         true_pred = results[name]['mahalanobis_similarity'][1]
+        threshold = results[name]['mahalanobis_similarity'][2]
+        
         t_mahala = full_data[true_pred]
         fname = name+'_mahalanobis_data.txt'
         file = open(os.path.join(results_dir,fname), 'w')
@@ -1292,14 +1294,18 @@ def save_results_transfer_learning(path, results):
                 hist_sum[tar][lab]['p'].append(np.float_(all_vec.T[3]))
         
         for k in plot_list.keys():
-            plot_list[k][1][0].legend()
-            plot_list[k][1][1].legend()
+            ax1 = plot_list[k][1][0]
+            ax2 = plot_list[k][1][1]
+            ax1.legend()
+            ax2.legend()
+            ax1.axvline(x=threshold, ymax=ax1.get_ylim()[1], color='r', linestyle='--', linewidth=3)
+            ax2.axvline(x=0.99, ymax=ax2.get_ylim()[1], color='r', linestyle='--', linewidth=3)
             fig_name = os.path.join(results_dir,name+'_histogram_'+k+'.png')
             plot_list[k][0].savefig(fig_name)
         
         
             
-                
+        file.write('\nthreshold '+str(threshold))       
         file.close()
         
         cmatrix_mahala = results[name]['confusion_mahala']
@@ -1355,10 +1361,14 @@ def save_results_transfer_learning(path, results):
             plot_list[k2][1][0].hist(hist_sum[k1][k2]['dist'], bins=35, label = k1, alpha=0.5)
             plot_list[k2][1][1].hist(hist_sum[k1][k2]['p'], bins=35, label = k1, alpha=0.5)
    
-    for t in hist_sum[hist_sum.keys()[0]].keys():
-        plot_list[t][1][0].legend()
-        plot_list[t][1][1].legend()
-        plot_list[t][0].savefig(os.path.join(path,'total_histogram_'+t+'.png'))
+    for k in hist_sum[hist_sum.keys()[0]].keys():
+            ax1 = plot_list[k][1][0]
+            ax2 = plot_list[k][1][1]
+            ax1.legend()
+            ax2.legend()
+            ax1.axvline(x=threshold, ymax=ax1.get_ylim()[1], color='r', linestyle='--', linewidth=3)
+            ax2.axvline(x=0.99, ymax=ax2.get_ylim()[1], color='r', linestyle='--', linewidth=3)
+            plot_list[k][0].savefig(os.path.join(path,'total_histogram_'+k+'.png'))
         
     return
 
