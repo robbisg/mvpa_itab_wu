@@ -300,6 +300,68 @@ def test_searchlight(path, subjects, conf_file, type, **kwargs):
     
     return total_results
 
+def test_searchlight_cross_decoding(path, subjects, conf_file, type, **kwargs):
+    
+    conf = read_configuration(path, conf_file, type)
+    
+    for arg in kwargs:
+        conf[arg] = kwargs[arg]
+        if arg == 'radius':
+            radius = kwargs[arg]
+    
+    
+    debug.active += ["SLC"]
+    
+    ds_merged = get_merged_ds(path, subjects, conf_file, type, **kwargs)
+    
+    clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
+    cv = CrossValidation(clf, NFoldPartitioner(attr='task'))
+    
+    maps = []
+    
+    for ds in ds_merged:
+                
+        ds.targets[ds.targets == 'point'] = 'face'
+        ds.targets[ds.targets == 'saccade'] = 'place'
+        
+        sl = sphere_searchlight(cv, radius, space = 'voxel_indices')
+    
+        sl_map = sl(ds)
+    
+        sl_map.samples *= -1
+        sl_map.samples +=  1
+    
+        nif = map2nifti(sl_map, imghdr=ds.a.imghdr)
+        
+        maps.append(nif)
+        
+        
+    datetime = get_time()
+    analysis = 'cross_searchlight'
+    mask = conf['mask_area']
+    task = type
+    
+    new_dir = datetime+'_'+analysis+'_'+mask+'_'+task
+    command = 'mkdir '+os.path.join(path, '0_results', new_dir)
+    os.system(command)
+    
+    parent_dir = os.path.join(path, '0_results', new_dir)
+    
+    for s, map in zip(subjects, maps):
+        name = s
+        command = 'mkdir '+os.path.join(parent_dir, name)
+        os.system(command)
+        
+        results_dir = os.path.join(parent_dir, name)
+        fname = name+'_radius_'+str(radius)+'_searchlight_map.nii.gz'
+        map.to_filename(os.path.join(results_dir, fname))
+        
+    
+    return maps
+        
+        
+
+
 
 def test_group_mvpa(path, subjects, analysis,  conf_file, type='task', **kwargs):
     
@@ -355,8 +417,7 @@ def signal_detection_measures(predictions, targets, map_list):
 def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     
     from scipy.spatial.distance import mahalanobis
-    from sklearn.covariance import LedoitWolf
-    
+    from sklearn.covariance import LedoitWolf, MinCovDet, GraphLasso, ShrunkCovariance
     print 'Computing Mahalanobis similarity...'
     #classifier = results['classifier']
     
@@ -367,7 +428,6 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     prediction_src = classifier.predict(ds_src)
     #prediction_src = results['predictions_ds']
     true_predictions = np.array(prediction_src) == ds_src.targets
-    
     example_dist = dict()
     
     #Extract feature selected from each dataset
@@ -396,13 +456,21 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
         example_dist[label]['cov'] = cov_
         '''
         print 'Estimation of covariance matrix for '+label+' class...'
+        print true_ex.shape
         try:
-            cov_ = LedoitWolf(block_size = 10000).fit(true_ex).covariance_
+            print 'Method is MinCovDet...'
+            #print true_ex[:np.int(true_ex.shape[0]/3),:].shape
+            #cov_ = MinCovDet().fit(true_ex)
+            cov_ = LedoitWolf(block_size = 5000).fit(true_ex)
+            #cov_ = np.cov(true_ex.T)
         except MemoryError, err:
-            cov_ = LedoitWolf(block_size = 15000).fit(true_ex).covariance_
+            print 'Method is LedoitWolf'
+            cov_ = LedoitWolf(block_size = 15000).fit(true_ex)
             
-        example_dist[label]['i_cov'] = scipy.linalg.inv(cov_)
-
+            
+        #example_dist[label]['i_cov'] = scipy.linalg.inv(cov_)
+        example_dist[label]['i_cov'] = cov_.precision_
+        print 'Inverted covariance estimated...'
         
     #Get target predictions (unlabelled)
     prediction_target = results['predictions']
@@ -429,7 +497,8 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     
     #Set the p-value and the threshold value to validate predictions
     m_value = c_squared.isf(p_value)
-    
+    threshold = m_value
+    print m_value
     #Mask true predictions
     true_predictions = (mahalanobis_values < m_value)
     p_values = 1 - c_squared.cdf(mahalanobis_values)
@@ -441,7 +510,7 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     
     #true_data = full_data[true_predictions]
 
-    return full_data, true_predictions
+    return full_data, true_predictions, threshold
     
     
 ##################################################################################
@@ -620,7 +689,10 @@ def get_merged_ds(path, subjects, conf_file, source='task', **kwargs):
             continue
         
         ds_src = preprocess_dataset(ds_src, source, **conf_src)
+        ds_src.sa['task'] = [source for s in range(ds_src.samples.shape[0])]
+        
         ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
+        ds_tar.sa['task'] = [target for s in range(ds_tar.samples.shape[0])]
         
         ds_merged = vstack((ds_src, ds_tar))
         ds_merged.a.update(ds_src.a)
