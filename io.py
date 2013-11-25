@@ -19,6 +19,7 @@ import cPickle as pickle
 from sklearn.linear_model import Ridge
 from scipy.interpolate import UnivariateSpline
 from sklearn import decomposition, manifold, lda, ensemble
+from checkbox import arguments
 
 
 
@@ -470,8 +471,7 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     #Verifying which type of task I've to classify (task or rest) and loads filename in different dirs
     for path in path_file_dirs:
         fileL = fileL + os.listdir(path)
-   
-    
+
     #Verifying which kind of analysis I've to perform (single or group) and filter list elements   
     if cmp(analysis, 'single') == 0:
         fileL = [elem for elem in fileL if (elem.find(img_pattern) != -1) and (elem.find(task) != -1) and (elem.find('mni') == -1)]
@@ -480,7 +480,7 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
 
     #print fileL
     #if no file are found I perform previous analysis!        
-    if (len(fileL) < runs and len(fileL) >= 0):
+    if (len(fileL) <= runs and len(fileL) == 0):
         """
         print ' **** File corrected not found... ****'
         if cmp(analysis, 'single') == 0:
@@ -538,6 +538,144 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     del fileL
     return imgList
 
+def load_beta_dataset(path, subj, type, **kwargs):
+    
+    for arg in kwargs:
+        if arg == 'runs':
+            runs = np.int(kwargs[arg])
+
+    dataset = []
+    targets = []
+    for r in range(runs):
+        filename = 'avg_stats_for_regions_'+subj+'_'+str(runs)+'run_'+subj+'_run'+str(r+1)+'_vox.txt'
+        f = open(os.path.join(path, subj, filename), 'r')
+        run_data = read_beta_file(f, r, **kwargs)
+        dataset.append(run_data[0])
+        targets.append(run_data[1])
+        
+    dataset = np.vstack(dataset)
+    targets = np.vstack(targets)
+    
+    ds = dataset_wizard(dataset, targets=targets[:,0], chunks=targets[:,1])
+    
+    return ds
+
+def read_beta_file(f, run, time_begin=1, time_end=14, **kwargs):
+    #print kwargs
+    for arg in kwargs:
+        #print arg
+        if arg == 'mask_area':
+            mask = kwargs[arg].split(',')
+        if arg == 'time_begin':
+            time_begin = np.int(kwargs[arg])
+        if arg == 'time_end':
+            time_end = np.int(kwargs[arg])
+            
+    if 'time_begin' not in locals():
+        time_begin = 0
+    if 'time_end' not in locals():
+        time_end = 600   
+        
+    file_lines = f.readlines()
+        
+    data_flag = False
+    data = []
+    condition = []
+    runs = []
+    line_ctr = 0
+    for line in file_lines:
+        
+        s_line = line.split()
+        
+        if len(s_line) == 0:
+            data_flag = False
+            line_ctr = 0
+            continue
+          
+        #if line.find('TIMECOURSE : ') != -1:
+        if s_line[0] == 'TIMECOURSE':
+            cond, time_points = decode_line(line, 'timecourse')
+            voxel_per_condition = 0
+            
+            interval = time_end - time_begin
+            if interval >= time_points:
+                interval = time_points
+            if time_end > time_points:
+                time_end = time_points
+            if time_begin > time_points:
+                time_begin = 0
+            if time_begin >= time_end:
+                interval = time_points
+                
+            for i in range(int(interval)):
+                condition.append(cond)
+                runs.append(run)
+            
+        #if line.find('REGION : ') !=-1:
+        if s_line[0] == 'REGION':
+            voxel_num, roi_name = decode_line(line, 'region')
+            for area in mask:
+                if roi_name.find(area) != -1:
+                    voxel_per_condition += int(voxel_num)
+                    data_flag = True
+                    line_ctr = 0
+                    
+                                        
+        #print line
+        if data_flag == True:
+            #print line
+            try:
+                int(s_line[0])
+            except ValueError, err:
+                continue
+            
+            line_ctr += 1
+            
+            data_begin = 3 + time_begin
+            data_end = data_begin +interval
+            #print 'voxel_num='+str(voxel_num)
+            #print 'line_ctr='+str(line_ctr)
+            if line_ctr <= voxel_num:
+                #print line.split()[data_begin:data_end]
+                data.append(np.float_(np.array(line.split()[data_begin:data_end])))
+    
+    data_div = []
+    ndata = np.array(data)
+    for block in range(len(np.unique(condition))):
+        data_div.append(ndata[block * voxel_per_condition:(block+1) * voxel_per_condition])
+    
+    ndata = np.hstack(data_div).T
+    targets = np.vstack((condition, runs)).T
+    
+    return ndata, targets
+
+def decode_line(line, keyword):
+    
+    if keyword == 'timecourse':
+        
+        condition = line.split()[2]
+        time_points = line.split()[-1]
+        return condition, time_points
+    
+    elif keyword == 'data':
+        
+        data = np.array(line)
+        return data
+    
+    elif keyword == 'region':
+        
+        vox_num = line.split()[-1]
+        roi_name = line.split()[-2]
+        return vox_num, roi_name
+
+
+def read_beta_data(line, voxel_num, time_points):
+    
+    
+    
+    return
+    
+    
 #@profile
 def load_dataset(path, subj, type, **kwargs):
     '''
@@ -766,7 +904,9 @@ def load_mask_wu(path, subj, **kwargs):
         mask_list = os.listdir(mask_path)
         mask_to_find1 = subj+'_mask_mask'
         mask_to_find2 = 'mask_'+subj+'_mask'
-        mask_list = [m for m in mask_list if m.find(mask_to_find1) != -1 or m.find(mask_to_find2) != -1]
+        mask_to_find3 = '_mask.nii.gz'
+        mask_list = [m for m in mask_list if m.find(mask_to_find1) != -1 or m.find(mask_to_find2) != -1 \
+                     or m.find(mask_to_find3) != -1]
     
     elif (mask_area == ['searchlight_3'] or mask_area == ['searchlight_5']):
         mask_list = os.listdir(mask_path)
@@ -1164,12 +1304,15 @@ def save_results_transfer_learning(path, results):
     
     hist_sum = dict()
     
+    means_s = dict()
     for t in np.unique(r):
         hist_sum[t] = dict()
         for l in np.unique(p):
             hist_sum[t][l] = dict()
             hist_sum[t][l]['dist'] = []
             hist_sum[t][l]['p'] = []
+            means_s[l+'_'+t] = []
+    
     
     for name in results:
         command = 'mkdir '+os.path.join(path, name)
@@ -1238,6 +1381,7 @@ def save_results_transfer_learning(path, results):
         full_data = results[name]['mahalanobis_similarity'][0]
         true_pred = results[name]['mahalanobis_similarity'][1]
         threshold = results[name]['mahalanobis_similarity'][2]
+        distances = results[name]['mahalanobis_similarity'][4]
         
         t_mahala = full_data[true_pred]
         fname = name+'_mahalanobis_data.txt'
@@ -1252,17 +1396,22 @@ def save_results_transfer_learning(path, results):
         for t in np.unique(full_data.T[1]):
             f, ax = plt.subplots(2, 1)
             plot_list[t] = [f, ax]
-
+        
+        #for each label of the target dataset (target classes)
         for tar in np.unique(full_data.T[0]): 
             
+            #Rest mask
             t_pred_mask = full_data.T[0] == tar
             t_m_data = full_data[t_pred_mask * true_pred]
             
-            
+            #for each predicted label
             for lab in np.unique(full_data.T[1]):
                 
                 histo_fname = name+'_histo_'+lab+'_'+tar+'_dist.txt'
                 histo_p_fname = name+'_histo_'+lab+'_'+tar+'_p.txt'
+                
+                
+                
                 all_vec = full_data[(full_data.T[1] == lab) * t_pred_mask]
                 
                 if len(t_m_data) != 0:
@@ -1292,6 +1441,43 @@ def save_results_transfer_learning(path, results):
                 
                 hist_sum[tar][lab]['dist'].append(np.float_(all_vec.T[2]))
                 hist_sum[tar][lab]['p'].append(np.float_(all_vec.T[3]))
+                
+            
+            histo_full_fname = name+'_'+tar+'_histo_.txt'
+            histo_full_p_fname = name+'_'+tar+'_histo_p.txt'
+            
+            l = 0
+            pred_array = np.zeros(full_data.T[1].shape)
+            for lab in np.unique(full_data[t_pred_mask].T[1]):
+                
+                pred_array[full_data.T[1] == lab] = l
+                
+                l = l + 1
+                
+            #np.savetxt(os.path.join(results_dir,histo_full_fname), np.vstack((full_data[t_pred_mask].T[2:], pred_array)))
+
+
+        for c in distances.keys():
+            for tar in np.unique(full_data.T[0]):
+                data = distances[c][full_data.T[0] == tar]
+                f_d = plt.figure()
+                a_d = f_d.add_subplot(111)
+                a_d.plot(data)
+                a_d.set_ylim(1000, 10000)
+                step = data.__len__() / 6.
+                for j in np.arange(6)+1:#n_runs
+                    a_d.axvline(x = step * j, ymax=a_d.get_ylim()[1], color='y', linestyle='-', linewidth=1)
+                a_d.axhline(y = threshold, color='r', linestyle='--', linewidth=2)
+                
+                means_s[c+'_'+tar].append(np.mean(data))
+                a_d.axhline(y = np.mean(data), color='black', linestyle=':', linewidth=2)
+                f_d.savefig(os.path.join(results_dir,name+'_distance_plot_'+c+'_'+tar+'_.png'))
+            
+                np.savetxt(os.path.join(results_dir,name+'_distance_txt_'+c+'_'+tar+'_.txt'), distances[c][full_data.T[0] == tar])               
+                
+                
+                
+            
         
         for k in plot_list.keys():
             ax1 = plot_list[k][1][0]
@@ -1341,9 +1527,19 @@ def save_results_transfer_learning(path, results):
             for map, t in zip(results[name]['map'], results[name]['sensitivities'].sa.targets):
                     cl = '_'.join(t)
                     fname = name+'_'+cl+'_map.nii.gz'
+    
                     map._data = (map._data - np.mean(map._data))/np.std(map._data)
                     ni.save(map, os.path.join(results_dir,fname))
     
+    
+    '''
+    End of main for
+    '''
+                
+    from pprint import pprint
+    filename_ = open(os.path.join(path, 'distance_means.txt'), 'w')
+    pprint(means_s, filename_)
+    filename_.close()
     
     plot_list = dict()
     for t in hist_sum[hist_sum.keys()[0]].keys():

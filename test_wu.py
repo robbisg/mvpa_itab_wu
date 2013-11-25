@@ -73,6 +73,7 @@ def test_spatial(path, subjects, conf_file, type, **kwargs):
         
         total_results[subj] = r
         
+        #del ds
         
     
     conf['analysis_type'] = 'spatial'
@@ -482,6 +483,13 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
         #Keep mahalanobis distance between examples and class distribution
         mahalanobis_values.append(mahalanobis(example_dist[l]['mean'], ex, example_dist[l]['i_cov']))
     
+    distances = dict()
+    for c in np.unique(prediction_target):
+            distances[c] = []
+            for ex in ds_tar.samples:
+                distances[c].append(mahalanobis(example_dist[c]['mean'], ex, example_dist[c]['i_cov']))
+            
+            distances[c] = np.array(distances[c]) ** 2
     '''
     Squared Mahalanobis distance is similar to a chi square distribution with 
     degrees of freedom equal to the number of features.
@@ -498,19 +506,20 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     #Set the p-value and the threshold value to validate predictions
     m_value = c_squared.isf(p_value)
     threshold = m_value
-    print m_value
+    
     #Mask true predictions
     true_predictions = (mahalanobis_values < m_value)
     p_values = 1 - c_squared.cdf(mahalanobis_values)
-    
+    print np.count_nonzero(p_values)
     '''
     Get some data
     '''
     full_data = np.array(zip(ds_tar.targets, prediction_target, mahalanobis_values, p_values))
+    #print np.count_nonzero(np.float_(full_data.T[3]) == p_values)
     
     #true_data = full_data[true_predictions]
 
-    return full_data, true_predictions, threshold
+    return full_data, true_predictions, threshold, p_values, distances
     
     
 ##################################################################################
