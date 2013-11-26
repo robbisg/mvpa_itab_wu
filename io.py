@@ -19,8 +19,6 @@ import cPickle as pickle
 from sklearn.linear_model import Ridge
 from scipy.interpolate import UnivariateSpline
 from sklearn import decomposition, manifold, lda, ensemble
-from checkbox import arguments
-
 
 
 def get_time():
