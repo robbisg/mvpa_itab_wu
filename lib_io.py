@@ -4,7 +4,6 @@
 #     See the file license.txt for copying permission.
 ########################################################
 
-
 import nibabel as ni
 import os
 from main_wu import *
@@ -15,11 +14,6 @@ from itertools import cycle
 import cPickle as pickle
 
 #from memory_profiler import profile
-
-from sklearn.linear_model import Ridge
-from scipy.interpolate import UnivariateSpline
-from sklearn import decomposition, manifold, lda, ensemble
-
 
 def get_time():
         #Time acquisition for file name!
@@ -39,6 +33,8 @@ def get_time():
 
 def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
     
+    from sklearn.linear_model import Ridge
+    from scipy.interpolate import UnivariateSpline
     result_file = open(
                        os.path.join(path, 
                                '0_results', 
@@ -120,6 +116,8 @@ def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
 
 def plot_transfer_graph_fitted(path, name, analysis_folder):
     
+    from sklearn.linear_model import Ridge
+    from scipy.interpolate import UnivariateSpline
     result_file = open(
                        os.path.join(path, 
                                '0_results', 
@@ -337,6 +335,7 @@ def plot_cv_results(cv, err, title):
 
 def plot_scatter_2d(ds_merged, method='mds', fig_number = 1):
     
+    from sklearn import decomposition, manifold, lda, ensemble
     """
     methods: 'mds', 'pca', 'iso', 'forest', 'embedding'
     """
@@ -365,7 +364,7 @@ def plot_scatter_2d(ds_merged, method='mds', fig_number = 1):
         stringa = 'Spectral Embedding'
     #########
     else:
-        clf = MDS(n_components=2, n_init=1, max_iter=100)
+        clf = manifold.MDS(n_components=2, n_init=1, max_iter=100)
         stringa = 'Multidimensional scaling'
         
         
@@ -463,7 +462,7 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
             path_file_dirs.append(os.path.join(path,name,dir))
     
    
-    print 'Loading...'
+    #print 'Loading...'
     
     fileL = []
     #Verifying which type of task I've to classify (task or rest) and loads filename in different dirs
@@ -476,7 +475,7 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     else:
         fileL = [elem for elem in fileL if elem.find(img_pattern) != -1 and elem.find(task) != -1 and elem.find('mni') != -1]
 
-    #print fileL
+    print fileL
     #if no file are found I perform previous analysis!        
     if (len(fileL) <= runs and len(fileL) == 0):
         """
@@ -526,12 +525,14 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
         #if (str(len(imgList))) < 1:
         print data.shape
         
-        new_im = ni.Nifti1Image(data[:,:,:,el_vols:], affine = im.get_affine(), header = im.get_header()) 
+        new_im = im.__class__(data[:,:,:,el_vols:], affine = im.get_affine(), header = im.get_header()) 
+        new_im.set_filename(pathF)
         
-        del data, im
+        del data
+        del im
         imgList.append(new_im)
         
-    print 'The image list is of ' + str(len(imgList)) + ' images.'
+    #print 'The image list is of ' + str(len(imgList)) + ' images.'
         
     del fileL
     return imgList
@@ -810,7 +811,7 @@ def load_spatiotemporal_dataset(ds, **kwargs):
     return evds
 
 
-
+#@profile
 def load_mask(path, subj, **kwargs):
     '''
     @param mask_type: indicates the type of atlas you want to use:
@@ -1014,7 +1015,7 @@ def load_attributes (path, task, subj, **kwargs):
         attrFiles = attrFiles + os.listdir(dir)
 
     attrFiles = [f for f in attrFiles if f.find(event_file) != -1]
-    #print attrFiles
+    print attrFiles
     if len(attrFiles) > 2:
         attrFiles = [f for f in attrFiles if f.find(subj) != -1]
         
@@ -1101,7 +1102,8 @@ def read_remote_configuration(path):
     
     
     print 'Reading remote config file '+os.path.join(path,'remote.conf')
-    
+
+#@profile
 def read_configuration (path, experiment, section):
     
     import ConfigParser
@@ -1323,58 +1325,58 @@ def save_results_transfer_learning(path, results):
         
         stats = results[name]['stats']
         fname = name+'_stats.txt'
-        file = open(os.path.join(results_dir,fname), 'w')
-        file.write(str(stats))
+        file_ = open(os.path.join(results_dir,fname), 'w')
+        file_.write(str(stats))
         p_value = results[name]['p-value']
-        file.write('\n\n p-values for each fold \n')
+        file_.write('\n\n p-values for each fold \n')
         for v in p_value:
-            file.write(str(v)+'\n')
-        file.write('\n\n Mean each fold p-value: '+str(p_value.mean()))
-        file.write('\n\n Mean null dist total accuracy value: '+str(results[name]['p']))
-        file.write('\nd-prime coefficient: '+str(results[name]['d_prime']))
-        file.write('\nbeta coefficient: '+str(results[name]['beta']))
-        file.write('\nc coefficient: '+str(results[name]['c']))
+            file_.write(str(v)+'\n')
+        file_.write('\n\n Mean each fold p-value: '+str(p_value.mean()))
+        file_.write('\n\n Mean null dist total accuracy value: '+str(results[name]['p']))
+        file_.write('\nd-prime coefficient: '+str(results[name]['d_prime']))
+        file_.write('\nbeta coefficient: '+str(results[name]['beta']))
+        file_.write('\nc coefficient: '+str(results[name]['c']))
         #file.write('\n\nd-prime mahalanobis coeff: '+str(results[name]['d_prime_maha']))
-        file.close()
+        file_.close()
         
         if name == 'group':
             fname = name+'_fold_stats.txt'
-            file = open(os.path.join(results_dir,fname), 'w')
+            file_ = open(os.path.join(results_dir,fname), 'w')
             for m in stats.matrices:
-                file.write(str(m.stats['ACC']))
-                file.write('\n')
-            file.close()
+                file_.write(str(m.stats['ACC']))
+                file_.write('\n')
+            file_.close()
                 
         obj = results[name]['classifier'].ca
         fname = name+'_'+'classifier'+'.pyobj'          
-        file = open(os.path.join(results_dir,fname), 'w')
-        pickle.dump(obj, file)
-        file.close()
+        file_ = open(os.path.join(results_dir,fname), 'w')
+        pickle.dump(obj, file_)
+        file_.close()
         
         obj = results[name]['targets']
         fname = name+'_'+'targets'+'.pyobj'          
-        file = open(os.path.join(results_dir,fname), 'w')
-        pickle.dump(obj, file)
-        file.close()
+        file_ = open(os.path.join(results_dir,fname), 'w')
+        pickle.dump(obj, file_)
+        file_.close()
         
         obj = results[name]['predictions']
         fname = name+'_'+'predictions'+'.pyobj'          
-        file = open(os.path.join(results_dir,fname), 'w')
-        pickle.dump(obj, file)
-        file.close()
+        file_ = open(os.path.join(results_dir,fname), 'w')
+        pickle.dump(obj, file_)
+        file_.close()
         #plot_transfer_graph(results_dir, name, results[name])
         
         c_m = results[name]['confusion_target']
         fname = name+'_confusion_target.txt'
-        file = open(os.path.join(results_dir,fname), 'w')
-        file.write(str(c_m))
-        file.close()
+        file_ = open(os.path.join(results_dir,fname), 'w')
+        file_.write(str(c_m))
+        file_.close()
         
         c_m = results[name]['confusion_total']
         fname = name+'_confusion_total.txt'
-        file = open(os.path.join(results_dir,fname), 'w')
-        file.write(str(c_m))
-        file.close()        
+        file_ = open(os.path.join(results_dir,fname), 'w')
+        file_.write(str(c_m))
+        file_.close()        
         
         full_data = results[name]['mahalanobis_similarity'][0]
         true_pred = results[name]['mahalanobis_similarity'][1]
@@ -1383,7 +1385,7 @@ def save_results_transfer_learning(path, results):
         
         t_mahala = full_data[true_pred]
         fname = name+'_mahalanobis_data.txt'
-        file = open(os.path.join(results_dir,fname), 'w')
+        file_ = open(os.path.join(results_dir,fname), 'w')
         
         n_src_label = len(np.unique(full_data.T[1]))
         n_tar_label = len(np.unique(full_data.T[0]))
@@ -1426,7 +1428,7 @@ def save_results_transfer_learning(path, results):
                 tot_mean = np.mean(np.float_(all_vec.T[2]))
                 tot_p = np.mean(np.float_(all_vec.T[3]))
                                
-                file.write(tar+' '+lab+' '+str(num)+' '+str(mean_maha)+' '+str(mean_p)+' '+str(tot_mean)+' '+str(tot_p)+'\n')
+                file_.write(tar+' '+lab+' '+str(num)+' '+str(mean_maha)+' '+str(mean_p)+' '+str(tot_mean)+' '+str(tot_p)+'\n')
                 
                 np.savetxt(os.path.join(results_dir,histo_fname), np.float_(all_vec.T[2]))
                 np.savetxt(os.path.join(results_dir,histo_p_fname), np.float_(all_vec.T[3]))
@@ -1461,7 +1463,7 @@ def save_results_transfer_learning(path, results):
                 f_d = plt.figure()
                 a_d = f_d.add_subplot(111)
                 a_d.plot(data)
-                a_d.set_ylim(1000, 10000)
+                a_d.set_ylim(1000, 3000)
                 step = data.__len__() / 6.
                 for j in np.arange(6)+1:#n_runs
                     a_d.axvline(x = step * j, ymax=a_d.get_ylim()[1], color='y', linestyle='-', linewidth=1)
@@ -1471,7 +1473,8 @@ def save_results_transfer_learning(path, results):
                 a_d.axhline(y = np.mean(data), color='black', linestyle=':', linewidth=2)
                 f_d.savefig(os.path.join(results_dir,name+'_distance_plot_'+c+'_'+tar+'_.png'))
             
-                np.savetxt(os.path.join(results_dir,name+'_distance_txt_'+c+'_'+tar+'_.txt'), distances[c][full_data.T[0] == tar])               
+                np.savetxt(os.path.join(results_dir,name+'_distance_txt_'+c+'_'+tar+'_.txt'), 
+                           distances[c][full_data.T[0] == tar], fmt='%.4f')               
                 
                 
                 
@@ -1489,16 +1492,16 @@ def save_results_transfer_learning(path, results):
         
         
             
-        file.write('\nthreshold '+str(threshold))       
-        file.close()
+        file_.write('\nthreshold '+str(threshold))       
+        file_.close()
         
         cmatrix_mahala = results[name]['confusion_mahala']
         fname = name+'_confusion_mahala.txt'
-        file = open(os.path.join(results_dir,fname), 'w')
+        file_ = open(os.path.join(results_dir,fname), 'w')
         try:
-            file.write(str(cmatrix_mahala))
+            file_.write(str(cmatrix_mahala))
         except ValueError,err:
-            file.write('None')
+            file_.write('None')
             print err
         '''
         cmatrix_mahala = results[name]['confusion_tot_maha']
@@ -1511,7 +1514,7 @@ def save_results_transfer_learning(path, results):
             print err  
         '''
         
-        file.close()
+        file_.close()
         
     
         if results[name]['map'] != None:

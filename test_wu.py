@@ -459,10 +459,10 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
         print 'Estimation of covariance matrix for '+label+' class...'
         print true_ex.shape
         try:
-            print 'Method is MinCovDet...'
+            #print 'Method is MinCovDet...'
             #print true_ex[:np.int(true_ex.shape[0]/3),:].shape
             #cov_ = MinCovDet().fit(true_ex)
-            cov_ = LedoitWolf(block_size = 5000).fit(true_ex)
+            cov_ = LedoitWolf(block_size = 2000).fit(true_ex)
             #cov_ = np.cov(true_ex.T)
         except MemoryError, err:
             print 'Method is LedoitWolf'
@@ -657,6 +657,8 @@ def sources_merged_ds(path_list, subjects_list, conf_list, task, **kwargs):
    
 def get_merged_ds(path, subjects, conf_file, source='task', **kwargs):
     
+    
+    #Mettere source e target nel conf!
     if source == 'task':
         target = 'rest'
     else:

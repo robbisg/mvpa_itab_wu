@@ -11,14 +11,13 @@ import time
 
 from mvpa2.suite import *
 
-from sklearn.manifold import MDS
-from sklearn.cluster import KMeans
+
 from sklearn.svm import SVC
 
 from scipy.spatial.distance import *
 
 import matplotlib.pyplot as plt
-from io import *
+from lib_io import *
 from utils import *
 
 class StoreResults(object):
@@ -178,7 +177,15 @@ def preprocess_dataset(ds, type, **kwargs):
         if (arg == 'img_dim'):
             img_dim = int(kwargs[arg])
                 
-    print 'Dataset preprocessing: Detrending and Z-Scoring...'
+                
+    if  label_dropped != 'none':
+        ds = ds[ds.sa.targets != label_dropped]
+    if  label_included != ['all']:
+        ds = ds[np.array([l in label_included for l in ds.sa.targets],
+                          dtype='bool')]
+    
+    
+    print 'Dataset preprocessing: Detrending...'
     if img_dim == 4:
         poly_detrend(ds, polyord = 1, chunks_attr = 'file');
     poly_detrend(ds, polyord = 1, chunks_attr = 'chunks');
@@ -189,16 +196,19 @@ def preprocess_dataset(ds, type, **kwargs):
         print 'Averaging samples...'
         avg_mapper = mean_group_sample(['events_number']) 
         ds = ds.get_mapped(avg_mapper)     
-
+    
+    print 'Dataset preprocessing: Normalization feature-wise...'
     if img_dim == 4:
         zscore(ds, chunks_attr='file')
     zscore(ds)#, param_est=('targets', ['fixation']))
    
-    if  label_dropped != 'none':
-        ds = ds[ds.sa.targets != label_dropped]
-    if  label_included != ['all']:
-        ds = ds[np.array([l in label_included for l in ds.sa.targets],
-                          dtype='bool')]
+    #Normalizing image-wise
+    print 'Dataset preprocessing: Normalization sample-wise...'
+    ds.samples -= np.mean(ds, axis=1)[:, None]
+    ds.samples /= np.std(ds, axis=1)[:, None]
+    
+    ds.samples[np.isnan(ds.samples)] = 0
+    
     
     ds.a.events = find_events(chunks = ds.sa.chunks, targets = ds.sa.targets)
     
@@ -669,6 +679,9 @@ def setup_classifier(**kwargs):
 
 
 def clustering (ds, n_clusters=6):
+    
+    from sklearn.manifold import MDS
+    from sklearn.cluster import KMeans
     
     data = ds.samples
     
