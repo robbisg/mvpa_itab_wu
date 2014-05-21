@@ -462,20 +462,21 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
             path_file_dirs.append(os.path.join(path,name,dir))
     
    
-    #print 'Loading...'
+    print 'Loading...'
     
     fileL = []
     #Verifying which type of task I've to classify (task or rest) and loads filename in different dirs
     for path in path_file_dirs:
         fileL = fileL + os.listdir(path)
 
+    #print fileL
     #Verifying which kind of analysis I've to perform (single or group) and filter list elements   
     if cmp(analysis, 'single') == 0:
-        fileL = [elem for elem in fileL if (elem.find(img_pattern) != -1) and (elem.find(task) != -1) and (elem.find('mni') == -1)]
+        fileL = [elem for elem in fileL if (elem.find(img_pattern) != -1) and (elem.find(task) != -1) ]#and (elem.find('mni') == -1)]
     else:
         fileL = [elem for elem in fileL if elem.find(img_pattern) != -1 and elem.find(task) != -1 and elem.find('mni') != -1]
 
-    print fileL
+    #print fileL
     #if no file are found I perform previous analysis!        
     if (len(fileL) <= runs and len(fileL) == 0):
         """

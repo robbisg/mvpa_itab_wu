@@ -21,24 +21,26 @@ from lib_io import *
 from utils import *
 
 class StoreResults(object):
-        def __init__(self):
-            self.storage = []
+    def __init__(self):
+        self.storage = []
             
-        def __call__(self, data, node, result):
-            self.storage.append((node.measure.clf.ca.probabilities,
+    def __call__(self, data, node, result):
+        self.storage.append((node.measure.clf.ca.probabilities,
                                     node.measure.clf.ca.predictions)),
-                                    
+
 def balance_dataset(ds, label, sort=True, **kwargs):
     
     ################ To be changed ######################
     m_fixation = ds.targets == 'fixation'
-    ev_fix = zip(ds.chunks[m_fixation], 4*((ds.sa.events_number[m_fixation]+2)/4 - 1 )+2)
+    ev_fix = zip(ds.chunks[m_fixation], 
+                 4*((ds.sa.events_number[m_fixation]+2)/4 - 1 )+2)
     ####################################################
     
     ev_fix=np.array(ev_fix)
     ds.sa.events_number[m_fixation] = np.int_(ev_fix.T[1])
     arg_sort = np.argsort(ds.sa.events_number)
-    events = find_events(chunks = ds[arg_sort].sa.chunks, targets = ds[arg_sort].sa.targets)
+    events = find_events(chunks = ds[arg_sort].sa.chunks, 
+                         targets = ds[arg_sort].sa.targets)
     # min duration
     min_duration = np.min( [e['duration'] for e in events])
 
@@ -187,8 +189,8 @@ def preprocess_dataset(ds, type, **kwargs):
     
     print 'Dataset preprocessing: Detrending...'
     if img_dim == 4:
-        poly_detrend(ds, polyord = 1, chunks_attr = 'file');
-    poly_detrend(ds, polyord = 1, chunks_attr = 'chunks');
+        poly_detrend(ds, polyord = 1, chunks_attr = 'file')
+    poly_detrend(ds, polyord = 1, chunks_attr = 'chunks')
     
     
                           
@@ -484,19 +486,19 @@ def spatiotemporal(ds, **kwargs):
         enable_results = ['map', 'sensitivities', 'stats', 
                           'mapper', 'classifier', 'ds', 
                           'p-value', 'p']
-        
-    allowed_keys = ['map', 'sensitivities', 'stats', 
-                    'mapper', 'classifier', 'ds', 
-                    'p-value', 'p']       
-    
+
+    allowed_keys = ['map', 'sensitivities', 'stats',
+                    'mapper', 'classifier', 'ds',
+                    'p-value', 'p']
+
     allowed_results = [l_maps, res_sens, cvte.ca.stats, 
                        evds.a.mapper, fclf, evds, 
                        p_value, total_p_value]
-    
+
     results_dict = dict(zip(allowed_keys, allowed_results))
-    
+
     for elem in enable_results:
-        
+
         if elem in allowed_keys:
             results[elem] = results_dict[elem]
         else:
@@ -506,68 +508,68 @@ def spatiotemporal(ds, **kwargs):
 
 
 def transfer_learning(ds_src, ds_tar, analysis, **kwargs):
-    
+
     for arg in kwargs:
         if arg == 'enable_results':
             enable_results = kwargs[arg]
         if arg == 'duration':
-            duration = kwargs[arg]  
+            duration = kwargs[arg]
         if arg == 'window_number':
             window_number = kwargs[arg]
-    
+
     #src_result = analysis(ds_src, enable_results = ['classifier', 'map', 'stats', 'seni'], **kwargs)
     src_result = analysis(ds_src, **kwargs)
-    
+
     classifier = src_result['classifier']
     
     if analysis.func_name == 'spatiotemporal':
         if 'duration' not in locals():
             duration = np.min([e['duration'] for e in ds_src.a.events])
-            
+
         ds_tar = build_events_ds(ds_tar, duration, **kwargs)
-        
-    
+
+
     predictions = classifier.predict(ds_tar)
-    
+
     ###########################################################
     #   Pack_results
     results = dict()
     #del enable_results
     if 'enable_results' not in locals():
-        enable_results = ['targets', 'classifier', 'map', 
-                          'stats', 'sensitivities', 'mapper', 
+        enable_results = ['targets', 'classifier', 'map',
+                          'stats', 'sensitivities', 'mapper',
                           'predictions','fclf', 'ds_src', 'ds_tar', 'p-value', 'p']
-        
-    allowed_keys = ['targets', 'classifier', 'map', 
-                    'stats', 'sensitivities', 'mapper', 
+
+    allowed_keys = ['targets', 'classifier', 'map',
+                    'stats', 'sensitivities', 'mapper',
                     'predictions','fclf', 'ds_src', 'ds_tar', 'p-value', 'p']
-    
-    
+
+
     if isinstance(classifier, FeatureSelectionClassifier):
         classifier_s = classifier.clf
     else:
         classifier_s = classifier
-        
+
     allowed_results = [ds_tar.targets, classifier_s, src_result['map'], 
                        src_result['stats'], src_result['sensitivities'], 
                        src_result['mapper'], predictions, 
                        classifier, src_result['ds'], ds_tar, src_result['p-value'],
                        src_result['p'] ]
-    
+
     results_dict = dict(zip(allowed_keys, allowed_results))
-    
+
     for elem in enable_results:
-        
+
         if elem in allowed_keys:
             results[elem] = results_dict[elem]
         else:
             print '******** '+elem+' result is not allowed  ! *********'
-    
+
     return results
 
 
 def setup_classifier(**kwargs):
-    
+
     '''
     Thinked!
     '''
@@ -575,21 +577,21 @@ def setup_classifier(**kwargs):
         if arg == 'clf_type':
             clf_type = kwargs[arg]
         if arg == 'fsel':
-            f_sel = kwargs[arg]        
+            f_sel = kwargs[arg]
         if arg == 'cv_type':
             cv_approach = kwargs[arg]
         if arg == 'cv_folds':
             if np.int(kwargs[arg]) == 0:
-                cv_type =  np.float(kwargs[arg])
+                cv_type = np.float(kwargs[arg])
             else:
                 cv_type = np.int(kwargs[arg])
         if arg == 'permutations':
             permutations = np.int(kwargs[arg])
         if arg == 'cv_attribute':
             attribute = kwargs[arg]
-    
+
     cv_n = cv_type
-            
+
     ################# Classifier #######################
     if clf_type == 'SVM':
         clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
@@ -609,135 +611,131 @@ def setup_classifier(**kwargs):
     else:
         clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
     
-    ############## Feature Selection #########################    
+    ############## Feature Selection #########################
     if f_sel == 'True':
         print 'Feature Selection selected.'
         fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  
-                                                FractionTailSelector(0.1, 
-                                                                     mode = 'select', 
-                                                                     tail = 'upper'))
+                                                FractionTailSelector(0.1,
+                                                                     mode='select',
+                                                                     tail='upper'))
         fclf = FeatureSelectionClassifier(clf, fsel)
-    
+
     elif f_sel == 'Fixed':
         print 'Fixed Feature Selection selected.'
         fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  
-                                                FixedNElementTailSelector(50, 
-                                                                     mode = 'select',
-                                                                     tail = 'upper'))
+                                                FixedNElementTailSelector(50,
+                                                                     mode='select',
+                                                                     tail='upper'))
         fclf = FeatureSelectionClassifier(clf, fsel)
     else:
-        
+
         fclf = clf
-    
+
     ######################### Permutations #############################
-    
+
     if permutations != 0:
         if __debug__:
             debug.active += ["STATMC"]
-        repeater = Repeater(count= permutations)
-        permutator = AttributePermutator('targets', limit={'partitions': 1}, count=1)
-        partitioner = NFoldPartitioner(cvtype=cv_n, attr = attribute)
+        repeater = Repeater(count=permutations)
+        permutator = AttributePermutator('targets', limit={'partitions': 1}, 
+                                         count=1)
+        partitioner = NFoldPartitioner(cvtype=cv_n, attr=attribute)
         null_cv = CrossValidation(
                                   clf,
-                                  ChainNode([partitioner, permutator], 
+                                  ChainNode([partitioner, permutator],
                                             space=partitioner.get_space()),
                                   errorfx=mean_mismatch_error)
-        
+
         distr_est = MCNullDist(repeater, tail='left', measure=null_cv,
                                enable_ca=['dist_samples'])
         #postproc = mean_sample()
     else:
         distr_est = None
         #postproc = None
-    
-    ##########################################################################    
+
+    ########################################################
     if cv_approach == 'n_fold':
         if cv_type != 0:
-            
-            splitter_used = NFoldPartitioner(cvtype = cv_type, attr = attribute)
+            splitter_used = NFoldPartitioner(cvtype=cv_type, attr=attribute)
         else:
-            splitter_used = NFoldPartitioner(cvtype = 1, attr = attribute)
+            splitter_used = NFoldPartitioner(cvtype=1, attr=attribute)
     else:
-        splitter_used = HalfPartitioner(attr = attribute)
+        splitter_used = HalfPartitioner(attr=attribute)
 
-    ############################################################################
+    #############################################################
     if distr_est == None:
         cvte = CrossValidation(fclf,
-                               splitter_used, 
+                               splitter_used,
                                enable_ca=['stats', 'repetition_results'])
     else:
         cvte = CrossValidation(fclf,
-                               splitter_used, 
+                               splitter_used,
                                errorfx=mean_mismatch_error,
-                               null_dist=distr_est,                               
+                               null_dist=distr_est,
                                enable_ca=['stats', 'repetition_results'])
-    
-       
+
     print 'Classifier set...'
-    
+
     return [fclf, cvte]
 
 
-def clustering (ds, n_clusters=6):
-    
+def clustering(ds, n_clusters=6):
+
     from sklearn.manifold import MDS
     from sklearn.cluster import KMeans
-    
+
     data = ds.samples
-    
+
     #clusters = inertia_clustering_analysis(ds, max_clusters = 13)
-              
+
     kmeans = KMeans(init='k-means++', n_clusters=n_clusters, n_init=10)
-    
-    print 'Clustering with '+str(n_clusters)+' clusters...'
+
+    print 'Clustering with ' + str(n_clusters) + ' clusters...'
     cluster_label = kmeans.fit_predict(data)
     dist = squareform(pdist(data, 'euclidean'))
-    
+
     ###########################################################
     #   Pack_results
     results = dict()
 
     if 'enable_results' not in locals():
         enable_results = ['clusters', 'dist']
-        
-    allowed_keys = ['clusters', 'dist']        
+
+    allowed_keys = ['clusters', 'dist']
     allowed_results = [cluster_label, dist]
-    
+
     results_dict = dict(zip(allowed_keys, allowed_results))
-    
+
     for elem in enable_results:
-        
+
         if elem in allowed_keys:
             results[elem] = results_dict[elem]
         else:
-            print '******** '+elem+' result is not allowed! *********'
-    
+            print '******** ' + elem + ' result is not allowed! *********'
+
     return results
-    
-    
+
+
 def clustering_analysis(ds_src, ds_tar, analysis, **kwargs):
-    
-    
+
     for arg in kwargs:
         if arg == 'duration':
             duration = kwargs[arg]
         if arg == 'mds':
             mds_flag = kwargs[arg]
-            
         if arg == 'n_clusters':
             n_clusters = kwargs[arg]
             ########
     mds_flag = True
-    
-    
+
     r_trans = transfer_learning(ds_src, ds_tar, analysis, **kwargs)
-    
+
     if analysis.func_name == 'spatiotemporal':
         if 'duration' not in locals():
             duration = np.min([e['duration'] for e in ds_src.a.events])
-            
+
         ds_tar = build_events_ds(ds_tar, duration, **kwargs)
-    
+
     r_clustering = dict()
     for label in np.unique(ds_tar.targets):
         mask = ds_tar.targets == label
@@ -749,146 +747,63 @@ def clustering_analysis(ds_src, ds_tar, analysis, **kwargs):
             print 'Multidimensional scaling is performing...'
             pos = mds.fit_transform(r_clustering[label]['dist'])
             r_clustering[label]['pos'] = pos
-  
+
     #cluster_label = r_clustering['clusters']
     predictions = r_trans['classifier'].ca.predictions
-    
+
     return dict({'clusters': r_clustering, 
                  'predictions': predictions, 
                  'targets': ds_tar.targets})
-    
 
-def inertia_clustering_analysis(ds, max_clusters = 13):
-    
+
+def inertia_clustering_analysis(ds, max_clusters=13):
+
     inertia_val = np.array([])
-    
+
     #max_clusters = 13#+2 = 15
     for i in np.arange(max_clusters)+2:
         kmeans = KMeans(init='k-means++', n_clusters=i, n_init=10)
         kmeans.fit(ds.samples)
         inertia_val = np.append(inertia_val, kmeans.inertia_)
-    
+
     f = plt.figure()
     a = f.add_subplot(111)
     a.plot(inertia_val)
     plt.show()
-    
+
     return inertia_val
 
-              
-def analyze (path, subjects, analysis, type, conf_file, **kwargs):
-    
-    
-    configuration = read_configuration(path, conf_file, type)
-    
+
+def analyze(path, subjects, analysis, model, conf_file, **kwargs):
+
+    configuration = read_configuration(path, conf_file, model)
+
     mask_area = ''
     mask_type = ''
     mask_space = ''
-    
+
     for arg in kwargs:
         configuration[arg] = kwargs[arg]
 
-    kwargs = configuration   
+    kwargs = configuration
     #resFile = open(os.path.join(path, 'spatiotemporal_res_5.log'),'w')
     results = []
 
     for subj in subjects:
-        ds = load_dataset(path, subj, type, **kwargs)
+        ds = load_dataset(path, subj, model, **kwargs)
         if ds == 0:
-            continue;
+            continue
         else:
-            ds = preprocess_dataset(ds, type, **kwargs)
-            
+            ds = preprocess_dataset(ds, model, **kwargs)
+
             res = analysis(ds, **kwargs)
 
-            mask = configuration['mask_atlas']+'_'+configuration['mask_area']
-            
+            mask = configuration['mask_atlas'] + '_' + configuration['mask_area']
+
             results.append(dict({'name': subj,
                                 'results': res,
                                 'configuration': configuration}))
-    
+
     #filename_pre = save_results(path, analysis, type, mask, results)
 
     return results
-
-
-def watch_results(path, filename, write_map=True):
-    results = pickle.load(open(os.path.join(path, 
-                                        filename)))
-
-       
-
-
-def update_log (path, param, file_param):
-    
-    logFile = open(os.path.join(path, 'analysis.log'), 'a')
-    
-    
-    logFile.write(file_param)
-    logFile.write('\n---------------------\n')
-    
-    for el in param.iteritems():
-        logFile.write(str(el))
-        logFile.write('\n')
-    
-    logFile.write('---------------------\n')
-    
-    logFile.close()
-    
-
-def query_log (path, **kwargs):
-    
-    logFile = open(os.path.join(path, 'analysis.log'), 'a')
-    
-    return
-
-
-
-
-################ Deprecated ###########################################
-
-
-
-if __name__ == '__main__':
-    print 'Hello Guys'
-    '''
-    for p, t, v in zip(pred_files, target_files, val_files):
-                predictions = pickle.load(open(os.path.join(path, '0_results', p), 'r'))
-                values = pickle.load(open(os.path.join(path, '0_results', v), 'r'))
-                target = pickle.load(open(os.path.join(path, '0_results', t), 'r'))
-                
-                if (p.find('src_task')==-1):
-                    tar_label = 'RestPost'
-                    pred_label = 'trained'
-                else:
-                    tar_label = 'RestPost'
-                    pred_label = 'trained'
-                
-                mask_fix = np.array(target == tar_label)
-                
-                zipp = np.array(zip(target, predictions, values))
-                
-                filteredPre = zipp[mask_fix]
-                
-                pred = filteredPre.T[1]
-                
-                nPre = np.count_nonzero(np.array(pred == pred_label, dtype = 'int'))
-                
-                perc = float(nPre)/filteredPre.shape[0]
-                
-                print p[:p.find('transf')] + ' ' + str(perc)
-        ------------------------------------------------------------------------------------------
-
-           ----------------------------
-             def test_var_kwargs(farg, **kwargs):
-                print "formal arg:", farg
-                radius = 3
-                mask = 'total'
-                for key in kwargs:
-                    if (key == 'radius'):
-                        radius = kwargs[key]
-                    if (key == 'mask'):
-                        mask = kwargs[key]  
-                
-                print mask + ' ' + str(radius)
-                '''

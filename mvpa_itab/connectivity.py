@@ -4,11 +4,10 @@ import nitime.fmri.io as io
 from nipy.modalities.fmri.glm import GeneralLinearModel
 
 from nitime.timeseries import TimeSeries
-from nitime.analysis.spectral import FilterAnalyzer
 from nitime.analysis.correlation import CorrelationAnalyzer
-
+from .lib_io import get_time
 from scipy.signal.windows import boxcar
-from scipy.signal.signaltools import convolve, detrend
+from scipy.signal.signaltools import convolve
 from scipy.stats.mstats import zscore
 
 from lib_io import load_wu_fmri_data, read_configuration
@@ -18,6 +17,12 @@ import matplotlib.pyplot as pl
 import os
 import nibabel as ni
 import numpy as np
+from nitime.analysis.coherence import CoherenceAnalyzer
+
+from mne.viz import circular_layout, plot_connectivity_circle
+from nitime.analysis.spectral import FilterAnalyzer
+
+from memory_profiler import profile
 
 #@profile
 def analyze_connectivity(imagelist, path_roi, roi_names, ts_param, **kwargs):
@@ -28,7 +33,8 @@ def analyze_connectivity(imagelist, path_roi, roi_names, ts_param, **kwargs):
             TR = np.float(kwargs[arg])
     
     roi_list = os.listdir(path_roi)
-    roi_list = [r for r in roi_list if r.find('.hdr') != -1 or r.find('nii.gz') != -1]
+    roi_list = [r for r in roi_list if r.find('.hdr') != -1 \
+                                    or r.find('nii.gz') != -1]
     '''
     roi_list = ['lower_left_new_.nii.gz',
                'lower_right_new_.nii.gz',
@@ -86,7 +92,8 @@ def create_similarity_files(path, subjects, target_label, source_label):
                 for folder in folder_list:
                     roi = folder.split('_')[-2]
                     path_file = os.path.join(path, '0_results', folder, s)
-                    data = np.loadtxt(os.path.join(path_file, '_'.join([s,'distance','txt',cond,time,'.txt'])))
+                    data = np.loadtxt(os.path.join(path_file,
+                                                    '_'.join([s,'distance','txt',cond,time,'.txt'])))
                     
                     data_list.append(data)
                     roi_list.append(roi)
@@ -188,14 +195,25 @@ def remove_bold_effect(bold_ts, distance_ts, ts_param, **kwargs):
 
 
 def get_bold_timeserie(imagelist, path_roi, roi_names, ts_param, detrend=False, **kwargs):
+    '''
+    To be modified
+    
+    Enhancement: 
+        - create a file/class for the rois with all the informations about it
+                (network, long_name, name, pathfile, mask_value)
+        - figure out how to 
+                
+    '''
+     
     
     TR = 1.
     for arg in kwargs:
-        if arg == 'TR':
+        if arg == 'tr':
             TR = np.float(kwargs[arg])
-            
-    roi_list = os.listdir(path_roi)
-    roi_list = [r for r in roi_list if r.find('.hdr') != -1 or r.find('nii.gz') != -1]
+    
+    #print TR            
+    #roi_list = os.listdir(path_roi)
+    #roi_list = [r for r in roi_list if r.find('.hdr') != -1 or r.find('nii.gz') != -1]
     
     print 'Length of image list is '+str(len(imagelist))
     volume_shape = imagelist[0].get_data().shape[:-1]
@@ -206,22 +224,26 @@ def get_bold_timeserie(imagelist, path_roi, roi_names, ts_param, detrend=False, 
     n_runs = len(imagelist)
     
     data_arr = []
-    for roi in roi_names.T[0]:
+    for roi in np.unique(roi_names.T[-2]):
         #print roi
-        r_mask = ni.load(os.path.join(path_roi, roi+'nii.gz'))
+        # roi_names.T[1][i]
+        roi_name = roi
+        #print roi_name
+        #network_name = roi[0]
+        r_mask = ni.load(os.path.join(path_roi, roi_name, roi_name+'_separated_3mm.nii.gz'))
         mask = r_mask.get_data().squeeze()
-        roi_filt = roi_names[roi_names.T[0] == roi]
-        
-        for label in np.unique(mask)[1:]:
+        roi_filt = roi_names[roi_names.T[-2] == roi_name]
+        #print roi_filt
+        for label in np.int_(np.unique(mask)[1:]):
+            roi_m = np.int_(roi_filt.T[-1]) == label
             
-            roi_m = np.int_(roi_filt.T[2]) == label
             if roi_m.any():
-                print 'Loading voxels from '+roi_filt[roi_m].T[0][0]
+                print 'Loading voxels from '+roi_filt[roi_m].T[2][0]
                 time_serie = io.time_series_from_file([f.get_filename() for f in imagelist], \
                                                       coords[mask==label].T, \
                                                       TR=float(TR), \
-                                                      normalize=None, \
-                                                      average=None, \
+                                                      normalize=ts_param['normalize'], \
+                                                      average=ts_param['average'], \
                                                       filter=ts_param['filter'])
                 
                 data_new = []
@@ -242,15 +264,17 @@ def get_bold_timeserie(imagelist, path_roi, roi_names, ts_param, detrend=False, 
                         
                     time_serie.data = np.vstack(data_new)
                     
-                
+                '''
                 if ts_param['average'] == True:
                     ts_new = np.mean(time_serie.data, axis=0)
-                    
+                '''   
                 
-                data_arr.append(ts_new)
+                data_arr.append(time_serie.data)
+
         del r_mask
     
-    data = np.array(data_arr)
+    data = np.vstack(data_arr)
+    data[np.isnan(data)] = 0
     ts = TimeSeries(data, sampling_interval=float(TR))
     del imagelist, time_serie
     #C = nta.CorrelationAnalyzer(ts)
@@ -287,30 +311,246 @@ def get_similarity_timeserie(path, name, condition, time, **kwargs):
     
     return ts
     
-
+def get_condition_timeserie(ts, paradigm, delete_condition=None, paste_runs=False):
+    
+    '''
+    Gets a whole fmri timeserie and returns an object partioned by condition and runs
+    
+    The output object is a dictionary with conditions as keys with an array runs x roi x timepoints
+    
+    '''
+    
+    conditions = paradigm.T[0]
+    runs = paradigm.T[1]
+    
+    if paste_runs == True:
+        runs = np.zeros_like(runs)
+    
+    if delete_condition != None:
+        m = conditions != delete_condition
+        conditions = conditions[m]
+        runs = runs[m]
+    
+    cond_list = np.unique(conditions)
+    runs_list = np.unique(runs)  
+    
+    timeserie = dict()
+    
+    for c in cond_list:
+        mask_cond = conditions == c
         
-def connectivity(ts):
-    
-    C = nta.CorrelationAnalyzer(ts)
-    
-    return C
+        timeserie[c] = []
+        
+        for r in runs_list:
+            mask_run = runs == r
+            
+            general_mask = mask_cond * mask_run
+            
+            ts_data = ts.data.T[general_mask].T
+            
+            timeserie[c].append(ts_data)
+        timeserie[c] = np.array(timeserie[c])
+            
+    return timeserie
 
-
+#@profile      
+def connectivity_analysis(ts_condition, sampling_interval=1.):
+    
+    matrices = dict()
+    for c in ts_condition:
+        matrices[c] = []
+        for i in range(len(ts_condition[c])):
+            
+            ts = TimeSeries(ts_condition[c][i], sampling_interval=sampling_interval)
+            C = CorrelationAnalyzer(ts)
+            
+            matrices[c].append(C.corrcoef)
+    
+    return matrices
+    
+    
 def global_signal_regression(timeserie, regressor):
         
-        #Get timeseries data
-        Y = timeserie.data.T
+    #Get timeseries data
+    Y = timeserie.data.T
         
         
-        X = np.expand_dims(regressor, axis=1)
-        glm_dist = GeneralLinearModel(X)
-        glm_dist.fit(Y)
-        beta_dist = glm_dist.get_beta()
+    X = np.expand_dims(regressor, axis=1)
+    glm_dist = GeneralLinearModel(X)
+    glm_dist.fit(Y)
+    beta_dist = glm_dist.get_beta()
         
-        r_signal = np.dot(X, beta_dist)
+    r_signal = np.dot(X, beta_dist)
         
-        regressed_s = Y - r_signal
+    regressed_s = Y - r_signal
     
+    return regressed_s
+
+
+
+#@profile
+def glm(image_ts, regressors):
+    
+    '''
+    image_ts should be a matrix of the form (t x v) where t is the no. of timepoints
+    and v is the no. of voxels
+    
+    regressors should be a matrix of the form (t x n) where t is the no. of timepoints
+    and n is the number of regressors
+    
+    ------------------
+    
+    beta output is a serie of beta vector of the form (n x v).
+    
+    '''
+    Y = image_ts
+        
+    if len(regressors.shape) == 1:
+        X = np.expand_dims(regressors, axis=1)
+    else:
+        X = regressors
+        
+
+    glm_dist = GeneralLinearModel(X)
+    glm_dist.fit(Y)
+    
+    beta = glm_dist.get_beta()
+    
+    return beta
+
+#@profile       
+def get_bold_signals (image, mask, TR, normalize=True, average=True, filter_par=None):
+    '''
+    Image and mask must be in nibabel format
+    '''
+    
+    mask_data = mask.get_data()
+    labels = np.unique(mask_data)
+    
+    final_data = []
+    
+    for v in labels[1:]:
+        #print str(v)
+        data = image.get_data()[mask_data == v]
+        
+        if normalize == True:
+            data = zscore(data, axis = 1)
+            data[np.isnan(data)] = 0
+        
+        if average == True:
+            data = data.mean(axis=0)
+        
+        ts = TimeSeries(data, sampling_interval=float(TR))
+        
+        if filter_par != None:
+            
+            upperf = filter_par['ub']
+            lowerf = filter_par['lb']
+            
+            F = FilterAnalyzer(ts, ub=upperf, lb=lowerf)
+            
+            ts = TimeSeries(F.fir.data, sampling_interval=float(TR))
+            
+            del F
+        
+        final_data.append(ts.data)
+
+    del data
+    del mask_data
+    del ts
+    return TimeSeries(np.vstack(final_data), sampling_interval=float(TR))
+        
+def save_matrices(path, results):
+    
+    datetime = get_time()
+    analysis = 'connectivity'
+    task = 'fmri'
+        
+    new_dir = datetime+'_'+analysis+'_'+task
+    command = 'mkdir '+os.path.join(path, '0_results', new_dir)
+    os.system(command)
+    
+    parent_dir = os.path.join(path, '0_results', new_dir)
+    
+    for subj in results.keys():
+        
+        sub_dir = os.path.join(parent_dir, subj)
+        command = 'mkdir '+sub_dir
+        
+        os.system(command)
+        
+        for cond in results[subj].keys():
+            matrices = results[subj][cond]
+            for i in range(len(matrices)):
+                
+                fname = 'correlation_'+cond+'_run_'+str(i)+'.txt'
+                path_fn = os.path.join(sub_dir, fname)
+                
+                np.savetxt(path_fn, matrices[i], fmt='%.4f')
+    
+def load_matrices(path, condition):
+    
+    subjects = os.listdir(path)
+    
+    subjects = [s for s in subjects if s.find('configuration') == -1 \
+                and s.find('.mat') == -1]
+    
+    
+    result = []
+    
+    for c in condition:
+        
+        s_list = []
+        
+        for s in subjects:
+            sub_path = os.path.join(path, s)
+
+            filel = os.listdir(sub_path)
+            filel = [f for f in filel if f.find(c) != -1]
+            c_list = []
+            for f in filel:
+                matrix = np.loadtxt(os.path.join(sub_path, f))
+                c_list.append(matrix)
+        
+            s_list.append(np.array(c_list))
+    
+        result.append(np.array(s_list))
+        
+    return np.array(result)
+    
+    
+    
+def z_fisher(r):
+    
+    F = 0.5*np.log((1+r)/(1-r))
+    
+    return F
+
+
+#class ConditionTimeserie():
+
+    
+
+def plot_circle_connectivity(matrix, roi_names, roi_color, n_lines=50):
+    
+    
+    f, sp = plot_connectivity_circle(matrix, 
+                                    roi_names, 
+                                    n_lines=n_lines, 
+                                    node_colors=roi_color, 
+                                    facecolor='white', 
+                                    textcolor='black',
+                                    colormap='RdYlGn',
+                                    fontsize_names=14,
+                                    node_angles=circular_layout(roi_names, list(roi_names)),
+                                    node_edgecolor='white',
+                                    colorbar_size=0.5,
+                                    fig=pl.figure(figsize=(13,13)),
+                                    vmin=-4.5,
+                                    vmax=4.5,                          
+                                    )
+    return f,sp
+
 
 
 def plot_cross_correlation(xcorr, t_start, t_end, labels):
@@ -327,7 +567,7 @@ def plot_cross_correlation(xcorr, t_start, t_end, labels):
     
     
     #im = ax.imshow(xcorr.at(t_start), interpolation='nearest', vmin=-1, vmax=1)
-    im = ax.imshow(np.eye(dim), interpolation='nearest', vmin=-1, vmax=1)
+    im = ax.imshow(np.eye(dim), interpolation='nearest', vmin=-4, vmax=4)
     title = ax.set_title('')
     xt = ax.set_xticks(np.arange(dim))
     xl = ax.set_xticklabels(labels, rotation='vertical')
@@ -348,7 +588,7 @@ def plot_cross_correlation(xcorr, t_start, t_end, labels):
     
     def animate(i):
         global l_time        
-        j = np.int(np.rint(i/10))
+        j = np.int(np.rint(i/20))
         print l_time[mask][j]
         #im.set_array(xcorr.at(l_time[j]))
         im.set_array(x[mask][j])
@@ -358,224 +598,52 @@ def plot_cross_correlation(xcorr, t_start, t_end, labels):
 
     ani = animation.FuncAnimation(fig, animate, 
                                   init_func=init, 
-                                  frames=10*(t_end-t_start), 
-                                  interval=20,
+                                  frames=20*(t_end-t_start), 
+                                  interval=10,
                                   repeat=False, 
                                   blit=True)
     plt.show()
     #ani.save('/home/robbis/xcorrelation_.mp4')
-
     
-################### Script ##########################
-if __name__ == '__main__':
-    path = ''
-    subjects = []
+if __name__ == '__main__':   
+    from scipy.io import savemat
+    path = '/media/DATA/fmri/monks/0_results/'
+     
+    results_dir = os.listdir(path)
+     
+    results_dir = [r for r in results_dir if r.find('connectivity') != -1]
+    roi_list = np.loadtxt('/media/DATA/fmri/templates_fcmri/findlab_rois.txt', 
+                          delimiter=',',
+                          dtype=np.str)
     
-    task = 'rest'
-    conf = read_configuration(path, 'learning.conf', task)
+    subjects = np.loadtxt('/media/DATA/fmri/monks/attrib_struct.txt',
+                          dtype=np.str)
     
-    path_data = '/media/DATA/fmri/learning/'
-    path_roi = '/media/DATA/fmri/learning/1_single_ROIs/fcMRI_ROI/single_ROI/'
-    path_dist = '/media/DATA/fmri/learning/0_results/connectivity/similarity/regressed_distance'
-    path_dist_save = '/media/DATA/fmri/learning/0_results/connectivity/similarity/deconvolved_distances'
-    
-    roi_names = np.loadtxt('/media/DATA/fmri/learning/roi_labels', dtype=np.str)
-    
-    condition = 'trained'
-    
-    ts_param = dict()
-    ts_param['filter'] = {'lb': 0.008, 'ub':0.09, 'method':'fir'}
-    ts_param['average'] = True
-    ts_param['normalize'] = 'zscore'
-    
-    correlation_list = []
-    connectivity_list = []
-    for name in subjects:
-        
-        imglist = load_wu_fmri_data(path_data, name, task, **conf)
-        
-        ################## Pre ##########################
-        
-        list_pre = [f for f in imglist if f.get_filename().split('/')[-2] == 'rest']
-        
-        length_pre = len(list_pre)
-        
-        print length_pre
-        conf['runs'] = np.int(length_pre)
-        
-        bold_ts_pre = get_bold_timeserie(list_pre, path_roi, roi_names, ts_param, **conf)
-        dist_ts_pre = get_similarity_timeserie(path_dist, name, condition, 'RestPre', **conf)
-        
-        '''
-        bold_ts_pre_conv = bold_convolution(bold_ts_pre, 7, win_func=boxcar)
-        
-        dist_ts_pre_deconv = remove_bold_effect(bold_ts_pre_conv, dist_ts_pre, ts_param, **conf)
-        
-        fname = os.path.join(path_dist_save, 'ts_deconv_'+name+'_'+condition+'_RestPre.txt')
-        print dist_ts_pre_deconv.shape
-        
-        np.savetxt(fname, dist_ts_pre_deconv.data, fmt='%.6f', delimiter=',')
-        '''
-        
-        C_pre_nd = CorrelationAnalyzer(dist_ts_pre)
-        #C_pre_d = CorrelationAnalyzer(dist_ts_pre_deconv)
-        
-        fname_c = os.path.join(path_dist_save, 'corr_deconv_'+name+'_'+condition+'_RestPre.txt')
-        np.savetxt(fname_c, C_pre_d.corrcoef, fmt='%.6f', delimiter=',')
-        
-        fname_nc = os.path.join(path_dist_save, 'corr_true_'+name+'_'+condition+'_RestPre.txt')
-        np.savetxt(fname_nc, C_pre_nd.corrcoef, fmt='%.6f', delimiter=',')
-        
-        '''
-        f = pl.figure()
-        ax1 = f.add_subplot(121)
-        m1 = ax1.imshow(C_pre_nd.corrcoef, interpolation='nearest')
-        f.colorbar(m1)
-        ax2 = f.add_subplot(122)
-        m2 = ax2.imshow(C_pre_d.corrcoef, interpolation='nearest')
-        f.colorbar(m2)
-        '''
-        
-        #################### Post #########################
-        
-        list_post = [f for f in imglist if f.get_filename().split('/')[-2] == 'task']
-        
-        length_post = len(list_post)
-        
-        conf['runs'] = np.int(length_pre)
-        
-        bold_ts_post = get_bold_timeserie(list_post, path_roi, roi_names, ts_param, **conf)
-        dist_ts_post = get_similarity_timeserie(path_dist, name, condition, 'RestPost', **conf)
-        
-        bold_ts_post_conv = bold_convolution(bold_ts_post, 7, win_func=boxcar)
-        
-        dist_ts_post_deconv = remove_bold_effect(bold_ts_post_conv, dist_ts_post, ts_param, **conf)
-        print dist_ts_post_deconv.shape
-        
-        fname = os.path.join(path_dist_save, 'ts_deconv_'+name+'_'+condition+'_RestPost.txt')
-        np.savetxt(fname, dist_ts_post_deconv.data, fmt='%.6f', delimiter=',')
-    
-        C_post_nd = CorrelationAnalyzer(dist_ts_post)
-        C_post_d = CorrelationAnalyzer(dist_ts_post_deconv)
-        
-        fname_c = os.path.join(path_dist_save, 'corr_deconv_'+name+'_'+condition+'_RestPost.txt')
-        np.savetxt(fname_c, C_post_d.corrcoef, fmt='%.6f', delimiter=',')
-        
-        fname_nc = os.path.join(path_dist_save, 'corr_true_'+name+'_'+condition+'_RestPost.txt')
-        np.savetxt(fname_nc, C_post_nd.corrcoef, fmt='%.6f', delimiter=',')
-        
-        correlation_list.append([C_pre_d.corrcoef, C_post_d.corrcoef, C_pre_nd.corrcoef, C_post_nd.corrcoef])
-        connectivity_list.append([bold_ts_post, bold_ts_pre])
-        
-        '''
-        f = pl.figure()
-        ax1 = f.add_subplot(121)
-        m1 = ax1.imshow(C_post_nd.corrcoef, interpolation='nearest')
-        f.colorbar(m1)
-        ax2 = f.add_subplot(122)
-        m2 = ax2.imshow(C_post_d.corrcoef, interpolation='nearest')
-        f.colorbar(m2)
-        '''
-        
-    for name in subjects:
-    
-        fname = os.path.join(path_dist_save, 'ts_deconv_'+name+'_'+condition+'_RestPost.txt')
-    
-        dist_ts_post_deconv = np.loadtxt(fname, delimiter=',')
-        dist_ts_post = get_similarity_timeserie(path_dist, name, condition, 'RestPost', **conf)
-    
-        f = pl.figure()
-        ax1 = f.add_subplot(211)
-    
-    ################ Global Signal Regression #########################
-    
-    res = []
-    
-    for rest in ['RestPre', 'RestPost']:
-        
-        s_res = []
-        
-        for name in subjects:
-        ################ Post #############
-        
-            dist_ts = get_similarity_timeserie(path_dist, name, condition, rest, **conf)
-        
-            Y = dist_ts.data.T
-            regressor = np.mean(Y, axis=1)
-        
-            X = np.expand_dims(regressor, axis=1)
-            glm_dist = GeneralLinearModel(X)
-            glm_dist.fit(Y)
-            beta_dist = glm_dist.get_beta()
-        
-            r_signal = np.dot(X, beta_dist)
-        
-            regressed_s = Y - r_signal
+    for r in results_dir:
+        results = load_matrices(os.path.join(path,r), ['Samatha', 'Vipassana'])
+        nan_mask = np.isnan(results)
+         
+        for i in range(len(results.shape) - 2):
+            nan_mask = nan_mask.sum(axis=0)
             
-            save_fn = os.path.join(path_dist,'similarity_regressed_'+name+'_'+condition+'_'+rest+'_.txt')
-            #np.savetxt(save_fn, regressed_s, fmt='%.4f', delimiter=',')
-            
-            r_ts = TimeSeries(regressed_s.T, sampling_interval=dist_ts.sampling_interval)
-            
-            C = CorrelationAnalyzer(r_ts)
-            s_res.append(np.arctanh(C.corrcoef))
+        results = results[:,:,:,~np.bool_(nan_mask)]
+        rows = np.sqrt(results.shape[-1])
+        shape = list(results.shape[:-2])
+        shape.append(rows)
+        shape.append(-1)
         
-        res.append(s_res)
-            
-######################## Cross Correlation ###################################
-
-
-    for name in subjects:
+        results = results.reshape(shape)
+        zresults = z_fisher(results)
+        zresults[np.isinf(zresults)] = 1
         
-        imglist = load_wu_fmri_data(path_data, name, task, **conf)
+        roi_mask = ~np.bool_(np.diagonal(nan_mask))
         
-        ################## Pre ##########################
+        fields = dict()
+        fields['z_matrix'] = zresults
+        fields['network'] = list(roi_list[roi_mask].T[0])
+        fields['roi_name'] = list(roi_list[roi_mask].T[2])
         
-        list_pre = [f for f in imglist if f.get_filename().split('/')[-2] == 'rest']
-        
-        length_pre = len(list_pre)
-        
-        print length_pre
-        conf['runs'] = np.int(length_pre)
-        
-        bold_ts_pre = get_bold_timeserie(list_pre, path_roi, roi_names, ts_param, **conf)
-        #dist_ts_pre = get_similarity_timeserie(path_dist, name, condition, 'RestPre', **conf)
-        
-        fname = '_'.join(['similarity','regressed',name, condition, 'RestPre','.txt'])
-        dist_ts_file = np.loadtxt(os.path.join(path_dist,fname), delimiter=',')
-        
-        dist_ts_pre = TimeSeries(dist_ts_file.T, sampling_interval=bold_ts_pre.sampling_interval)
-        
-        assert dist_ts_pre.data.shape[0] == bold_ts_pre.data.shape[0]
-        
-        C_dist_pre = CorrelationAnalyzer(dist_ts_pre)
-        C_bold_pre = CorrelationAnalyzer(bold_ts_pre)
+        #savemat(os.path.join(path,r,'zcorrelation_matrix.mat'), fields)
         
         
-        
-        #################### Post #########################
-        
-        list_post = [f for f in imglist if f.get_filename().split('/')[-2] == 'task']
-        
-        length_post = len(list_post)
-        
-        conf['runs'] = np.int(length_pre)
-        
-        bold_ts_post = get_bold_timeserie(list_post, path_roi, roi_names, ts_param, **conf)
-        #dist_ts_post = get_similarity_timeserie(path_dist, name, condition, 'RestPost', **conf)
-    
-        fname = '_'.join(['similarity','regressed',name, condition, 'RestPost','.txt'])
-        dist_ts_file = np.loadtxt(os.path.join(path_dist,fname), delimiter=',')
-        
-        dist_ts_post = TimeSeries(dist_ts_file.T, sampling_interval=bold_ts_pre.sampling_interval)
-        
-        assert dist_ts_post.data.shape[0] == bold_ts_post.data.shape[0]
-        
-        C_dist_post = CorrelationAnalyzer(dist_ts_post)
-        C_bold_post = CorrelationAnalyzer(bold_ts_post)
-        
-        correlation_list.append([C_dist_pre.xcorr_norm, C_dist_post.xcorr_norm])
-        connectivity_list.append([C_bold_pre.xcorr_norm, C_bold_pre.xcorr_norm])
-        
-        del list_pre, list_post, imglist
-    
+           
