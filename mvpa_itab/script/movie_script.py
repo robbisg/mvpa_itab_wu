@@ -28,8 +28,8 @@ datapath = '/media/DATA/fmri/movie_viviana/corr_raw/RAW_mat_corr/'
 filelist = os.listdir(datapath)
 filelist = [f for f in filelist if f.find('.mat') != -1]
 
-conditions = ['movie', 'rest']
-bands = ['alpha','beta','gamma','delta','theta']
+conditions = ['movie', 'scramble', 'rest']
+bands = ['alpha']#,'beta','gamma','delta','theta']
 
 target_list = []
 sample_list = []
@@ -38,7 +38,7 @@ band_list = []
 
 labels = np.loadtxt(os.path.join(datapath, 'roi_labels.txt'),
                     dtype=np.str_,
-                    delimiter='%')
+                    delimiter='\t')
 
 labels = labels.T[1]
 subject_list_chunks = np.loadtxt(os.path.join(datapath, 'subj_list'),
@@ -60,8 +60,8 @@ for cond in conditions:
 
         il = np.tril_indices(mat_[0].shape[0])
 
-        masked_mat = mat_ * mask_roi
-
+        #masked_mat = mat_ * mask_roi
+        masked_mat = mat_ * mask_roi[np.newaxis,:]
         for m in masked_mat:
             m[il] = 0
 
@@ -80,7 +80,7 @@ targets = np.hstack(target_list)
 samples = np.vstack(sample_list)
 chunks = np.hstack(chunk_list)
 
-zsamples = sc_zscore(samples, axis=1)
+zsamples = sc_zscore(samples, axis=0)
 
 ds = dataset_wizard(zsamples, targets=targets, chunks=chunks)
 ds.sa['band'] = np.hstack(band_list)
@@ -167,14 +167,17 @@ def array_to_matrix(arr, dim, is_triangular=True):
     matrix = np.zeros((dim, dim))
     
     #This gives me indexes of lower part of matrix, diagonal included
-    il = np.tril_indices(dim)
+    iu = np.triu_indices(dim)
     #This refines me indexes leaving diagonal indexes
-    il = (il[0][il[0] != il[1]], il[1][il[0] != il[1]])
+    iu = (iu[0][iu[0] != iu[1]], iu[1][iu[0] != iu[1]])
     
     if is_triangular:
-        matrix[il] = arr
+        matrix[iu] = arr
+        matrix = copy_matrix(matrix)
     else:
-        #To be continued!    
+        il = np.tril_indices(dim)
+    
+    return matrix
     
 
 
@@ -190,7 +193,7 @@ def copy_matrix(matrix):
 
     return matrix
 
-def load_mat_dataset(datapath, bands, conditions):
+def load_mat_dataset(datapath, bands, conditions, networks=None):
     
     target_list = []
     sample_list = []
@@ -199,16 +202,24 @@ def load_mat_dataset(datapath, bands, conditions):
 
     labels = np.loadtxt(os.path.join(datapath, 'roi_labels.txt'),
                     dtype=np.str_,
-                    delimiter='%')
+                    delimiter='\t')
 
-    labels = labels.T[1]
+    #labels = labels.T[1]
     subject_list_chunks = np.loadtxt(os.path.join(datapath, 'subj_list'),
                                  dtype=np.str)
-
-    mask = np.ones(len(labels), np.bool)
-    #mask[10:] = False
+    
+    
+    
+    mask = np.zeros(len(labels.T[0]))
+    if networks != None:
+        for n in networks:
+            mask += labels.T[-1] == n
+        
+    else:
+        mask = np.ones(len(labels.T[0]), dtype=np.bool_)
+    
     mask_roi = np.meshgrid(mask, mask)[1] * np.meshgrid(mask, mask)[0]
-
+    
     for cond in conditions:
         for band in bands:
             filt_list = [f for f in filelist if f.find(cond) != -1 \
@@ -221,7 +232,7 @@ def load_mat_dataset(datapath, bands, conditions):
 
             il = np.tril_indices(mat_[0].shape[0])
 
-            masked_mat = mat_ * mask_roi
+            masked_mat = mat_ * mask_roi[np.newaxis,:]
 
             for m in masked_mat:
                 m[il] = 0
@@ -241,15 +252,25 @@ def load_mat_dataset(datapath, bands, conditions):
     samples = np.vstack(sample_list)
     chunks = np.hstack(chunk_list)
 
-    zsamples = sc_zscore(samples, axis=1)
+    zsamples = sc_zscore(samples, axis=0)
 
     ds = dataset_wizard(zsamples, targets=targets, chunks=chunks)
     ds.sa['band'] = np.hstack(band_list)
 
-    zscore(ds)
+    #zscore(ds)
         
     return ds
+
+def plot_matrix():
     
+    for cond in np.unique(targets):
+        m_cond = targets == cond
+        for band in np.unique(bands):
+            m_band = bands == band
+            
+            total_m = m_cond * m_band
+            
+            
 
 
 class StoreResults(object):
@@ -257,8 +278,8 @@ class StoreResults(object):
         self.storage = []
             
     def __call__(self, data, node, result):
-        print node.measure
-        print data
-        print result
+        #print node.measure
+        #print data
+        #print result
         self.storage.append((node.measure.ca.estimates,
                                     node.measure.ca.predictions))

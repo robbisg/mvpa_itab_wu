@@ -4,8 +4,9 @@ import nitime.fmri.io as io
 from nipy.modalities.fmri.glm import GeneralLinearModel
 
 from nitime.timeseries import TimeSeries
-from nitime.analysis.correlation import CorrelationAnalyzer
-from .lib_io import get_time
+from nitime.analysis.correlation import CorrelationAnalyzer,\
+    SeedCorrelationAnalyzer
+from mvpa_itab.lib_io import get_time
 from scipy.signal.windows import boxcar
 from scipy.signal.signaltools import convolve
 from scipy.stats.mstats import zscore
@@ -19,10 +20,11 @@ import nibabel as ni
 import numpy as np
 from nitime.analysis.coherence import CoherenceAnalyzer
 
-from mne.viz import circular_layout, plot_connectivity_circle
+from conn.plot import *
 from nitime.analysis.spectral import FilterAnalyzer
 
 from memory_profiler import profile
+from scipy.stats.stats import ttest_ind
 
 #@profile
 def analyze_connectivity(imagelist, path_roi, roi_names, ts_param, **kwargs):
@@ -419,17 +421,20 @@ def glm(image_ts, regressors):
     return beta
 
 #@profile       
-def get_bold_signals (image, mask, TR, normalize=True, average=True, filter_par=None):
+def get_bold_signals (image, mask, TR, normalize=True, average=True, filter_par=None, roi_values=None):
     '''
     Image and mask must be in nibabel format
     '''
     
-    mask_data = mask.get_data()
-    labels = np.unique(mask_data)
+    mask_data = np.int_(mask.get_data())
+    if roi_values == None:
+        labels = np.unique(mask_data)[1:]
+    else:
+        labels = np.int_(roi_values)
     
     final_data = []
-    
-    for v in labels[1:]:
+    print labels
+    for v in labels[:]:
         #print str(v)
         data = image.get_data()[mask_data == v]
         
@@ -493,7 +498,7 @@ def load_matrices(path, condition):
     subjects = os.listdir(path)
     
     subjects = [s for s in subjects if s.find('configuration') == -1 \
-                and s.find('.mat') == -1]
+                and s.find('.') == -1]
     
     
     result = []
@@ -530,85 +535,11 @@ def z_fisher(r):
 #class ConditionTimeserie():
 
     
-
-def plot_circle_connectivity(matrix, roi_names, roi_color, n_lines=50):
-    
-    
-    f, sp = plot_connectivity_circle(matrix, 
-                                    roi_names, 
-                                    n_lines=n_lines, 
-                                    node_colors=roi_color, 
-                                    facecolor='white', 
-                                    textcolor='black',
-                                    colormap='RdYlGn',
-                                    fontsize_names=14,
-                                    node_angles=circular_layout(roi_names, list(roi_names)),
-                                    node_edgecolor='white',
-                                    colorbar_size=0.5,
-                                    fig=pl.figure(figsize=(13,13)),
-                                    vmin=-4.5,
-                                    vmax=4.5,                          
-                                    )
-    return f,sp
-
-
-
-def plot_cross_correlation(xcorr, t_start, t_end, labels):
-
-
-    import matplotlib.pyplot as plt
-    import matplotlib.animation as animation
-
-    dim = len(labels)
-    
-    
-    fig = plt.figure()
-    ax = plt.axes(xlim=(-0.5, dim-0.5), ylim=(dim-0.5, -0.5))
-    
-    
-    #im = ax.imshow(xcorr.at(t_start), interpolation='nearest', vmin=-1, vmax=1)
-    im = ax.imshow(np.eye(dim), interpolation='nearest', vmin=-4, vmax=4)
-    title = ax.set_title('')
-    xt = ax.set_xticks(np.arange(dim))
-    xl = ax.set_xticklabels(labels, rotation='vertical')
-    yt = ax.set_yticks(np.arange(dim))
-    yl = ax.set_yticklabels(labels)
-    fig.colorbar(im)
-
-    l_time = np.arange(-50, 50, 1)
-    mask = (l_time >= t_start) * (l_time<=t_end)
-    
-    def init():
-        im.set_array(np.eye(dim))
-        title.set_text('Cross-correlation at time lag of '+str(t_start)+' TR.')
-        plt.draw()
-        return im, title
-        
-    
-    
-    def animate(i):
-        global l_time        
-        j = np.int(np.rint(i/20))
-        print l_time[mask][j]
-        #im.set_array(xcorr.at(l_time[j]))
-        im.set_array(x[mask][j])
-        title.set_text('Cross-correlation at time lag of '+str(l_time[mask][j])+' TR.')
-        plt.draw()
-        return im, title
-
-    ani = animation.FuncAnimation(fig, animate, 
-                                  init_func=init, 
-                                  frames=20*(t_end-t_start), 
-                                  interval=10,
-                                  repeat=False, 
-                                  blit=True)
-    plt.show()
-    #ani.save('/home/robbis/xcorrelation_.mp4')
-    
 if __name__ == '__main__':   
     from scipy.io import savemat
     path = '/media/DATA/fmri/monks/0_results/'
-     
+    
+    print 'In the main()'
     results_dir = os.listdir(path)
      
     results_dir = [r for r in results_dir if r.find('connectivity') != -1]
@@ -616,7 +547,7 @@ if __name__ == '__main__':
                           delimiter=',',
                           dtype=np.str)
     
-    subjects = np.loadtxt('/media/DATA/fmri/monks/attrib_struct.txt',
+    subjects = np.loadtxt('/media/DATA/fmri/monks/attributes_struct.txt',
                           dtype=np.str)
     
     for r in results_dir:
@@ -628,8 +559,8 @@ if __name__ == '__main__':
             
         results = results[:,:,:,~np.bool_(nan_mask)]
         rows = np.sqrt(results.shape[-1])
-        shape = list(results.shape[:-2])
-        shape.append(rows)
+        shape = list(results.shape[:-1])
+        shape.append(int(rows))
         shape.append(-1)
         
         results = results.reshape(shape)
@@ -642,8 +573,57 @@ if __name__ == '__main__':
         fields['z_matrix'] = zresults
         fields['network'] = list(roi_list[roi_mask].T[0])
         fields['roi_name'] = list(roi_list[roi_mask].T[2])
+        fields['groups'] = list(subjects.T[1])
+        fields['level'] = list(np.int_(subjects.T[-1]))
         
         #savemat(os.path.join(path,r,'zcorrelation_matrix.mat'), fields)
         
+        ################### Tests ###########################
+        roi_names = np.array(fields['roi_name'])
+        networks = roi_list[roi_mask].T[-2]   
         
-           
+        zmean = zresults.mean(axis=2)
+        
+        vipassana = zmean[1]
+        samatha = zmean[0]
+        
+        tv, pv = ttest_ind(vipassana[subjects.T[1] == 'E'], 
+                         vipassana[subjects.T[1] != 'E'],
+                         axis=0)
+        
+        ts, ps = ttest_ind(samatha[subjects.T[1] == 'E'], 
+                         samatha[subjects.T[1] != 'E'],
+                         axis=0)       
+        
+        fields['ttest_vipassana_t'] = tv
+        fields['ttest_vipassana_p'] = pv
+        
+        f = plot_matrix(tv * (pv < 0.01), roi_names, networks)
+        f.savefig(os.path.join(path,r,'vipassana_t_test.png'))
+        
+
+        fields['ttest_samatha_t'] = ts
+        fields['ttest_samatha_p'] = ps
+        
+        f = plot_matrix(ts * (ps < 0.01), roi_names, networks)
+        f.savefig(os.path.join(path,r,'samatha_t_test.png'))
+        ############### Behavioral correlation ###############
+        
+        bh = TimeSeries(np.int_(subjects[subjects.T[1] == 'E'].T[-1]), sampling_interval=1.)
+        ts_s = TimeSeries(samatha[subjects.T[1] == 'E'].T, sampling_interval=1.)
+        ts_v = TimeSeries(vipassana[subjects.T[1] == 'E'].T, sampling_interval=1.)
+        
+        S_s = SeedCorrelationAnalyzer(bh, ts_s)
+        S_v = SeedCorrelationAnalyzer(bh, ts_v)
+        
+        fields['vipassana_expertise_corr'] = S_v.corrcoef
+        fields['samatha_expertise_corr'] = S_s.corrcoef       
+        
+        f = plot_matrix(S_s.corrcoef * (np.abs(S_s.corrcoef) > 0.6), roi_names, networks)
+        f.savefig(os.path.join(path,r,'samatha_correlation_expertise_0.6.png'))
+        
+        f = plot_matrix(S_v.corrcoef * (np.abs(S_v.corrcoef) > 0.6), roi_names, networks)
+        f.savefig(os.path.join(path,r,'vipassana_correlation_expertise_0.6.png'))
+        
+        savemat(os.path.join(path,r,'all_analysis.mat'), fields)
+        
