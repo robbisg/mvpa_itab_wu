@@ -12,8 +12,6 @@ from sklearn.feature_selection import f_regression
 from scipy.stats.mstats import zscore as sc_zscore
 import nibabel
 
-from nilearn import decoding
-import nilearn.masking
 import os
 
 from mvpa2.suite import RFE, SplitClassifier, CrossValidation, LinearCSVMC
@@ -269,9 +267,6 @@ def plot_matrix():
             m_band = bands == band
             
             total_m = m_cond * m_band
-            
-            
-
 
 class StoreResults(object):
     def __init__(self):
@@ -283,3 +278,51 @@ class StoreResults(object):
         #print result
         self.storage.append((node.measure.ca.estimates,
                                     node.measure.ca.predictions))
+        
+        
+######################################################
+if __name__ == '__main__':
+    
+    datapath = '/home/robbis/data/corr_raw/RAW_mat_corr/'
+
+    conditions = ['movie', 'scramble', 'rest']
+    bands = ['alpha','beta','gamma','delta','theta']
+    
+    labels = np.loadtxt(os.path.join(datapath, 'roi_labels.txt'),
+                    dtype=np.str_,
+                    delimiter='\t')
+    
+    results = []
+    
+    for net in np.unique(labels.T[-1]):
+        
+        print '----- '+net+' -----'
+        
+        ds = load_mat_dataset(datapath, bands, conditions, networks=[net])
+        
+        for b in bands:
+            
+            ds_train = ds[(ds.targets != 'rest') * (ds.sa.band == b)]
+            ds_test = ds[(ds.targets == 'rest') * (ds.sa.band == b)]
+            
+            clf = LinearCSVMC(C=1, probability=1,
+                              enable_ca=['probabilities', 'estimates'])
+            
+            #clf = knn()
+            
+            cvte = CrossValidation(clf,
+                                   NFoldPartitioner(cvtype=2, attr='chunks'),
+                                   #callback=cv_storage,
+                                   enable_ca=['stats', 'repetition_results','raw_results'])
+            err = cvte(ds_train)
+            
+            print cvte.ca.stats
+            
+            prediction = clf.predict(ds_test)
+            n_movie = np.count_nonzero(np.array(prediction) == 'movie')
+            perc = n_movie/np.float(len(prediction))
+            
+            print perc
+            
+            results.append([net, b, 1 - np.mean(err), perc])
+    

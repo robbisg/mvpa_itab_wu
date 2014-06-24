@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.io import loadmat
 from scipy.stats import zscore as sc_zscore
-from mvpa2.suite import dataset_wizard
+from mvpa2.suite import dataset_wizard, zscore
 import os
 
 
@@ -66,12 +66,16 @@ def load_mat_dataset(datapath, bands, conditions, networks=None):
     samples = np.vstack(sample_list)
     chunks = np.hstack(chunk_list)
 
-    zsamples = sc_zscore(samples, axis=0)
+    #zsamples = sc_zscore(samples, axis=1)
 
-    ds = dataset_wizard(zsamples, targets=targets, chunks=chunks)
+    ds = dataset_wizard(samples, targets=targets, chunks=chunks)
     ds.sa['band'] = np.hstack(band_list)
-
-    #zscore(ds)
+    
+    #zscore(ds, chunks_attr='band')
+    zscore(ds, chunks_attr='chunks')
+    #zscore(ds, chunks_attr='band')
+    
+    print ds.shape
         
     return ds
 
