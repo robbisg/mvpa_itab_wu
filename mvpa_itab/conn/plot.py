@@ -4,7 +4,7 @@ import numpy as np
 
 def plot_matrix(matrix, roi_names, networks):
     
-    f = pl.figure()
+    f = pl.figure(figsize=(12.0, 10.0))
     
     a = f.add_subplot(111)
     

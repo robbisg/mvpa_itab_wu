@@ -66,7 +66,7 @@ def load_mat_dataset(datapath, bands, conditions, networks=None):
     samples = np.vstack(sample_list)
     chunks = np.hstack(chunk_list)
 
-    #zsamples = sc_zscore(samples, axis=1)
+    #zsamples = sc_zscore(samples, axis=0)
 
     ds = dataset_wizard(samples, targets=targets, chunks=chunks)
     ds.sa['band'] = np.hstack(band_list)
