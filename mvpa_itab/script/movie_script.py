@@ -221,7 +221,7 @@ def load_mat_dataset(datapath, bands, conditions, networks=None):
     for cond in conditions:
         for band in bands:
             filt_list = [f for f in filelist if f.find(cond) != -1 \
-                                        and f.find(band) != -1]
+                                       th and f.find(band) != -1]
             data = loadmat(os.path.join(datapath, filt_list[0]))
 
             mat_ = data[data.keys()[0]]
@@ -284,7 +284,8 @@ class StoreResults(object):
 if __name__ == '__main__':
     
     datapath = '/home/robbis/data/corr_raw/RAW_mat_corr/'
-
+    datapath = '/media/DATA/fmri/movie_viviana/corr_raw/RAW_mat_corr/'
+    
     conditions = ['movie', 'scramble', 'rest']
     bands = ['alpha','beta','gamma','delta','theta']
     
@@ -294,17 +295,21 @@ if __name__ == '__main__':
     
     results = []
     
-    for net in np.unique(labels.T[-1]):
+    for net in np.unique(labels.T[-1])[:1]:
         
         print '----- '+net+' -----'
         
-        ds = load_mat_dataset(datapath, bands, conditions, networks=[net])
+        ds = load_mat_dataset(datapath, bands, conditions)#, networks=[net])
         
         for b in bands:
             
-            ds_train = ds[(ds.targets != 'rest') * (ds.sa.band == b)]
-            ds_test = ds[(ds.targets == 'rest') * (ds.sa.band == b)]
+            #ds_train = ds[(ds.targets != 'rest') * (ds.sa.band == b)]
+            #ds_test = ds[(ds.targets == 'rest') * (ds.sa.band == b)]
             
+            dist = permutations(ds[ds.sa.band == b], n_permutations=1501)
+            
+            results.append([net, b, dist])
+            ###################################################################
             clf = LinearCSVMC(C=1, probability=1,
                               enable_ca=['probabilities', 'estimates'])
             

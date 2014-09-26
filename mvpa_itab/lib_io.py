@@ -460,7 +460,7 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
             dir = ''
         if dir.find('/') == -1:
             path_file_dirs.append(os.path.join(path,name,dir))
-    
+
    
     print 'Loading...'
     
@@ -769,6 +769,9 @@ def load_dataset(path, subj, type, **kwargs):
     ds.sa['events_number'] = ev_list
     ds.sa['name'] = [subj for i in range(len(ds.sa.chunks))]
     
+    #Inserted for searchlight proof!
+    ds.sa['block'] = np.int_(np.array([(i/14.) for i in range(len(ds.sa.chunks))])-5*ds.sa.chunks)
+    
     f_list = []
     for i in range(files):
         for j in range(niftiFilez[i].shape[-1:][0]):
@@ -906,8 +909,7 @@ def load_mask_wu(path, subj, **kwargs):
         mask_to_find2 = 'mask_'+subj+'_mask'
         mask_to_find3 = '_mask.nii.gz'
         mask_list = [m for m in mask_list if m.find(mask_to_find1) != -1 or m.find(mask_to_find2) != -1 \
-                     or m.find(mask_to_find3) != -1]
-    
+                     or m.find(mask_to_find3) != -1 or m.find('brain_mask') != -1]
     elif (mask_area == ['searchlight_3'] or mask_area == ['searchlight_5']):
         mask_list = os.listdir(mask_path)
         if mask_area == ['searchlight_3']:
@@ -1054,10 +1056,10 @@ def modify_conc_list(path, subj, conc_filelist):
     location, the new mounting directory is passed as parameter.
     """
     new_list = []
-    for file in conc_filelist:
+    for fl in conc_filelist:
         
-        file = file[file.find(subj):-3]+'hdr'
-        new_list.append(os.path.join(path,file))
+        fl = fl[fl.find(subj):-3]+'hdr'
+        new_list.append(os.path.join(path,fl))
         
     del conc_filelist
     return new_list
@@ -1070,12 +1072,15 @@ def read_conc(path, subj, conc_file_patt):
     
     c_file = conc_file_list[0]
     
+    print conc_file_list
+    
     conc_file = open(os.path.join(path, subj, c_file), 'r')
     s = conc_file.readline()
     n_files = np.int(s.split(':')[1])
     
     i = 0
     filename_list = []
+    
     while i < n_files:
         name = conc_file.readline()
         filename_list.append(name[name.find('/'):-1])
@@ -1152,7 +1157,7 @@ def save_results(path, results, configuration):
         save_results_searchlight(parent_dir, results)
     elif analysis == 'transfer_learning':
         save_results_transfer_learning(parent_dir, results)
-        write_all_subjects_map(path, new_dir)
+        #write_all_subjects_map(path, new_dir)
     elif analysis == 'clustering':
         save_results_clustering(parent_dir, results)
     else:
@@ -1464,7 +1469,7 @@ def save_results_transfer_learning(path, results):
                 f_d = plt.figure()
                 a_d = f_d.add_subplot(111)
                 a_d.plot(data)
-                a_d.set_ylim(1000, 3000)
+                a_d.set_ylim(0, 75)
                 step = data.__len__() / 6.
                 for j in np.arange(6)+1:#n_runs
                     a_d.axvline(x = step * j, ymax=a_d.get_ylim()[1], color='y', linestyle='-', linewidth=1)
@@ -1670,10 +1675,17 @@ def update_subdirs(conc_file_list, subj, **kwargs):
             sub_dirs = kwargs[arg].split(',')
         
     i = 0
+
     for directory in conc_file_list:
+        
+        #Find the directory name
         s_dir = directory[directory.find(subj)+len(subj)+1:directory.rfind('/')]
-        if sub_dirs[i].find('/') != -1 or i > len(sub_dirs):
+        
+        if s_dir in sub_dirs:
+            continue
+        elif sub_dirs[i].find('/') != -1 or i > len(sub_dirs):
             sub_dirs.append(s_dir)
+            #i = i + 1          
         else:
             sub_dirs[i] = s_dir
         i = i + 1
@@ -1682,4 +1694,6 @@ def update_subdirs(conc_file_list, subj, **kwargs):
     
     return kwargs
             
-
+def _find_file(path, subj, pattern):
+    
+    return []

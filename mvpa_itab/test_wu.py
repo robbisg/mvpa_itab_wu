@@ -233,7 +233,12 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         
         if calculateSimilarity == 'True':
             if 'p' not in locals():
-                p = 0.01
+                print 'Ciao!'
+            
+            
+            print r['ds_tar'].shape
+            print r['ds_src'].shape
+            
             mahala_data = similarity_measure_mahalanobis(r['ds_tar'], r['ds_src'], r, p_value=p)
             r['mahalanobis_similarity'] = mahala_data
             #print tr_pred
@@ -415,10 +420,11 @@ def signal_detection_measures(predictions, targets, map_list):
     return d_prime[0], beta[0], c[0], c_matrix
 
 
-def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
+def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.95):
     
     from scipy.spatial.distance import mahalanobis
-    from sklearn.covariance import LedoitWolf, MinCovDet, GraphLasso, ShrunkCovariance
+    from sklearn.covariance import EmpiricalCovariance, LedoitWolf, MinCovDet, \
+                        GraphLasso, ShrunkCovariance
     print 'Computing Mahalanobis similarity...'
     #classifier = results['classifier']
     
@@ -462,8 +468,10 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
             #print 'Method is MinCovDet...'
             #print true_ex[:np.int(true_ex.shape[0]/3),:].shape
             #cov_ = MinCovDet().fit(true_ex)
-            cov_ = LedoitWolf(block_size = 2000).fit(true_ex)
-            #cov_ = np.cov(true_ex.T)
+            cov_ = LedoitWolf().fit(true_ex)
+            #cov_ = EmpiricalCovariance().fit(true_ex)
+            #cov_ = GraphLasso(alpha=0.5).fit(true_ex)
+            #cov_ = OAS(alpha=0.1).fit(true_ex)
         except MemoryError, err:
             print 'Method is LedoitWolf'
             cov_ = LedoitWolf(block_size = 15000).fit(true_ex)
@@ -476,7 +484,7 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     #Get target predictions (unlabelled)
     prediction_target = results['predictions']
     
-    
+
     #Test of data prediction
     mahalanobis_values = []
     for l, ex in zip(prediction_target, ds_tar.samples):
@@ -498,7 +506,9 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     mahalanobis_values = np.array(mahalanobis_values) ** 2
     
     #Get no. of features
-    df = ds_tar.samples.shape[1]
+    df = ds_src.samples.shape[1]
+    
+    print df
 
     #Set a chi squared distribution
     c_squared = scipy.stats.chi2(df)
@@ -506,6 +516,9 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.01):
     #Set the p-value and the threshold value to validate predictions
     m_value = c_squared.isf(p_value)
     threshold = m_value
+    
+    print m_value
+    print p_value
     
     #Mask true predictions
     true_predictions = (mahalanobis_values < m_value)

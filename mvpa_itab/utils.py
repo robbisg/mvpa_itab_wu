@@ -160,7 +160,7 @@ def fidl2txt (fidlPath, outPath):
     lastElem = tokens[0]
     
     runs = int(lastElem[-1])
-    
+    #runs = 12
     noEvents = len(tokens)/int(runs)
     
     eventLabels = []
@@ -198,24 +198,27 @@ def fidl2txt (fidlPath, outPath):
     outFile.close()
             
 
-def fidl2txt_2(fidlPath, outPath, exp_end=542):
+def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
     '''
     exp_end = ???
     '''
     print 'Converting fidl file '+fidlPath+' in '+outPath
     
+    exp_end = vol_run * runs
+    
     fidlFile = open(fidlPath)
     
-    firstRow = fidlFile.readline().split()
+    firstRow = fidlFile.readline().split(',')
     tokens = firstRow
     tokens.reverse()
     TR = float(tokens.pop())
        
     fidlFile.close()
-    data = np.loadtxt(fidlPath, skiprows = 1)
+    data = np.loadtxt(fidlPath, skiprows = 1, delimiter=',')
     
     onset = data.T[0]
-    duration = data.T[2]
+    #duration = data.T[2]
+    #
     events = data.T[1]
     
     outFile = open(outPath, 'w')
@@ -229,31 +232,38 @@ def fidl2txt_2(fidlPath, outPath, exp_end=542):
         eventLabels.append(tokens[i][:])
     
     onset = np.append(onset, exp_end * TR)
+    duration = [onset[i+1] - onset[i] for i in range(len(onset)-1)]
+    duration = np.array(duration)
     
     if onset[0] != 0:
         f = 0
         while f < np.rint(onset[0]/TR):
-            outFile.write('fixation 0\n')
+            outFile.write(u'FIX 0 0\n')
             f = f + 1
        
     for i in range(len(onset)-1):
-        
+        '''
         if i <= 1:
             runArr = np.array(np.ceil(np.bincount(np.int_(events[:2]))/4.) - 1, dtype=np.int)
         else:
             runArr = np.array(np.ceil(np.bincount(np.int_(events[:i+1]), 
                                               minlength=noEvents)/4.) - 1, 
                           dtype=np.int)
+        '''
         j = 0
 
         while j < np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR):
-            if (j < np.rint(duration[i]/TR)):#-1
-                outFile.write(eventLabels[int(events[i])]+' '+str(runArr[int(events[i])])+'\n')
+            
+            #if (j < np.rint(duration[i]/TR)):#-1
+            if (offset_tr < j < offset_tr+stim_tr):#-1
+                #outFile.write(eventLabels[int(events[i])]+' '+str(runArr[int(events[i])])+'\n')
+                outFile.write(eventLabels[int(events[i])]+' '+str(i/30)+' '+str(i)+'\n')
             else:
-                outFile.write('fixation '+str(runArr[int(events[i])])+'\n')
+                #outFile.write(u'fixation '+str(runArr[int(events[i])])+'\n')
+                outFile.write(u'FIX '+str(i/30)+' '+str(i)+'\n')
             j = j + 1
             
-    outFile.close()
+    outFile.close()   
 
 
 def roi_wu_data(path, name, task, init_vol=0):

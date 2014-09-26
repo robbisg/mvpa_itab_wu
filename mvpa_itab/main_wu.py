@@ -179,13 +179,6 @@ def preprocess_dataset(ds, type, **kwargs):
         if (arg == 'img_dim'):
             img_dim = int(kwargs[arg])
                 
-                
-    if  label_dropped != 'none':
-        ds = ds[ds.sa.targets != label_dropped]
-    if  label_included != ['all']:
-        ds = ds[np.array([l in label_included for l in ds.sa.targets],
-                          dtype='bool')]
-    
     
     print 'Dataset preprocessing: Detrending...'
     if img_dim == 4:
@@ -193,26 +186,42 @@ def preprocess_dataset(ds, type, **kwargs):
     poly_detrend(ds, polyord = 1, chunks_attr = 'chunks')
     
     
-                          
+    if  label_dropped != 'none':
+        print 'Removing labels...'
+        ds = ds[ds.sa.targets != label_dropped]
+    if  label_included != ['all']:
+        ds = ds[np.array([l in label_included for l in ds.sa.targets],
+                          dtype='bool')]
+        
+               
     if str(mean) == 'True':
-        print 'Averaging samples...'
-        avg_mapper = mean_group_sample(['events_number']) 
+        print 'Dataset preprocessing: Averaging samples...'
+        avg_mapper = mean_group_sample(['event_num']) 
         ds = ds.get_mapped(avg_mapper)     
+    
     
     print 'Dataset preprocessing: Normalization feature-wise...'
     if img_dim == 4:
         zscore(ds, chunks_attr='file')
     zscore(ds)#, param_est=('targets', ['fixation']))
-   
+    
+    
+
+    
+    
+    
+    '''
     #Normalizing image-wise
     print 'Dataset preprocessing: Normalization sample-wise...'
     ds.samples -= np.mean(ds, axis=1)[:, None]
     ds.samples /= np.std(ds, axis=1)[:, None]
     
     ds.samples[np.isnan(ds.samples)] = 0
+    '''
     
-    
-    ds.a.events = find_events(chunks = ds.sa.chunks, targets = ds.sa.targets)
+    ds.a.events = find_events(event= ds.sa.event_num, 
+                              chunks = ds.sa.chunks, 
+                              targets = ds.sa.targets)
     
     return ds
 
@@ -343,7 +352,7 @@ def searchlight(ds, **kwargs):
     [fclf, cvte] = setup_classifier(**kwargs)
     """ 
     clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
-    cv = CrossValidation(clf, HalfPartitioner())
+    cv = CrossValidation(clf, HalfPartitioner(attr='band'))
     
     
     sl = sphere_searchlight(cv, radius, space = 'voxel_indices')
@@ -449,6 +458,7 @@ def spatiotemporal(ds, **kwargs):
     
     try:
         sensana = fclf.get_sensitivity_analyzer()
+        res_sens = sensana(evds)
     except Exception, err:
         allowed_keys = ['map', 'sensitivities', 'stats', 
                         'mapper', 'classifier', 'ds', 
@@ -468,7 +478,7 @@ def spatiotemporal(ds, **kwargs):
                 
         return results
     
-    res_sens = sensana(evds)
+    
     
     sens_comb = res_sens.get_mapped(mean_sample())
     mean_map = map2nifti(evds, evds.a.mapper.reverse1(sens_comb))
@@ -615,7 +625,7 @@ def setup_classifier(**kwargs):
     if f_sel == 'True':
         print 'Feature Selection selected.'
         fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  
-                                                FractionTailSelector(0.1,
+                                                FractionTailSelector(0.05,
                                                                      mode='select',
                                                                      tail='upper'))
         fclf = FeatureSelectionClassifier(clf, fsel)
@@ -623,9 +633,17 @@ def setup_classifier(**kwargs):
     elif f_sel == 'Fixed':
         print 'Fixed Feature Selection selected.'
         fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  
-                                                FixedNElementTailSelector(50,
+                                                FixedNElementTailSelector(100,
                                                                      mode='select',
                                                                      tail='upper'))
+        fclf = FeatureSelectionClassifier(clf, fsel)
+        
+    elif f_sel == 'PCA':
+        from mvpa2.mappers.skl_adaptor import SKLTransformer
+        from sklearn.decomposition import PCA
+        print 'Fixed Feature Selection selected.'
+        fsel = SKLTransformer(PCA(n_components=45))
+        
         fclf = FeatureSelectionClassifier(clf, fsel)
     else:
 

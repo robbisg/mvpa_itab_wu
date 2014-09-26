@@ -23,7 +23,7 @@ def load_mat_dataset(datapath, bands, conditions, networks=None):
     
     filelist = os.listdir(datapath)
     filelist = [f for f in filelist if f.find('.mat') != -1]
-    
+    #print filelist
     mask = np.zeros(len(labels.T[0]))
     if networks != None:
         for n in networks:
@@ -38,6 +38,7 @@ def load_mat_dataset(datapath, bands, conditions, networks=None):
         for band in bands:
             filt_list = [f for f in filelist if f.find(cond) != -1 \
                                         and f.find(band) != -1]
+            
             data = loadmat(os.path.join(datapath, filt_list[0]))
 
             mat_ = data[data.keys()[0]]
@@ -66,18 +67,34 @@ def load_mat_dataset(datapath, bands, conditions, networks=None):
     samples = np.vstack(sample_list)
     chunks = np.hstack(chunk_list)
 
-    #zsamples = sc_zscore(samples, axis=0)
+    #zsamples = sc_zscore(samples, axis=1)
 
     ds = dataset_wizard(samples, targets=targets, chunks=chunks)
     ds.sa['band'] = np.hstack(band_list)
     
     #zscore(ds, chunks_attr='band')
-    zscore(ds, chunks_attr='chunks')
+    #zscore(ds, chunks_attr='chunks')
     #zscore(ds, chunks_attr='band')
     
-    print ds.shape
+    #print ds.shape
         
     return ds
+
+def flatten_correlation_matrix(matrix):
+    
+    il = np.tril_indices(matrix.shape[0])
+    out_matrix = matrix.copy()
+    out_matrix[il] = 0
+    
+    iu = np.triu_indices(matrix.shape[0])
+    out_matrix[out_matrix[iu] == 0] = np.isnan
+    
+    out_matrix = out_matrix[np.nonzero(out_matrix)]
+    out_matrix[np.isnan(out_matrix)] == 0
+    
+    return out_matrix
+    
+
 
 def load_correlation():
     # To be implemented
