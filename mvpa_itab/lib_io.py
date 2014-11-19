@@ -110,6 +110,7 @@ def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
                                name+'_values_fitted_ov.png')
     f.savefig(fname)
     f2.savefig(fname[:-3]+'smooth.png')
+    plt.close('all')
     return data_sm, data_or
     
 
@@ -159,7 +160,7 @@ def plot_transfer_graph_fitted(path, name, analysis_folder):
                                name, 
                                name+'_values_fitted.png')
     f.savefig(fname)
-    
+    plt.close('all')
 
 
 def plot_transfer_graph(path, name, results):
@@ -225,7 +226,7 @@ def plot_transfer_graph(path, name, results):
     rep = open(os.path.join(path, rep_txt), 'w')
     rep.write(report)
     rep.close()  
-    
+    plt.close('all')
 
 def plot_clusters_graph(path, name, results):
     
@@ -310,7 +311,8 @@ def plot_clusters_graph(path, name, results):
     rep = open(os.path.join(path, rep_txt), 'w')
     rep.write(report)
     rep.close()
-
+    plt.close('all')
+    
 def plot_cv_results(cv, err, title):
     # make new figure
     pl.figure()
@@ -1572,7 +1574,8 @@ def save_results_transfer_learning(path, results):
             ax1.axvline(x=threshold, ymax=ax1.get_ylim()[1], color='r', linestyle='--', linewidth=3)
             ax2.axvline(x=0.99, ymax=ax2.get_ylim()[1], color='r', linestyle='--', linewidth=3)
             plot_list[k][0].savefig(os.path.join(path,'total_histogram_'+k+'.png'))
-        
+    
+    plt.close('all')    
     return
 
 

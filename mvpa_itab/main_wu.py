@@ -19,14 +19,15 @@ from scipy.spatial.distance import *
 import matplotlib.pyplot as plt
 from lib_io import *
 from utils import *
+from similarity import *
+#from similarity import MahalanobisMeasure
 
 class StoreResults(object):
     def __init__(self):
         self.storage = []
             
     def __call__(self, data, node, result):
-        self.storage.append((node.measure.clf.ca.probabilities,
-                                    node.measure.clf.ca.predictions)),
+        self.storage.append(node.measure.ca.predictions),
 
 def balance_dataset(ds, label, sort=True, **kwargs):
     
@@ -181,7 +182,7 @@ def preprocess_dataset(ds, type, **kwargs):
                 
     
     print 'Dataset preprocessing: Detrending...'
-    if img_dim == 4:
+    if len(np.unique(ds.sa['file'])) != 1:
         poly_detrend(ds, polyord = 1, chunks_attr = 'file')
     poly_detrend(ds, polyord = 1, chunks_attr = 'chunks')
     
@@ -219,7 +220,7 @@ def preprocess_dataset(ds, type, **kwargs):
     ds.samples[np.isnan(ds.samples)] = 0
     '''
     
-    ds.a.events = find_events(event= ds.sa.event_num, 
+    ds.a.events = find_events(#event= ds.sa.event_num, 
                               chunks = ds.sa.chunks, 
                               targets = ds.sa.targets)
     
@@ -336,7 +337,6 @@ def spatial(ds, **kwargs):
     return results
 
 
-
 def searchlight(ds, **kwargs):
     
     if __debug__:
@@ -355,8 +355,10 @@ def searchlight(ds, **kwargs):
     cv = CrossValidation(clf, HalfPartitioner(attr='band'))
     
     
-    sl = sphere_searchlight(cv, radius, space = 'voxel_indices')
+    #sl = sphere_searchlight(cv, radius, space = 'voxel_indices')
     
+    #sl = Searchlight(MahalanobisMeasure, queryengine, add_center_fa, results_postproc_fx, results_backend, results_fx, tmp_prefix, nblocks)
+    sl = sphere_searchlight(MahalanobisMeasure(), 3, space= 'voxel_indices')
     sl_map = sl(ds)
     
     sl_map.samples *= -1

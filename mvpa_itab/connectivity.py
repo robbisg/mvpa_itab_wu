@@ -464,7 +464,8 @@ def get_bold_signals (image, mask, TR, normalize=True, average=True, filter_par=
     del mask_data
     del ts
     return TimeSeries(np.vstack(final_data), sampling_interval=float(TR))
-        
+
+       
 def save_matrices(path, results):
     
     datetime = get_time()
@@ -492,7 +493,8 @@ def save_matrices(path, results):
                 path_fn = os.path.join(sub_dir, fname)
                 
                 np.savetxt(path_fn, matrices[i], fmt='%.4f')
-    
+
+   
 def load_matrices(path, condition):
     
     subjects = os.listdir(path)
@@ -523,8 +525,7 @@ def load_matrices(path, condition):
         
     return np.array(result)
     
-    
-    
+     
 def z_fisher(r):
     
     F = 0.5*np.log((1+r)/(1-r))
@@ -535,95 +536,5 @@ def z_fisher(r):
 #class ConditionTimeserie():
 
     
-if __name__ == '__main__':   
-    from scipy.io import savemat
-    path = '/media/DATA/fmri/monks/0_results/'
-    
-    print 'In the main()'
-    results_dir = os.listdir(path)
-     
-    results_dir = [r for r in results_dir if r.find('connectivity') != -1]
-    roi_list = np.loadtxt('/media/DATA/fmri/templates_fcmri/findlab_rois.txt', 
-                          delimiter=',',
-                          dtype=np.str)
-    
-    subjects = np.loadtxt('/media/DATA/fmri/monks/attributes_struct.txt',
-                          dtype=np.str)
-    
-    for r in results_dir:
-        results = load_matrices(os.path.join(path,r), ['Samatha', 'Vipassana'])
-        nan_mask = np.isnan(results)
-         
-        for i in range(len(results.shape) - 2):
-            nan_mask = nan_mask.sum(axis=0)
-            
-        results = results[:,:,:,~np.bool_(nan_mask)]
-        rows = np.sqrt(results.shape[-1])
-        shape = list(results.shape[:-1])
-        shape.append(int(rows))
-        shape.append(-1)
-        
-        results = results.reshape(shape)
-        zresults = z_fisher(results)
-        zresults[np.isinf(zresults)] = 1
-        
-        roi_mask = ~np.bool_(np.diagonal(nan_mask))
-        
-        fields = dict()
-        fields['z_matrix'] = zresults
-        fields['network'] = list(roi_list[roi_mask].T[0])
-        fields['roi_name'] = list(roi_list[roi_mask].T[2])
-        fields['groups'] = list(subjects.T[1])
-        fields['level'] = list(np.int_(subjects.T[-1]))
-        
-        #savemat(os.path.join(path,r,'zcorrelation_matrix.mat'), fields)
-        
-        ################### Tests ###########################
-        roi_names = np.array(fields['roi_name'])
-        networks = roi_list[roi_mask].T[-2]   
-        
-        zmean = zresults.mean(axis=2)
-        
-        vipassana = zmean[1]
-        samatha = zmean[0]
-        
-        tv, pv = ttest_ind(vipassana[subjects.T[1] == 'E'], 
-                         vipassana[subjects.T[1] != 'E'],
-                         axis=0)
-        
-        ts, ps = ttest_ind(samatha[subjects.T[1] == 'E'], 
-                         samatha[subjects.T[1] != 'E'],
-                         axis=0)       
-        
-        fields['ttest_vipassana_t'] = tv
-        fields['ttest_vipassana_p'] = pv
-        
-        f = plot_matrix(tv * (pv < 0.01), roi_names, networks)
-        f.savefig(os.path.join(path,r,'vipassana_t_test.png'))
-        
 
-        fields['ttest_samatha_t'] = ts
-        fields['ttest_samatha_p'] = ps
-        
-        f = plot_matrix(ts * (ps < 0.01), roi_names, networks)
-        f.savefig(os.path.join(path,r,'samatha_t_test.png'))
-        ############### Behavioral correlation ###############
-        
-        bh = TimeSeries(np.int_(subjects[subjects.T[1] == 'E'].T[-1]), sampling_interval=1.)
-        ts_s = TimeSeries(samatha[subjects.T[1] == 'E'].T, sampling_interval=1.)
-        ts_v = TimeSeries(vipassana[subjects.T[1] == 'E'].T, sampling_interval=1.)
-        
-        S_s = SeedCorrelationAnalyzer(bh, ts_s)
-        S_v = SeedCorrelationAnalyzer(bh, ts_v)
-        
-        fields['vipassana_expertise_corr'] = S_v.corrcoef
-        fields['samatha_expertise_corr'] = S_s.corrcoef       
-        
-        f = plot_matrix(S_s.corrcoef * (np.abs(S_s.corrcoef) > 0.6), roi_names, networks)
-        f.savefig(os.path.join(path,r,'samatha_correlation_expertise_0.6.png'))
-        
-        f = plot_matrix(S_v.corrcoef * (np.abs(S_v.corrcoef) > 0.6), roi_names, networks)
-        f.savefig(os.path.join(path,r,'vipassana_correlation_expertise_0.6.png'))
-        
-        savemat(os.path.join(path,r,'all_analysis.mat'), fields)
         

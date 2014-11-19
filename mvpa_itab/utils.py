@@ -238,9 +238,9 @@ def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
     if onset[0] != 0:
         f = 0
         while f < np.rint(onset[0]/TR):
-            outFile.write(u'FIX 0 0\n')
+            outFile.write(u'FIX 0 0 0\n')
             f = f + 1
-       
+     
     for i in range(len(onset)-1):
         '''
         if i <= 1:
@@ -255,12 +255,15 @@ def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
         while j < np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR):
             
             #if (j < np.rint(duration[i]/TR)):#-1
-            if (offset_tr < j < offset_tr+stim_tr):#-1
+            if (offset_tr < j < offset_tr + stim_tr):#-1
                 #outFile.write(eventLabels[int(events[i])]+' '+str(runArr[int(events[i])])+'\n')
-                outFile.write(eventLabels[int(events[i])]+' '+str(i/30)+' '+str(i)+'\n')
+                outFile.write(eventLabels[int(events[i])]+' '
+                                            +str(i/30)+' '  #Chunk
+                                            +str(i)+' '     #Event
+                                            +str(j+1)+'\n') #Frame
             else:
                 #outFile.write(u'fixation '+str(runArr[int(events[i])])+'\n')
-                outFile.write(u'FIX '+str(i/30)+' '+str(i)+'\n')
+                outFile.write(u'FIX '+str(i/30)+' '+str(i)+' '+str(j+1)+'\n')
             j = j + 1
             
     outFile.close()   
