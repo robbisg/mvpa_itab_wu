@@ -1,6 +1,6 @@
 from mvpa_itab.test_wu import *
 import numpy as np
-
+'''
 path = '/media/robbis/DATA/fmri/learning/'
 conf = read_configuration(path, 'learning.conf', 'task')
 
@@ -21,7 +21,7 @@ ds = ds[np.logical_or((ds.targets == 'trained'),(ds.targets == 'RestPre')) ]
 '''
 sl = sphere_searchlight(MahalanobisMeasure(), 3, space= 'voxel_indices')
 sl_map = sl(ds)
-'''
+
 ############################
 ### Partitioner debug ######
 

@@ -15,7 +15,7 @@ import matplotlib.cm as cm
 
 
 
-from mvpa2.suite import h5load
+#from mvpa2.suite import h5load
 
 '''
 def writeConfiguration(name, experiment, zscoring = None, 

@@ -473,6 +473,7 @@ class MahalanobisMeasure(Measure):
     def __init__(self, p=0.05):
         
         Measure.__init__(self)
+        self.is_trained = True
         self.p = p
         
     def train(self, ds):
@@ -483,8 +484,8 @@ class MahalanobisMeasure(Measure):
     def _call(self, ds):
         
         #Partioner should be used instead
-        ds_train = ds[ds.sa.task == 'task']
-        ds_test = ds[ds.sa.task == 'rest']
+        ds_train = ds[ds.targets == 0]
+        ds_test = ds[ds.targets == 1]
         
         mean_ = ds_train.samples.mean(0)
         
@@ -502,7 +503,7 @@ class MahalanobisMeasure(Measure):
         distances = np.array(distances)
         value = np.count_nonzero((distances ** 2) < m_value)
         
-        return value
+        return distances
         
         
         
