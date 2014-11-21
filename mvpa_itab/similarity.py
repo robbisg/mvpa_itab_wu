@@ -5,6 +5,9 @@ from scipy.spatial.distance import mahalanobis, euclidean
 from scipy.stats import pearsonr
 from sklearn.covariance import EmpiricalCovariance, LedoitWolf, MinCovDet, \
                         GraphLasso, ShrunkCovariance
+from mvpa2.generators.partition import Partitioner
+from mvpa2.datasets.base import Dataset
+from timeit import itertools
                         
 def similarity_measure(ds_tar, ds_src, results, p_value=0.05, method='mahalanobis'):
     
@@ -473,27 +476,25 @@ class MahalanobisMeasure(Measure):
     def __init__(self, p=0.05):
         
         Measure.__init__(self)
-        self.is_trained = True
+        self.space = 'targets'
         self.p = p
+        self.params = dict()
         
     def train(self, ds):
         
-        pass
+        self.params['mean'] = ds.samples.mean(0)
+        self.params['icov'] = EmpiricalCovariance().fit(ds.samples).precision_
+        self.is_trained = True
         
     
     def _call(self, ds):
-        
-        #Partioner should be used instead
-        ds_train = ds[ds.targets == 0]
-        ds_test = ds[ds.targets == 1]
-        
-        mean_ = ds_train.samples.mean(0)
-        
-        icov_ = EmpiricalCovariance().fit(ds_train.samples).precision_
-        
+          
         distances = []
-        for ex in ds_test:
-            
+        
+        mean_ = self.params['mean']
+        icov_ = self.params['icov']
+          
+        for ex in ds:   
             dist_ = mahalanobis(mean_, ex, icov_)
             distances.append(dist_)
         
@@ -503,7 +504,35 @@ class MahalanobisMeasure(Measure):
         distances = np.array(distances)
         value = np.count_nonzero((distances ** 2) < m_value)
         
-        return distances
+        space = self.get_space()
+        return Dataset(np.array([value]), sa={space: ds.sa[space]})
         
+class TargetCombinationPartitioner(Partitioner):
+    
+    def __init__(self, attr_task='task', **kwargs):
         
+        Partitioner.__init__(self, **kwargs)
+        
+        self.__attr_task = attr_task
+        
+    
+    def get_partition_specs(self, ds):
+        #uniqueattr = ds.sa[self.__attr].unique()
+        uniquetask = ds.sa[self.__attr_task].unique
+        
+        listattr = []
+        for task in uniquetask:
+            targets = ds[ds.sa[self.__attr_task].value == task].uniquetargets
+            listattr.append(targets)                  
+
+        rule = self._get_partition_specs(listattr)
+        
+        return rule
+        
+    def _get_partition_specs(self, listattr):
+        
+        prod = itertools.product(*listattr)
+        
+        return [('None', [item[0]], [item[1]])  for item in prod]
+
         

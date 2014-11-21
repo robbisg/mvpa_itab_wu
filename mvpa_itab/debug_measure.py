@@ -1,6 +1,6 @@
 from mvpa_itab.test_wu import *
 import numpy as np
-'''
+
 path = '/media/robbis/DATA/fmri/learning/'
 conf = read_configuration(path, 'learning.conf', 'task')
 
@@ -14,20 +14,19 @@ ds = ds_merged[0]
 if __debug__:
     debug.active += ["SLC"]
 
-h_task = HalfPartitioner(attr='task')
-h_cond = HalfPartitioner(attr='target')
 
-ds = ds[np.logical_or((ds.targets == 'trained'),(ds.targets == 'RestPre')) ]
-'''
-sl = sphere_searchlight(MahalanobisMeasure(), 3, space= 'voxel_indices')
+cv = CrossValidation(MahalanobisMeasure(), 
+                     TargetCombinationPartitioner(attr='targets'),
+                     splitter=Splitter(attr='partitions', attr_values=(3,2)))
+
+sl = sphere_searchlight(cv, 3, space= 'voxel_indices')
 sl_map = sl(ds)
 
 ############################
 ### Partitioner debug ######
-
-nfold = NFoldPartitioner(attr='chunks')
+'''
+nfold = TargetCombinationPartitioner(attr='targets')
 gen = nfold.generate(ds)
 ds_part = gen.next()
-
 
 
