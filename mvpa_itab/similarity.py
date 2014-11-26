@@ -462,27 +462,29 @@ class SimilarityMeasure(Measure):
     
     def __init__(self):
         Measure.__init__(self)
-        
-    def _precall(self, ds):
-        pass
-        #common preprocess
-        #Calculate mean?
-
-
-class MahalanobisMeasure(Measure):
-    
-    #print 'Hello Mahalanobis'
-    
-    def __init__(self, p=0.05):
-        
-        Measure.__init__(self)
-        self.space = 'targets'
-        self.p = p
         self.params = dict()
         
     def train(self, ds):
-        
         self.params['mean'] = ds.samples.mean(0)
+        self.is_trained = True
+    
+    def untrain(self):
+        self.is_trained = False
+        self.params = {}
+
+
+class MahalanobisMeasure(SimilarityMeasure):
+    
+    def __init__(self, p=0.05):
+        
+        SimilarityMeasure.__init__(self)
+        #self.space = 'targets'
+        self.p = p
+        
+        
+    def train(self, ds):
+        
+        super(MahalanobisMeasure, self).train(ds)
         self.params['icov'] = EmpiricalCovariance().fit(ds.samples).precision_
         self.is_trained = True
         
@@ -504,9 +506,45 @@ class MahalanobisMeasure(Measure):
         distances = np.array(distances)
         value = np.count_nonzero((distances ** 2) < m_value)
         
-        space = self.get_space()
-        return Dataset(np.array([value]), sa={space: ds.sa[space]})
+        #space = self.get_space()
+        return Dataset(np.array([value]))
+    
+
+
+class CorrelationMeasure(SimilarityMeasure):
+
+    def __init__(self, p=0.05):
         
+        SimilarityMeasure.__init__(self)
+        #self.space = 'targets'
+        self.p = p
+
+    def _call(self, ds):
+          
+        distances = []
+        probabilities = []
+        
+        mean_ = self.params['mean']
+        
+        if ds.samples.shape[1] == 1:
+            return Dataset(np.array([0.]))
+        
+        samples = ds.samples
+        
+        for ex in samples:   
+            corr_, p_ = pearsonr(mean_.squeeze(), ex.squeeze())
+            distances.append(1 - corr_)
+            probabilities.append(p_)
+        
+        probabilities = np.array(probabilities)
+        distances = np.array(distances)
+        probabilities = probabilities[distances <= 1]
+        value = np.count_nonzero(probabilities < self.p)
+        
+        #space = self.get_space()
+        return Dataset(np.array([value]))
+    
+    
 class TargetCombinationPartitioner(Partitioner):
     
     def __init__(self, attr_task='task', **kwargs):
