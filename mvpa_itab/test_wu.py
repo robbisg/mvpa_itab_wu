@@ -356,7 +356,7 @@ def test_searchlight_similarity(path,
         
         
     datetime = get_time()
-    analysis = 'cross_searchlight'
+    analysis = 'searchlight_measure'
     mask = conf['mask_area']
     task = type
     
@@ -592,9 +592,10 @@ def get_merged_ds(path, subjects, conf_file, source='task', dim=3, **kwargs):
         ds_src = preprocess_dataset(ds_src, source, **conf_src)
         ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
 
-        if dim == 4:                
-            ds_tar = build_events_ds(ds_tar, 7, overlap=6.)
-            ds_src = load_spatiotemporal_dataset(ds_src)
+        if dim == 4:    
+            duration = np.min([e['duration'] for e in ds_src.a.events])      
+            ds_tar = build_events_ds(ds_tar, duration, overlap=duration-1)
+            ds_src = load_spatiotemporal_dataset(ds_src, duration=duration)
         
         print ds_src.samples.shape
         print ds_tar.samples.shape 
