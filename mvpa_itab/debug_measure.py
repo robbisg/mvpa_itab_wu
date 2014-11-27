@@ -2,7 +2,7 @@ from mvpa_itab.test_wu import *
 import numpy as np
 from mvpa2.clfs.svm import LinearCSVMC
 
-img = ni.load('/media/robbis/DATA/fmri/memory/110929angque/RESIDUALS_GOonly/angque_task_4RES_GOonly_res_b1.4dfp.hdr')
+img = ni.load('/media/robbis/DATA/fmri/memory/nibabel__/angque_task_4RES_GOonly_res_b1.4dfp.hdr')
 data = img.get_data()
 path = '/media/robbis/DATA/fmri/learning/'
 conf = read_configuration(path, 'learning.conf', 'task')
