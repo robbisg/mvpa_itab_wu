@@ -91,7 +91,7 @@ def build_events_ds(ds, new_duration, **kwargs):
     """
     
     for arg in kwargs:
-        if arg == 'number':
+        if arg == 'win_number':
             win_number = kwargs[arg]
         if arg == 'overlap':
             overlap = kwargs[arg]

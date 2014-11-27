@@ -308,6 +308,81 @@ def test_searchlight(path, subjects, conf_file, type, **kwargs):
     
     return total_results
 
+def test_searchlight_similarity(path,
+                                subjects, 
+                                conf_file, 
+                                type, 
+                                dim=4,
+                                measure=CorrelationMeasure(),
+                                partitioner=TargetCombinationPartitioner(attr='targets'),
+                                **kwargs):
+    
+    conf = read_configuration(path, conf_file, type)
+    
+    for arg in kwargs:
+        conf[arg] = kwargs[arg]
+        if arg == 'radius':
+            radius = kwargs[arg]
+        if arg == 'duration':
+            duration = kwargs[arg]
+            
+    
+    
+    debug.active += ["SLC"]
+    
+    ds_merged = get_merged_ds(path, subjects, conf_file, type, dim=dim, **kwargs)
+    
+    cv = CrossValidation(measure, 
+                         partitioner,
+                         splitter=Splitter(attr='partitions', attr_values=(3,2)),
+                         errorfx=None
+                         )
+    
+    maps = []
+    kwa = dict(voxel_indices=Sphere(radius), 
+               event_offsetidx=Sphere(duration))
+    queryengine = IndexQueryEngine(**kwa)
+    
+    voxel_num = ds_merged[0].samples.shape[1]/duration
+    ids = np.arange(voxel_num)
+    
+    for ds in ds_merged:
+                
+        sl = Searchlight(cv, queryengine=queryengine, roi_ids=ids)
+    
+        sl_map = sl(ds)
+            
+        maps.append(sl_map)
+        
+        
+    datetime = get_time()
+    analysis = 'searchlight_measure'
+    mask = conf['mask_area']
+    task = type
+    
+    new_dir = datetime+'_'+analysis+'_'+mask+'_'+task
+    command = 'mkdir '+os.path.join(path, '0_results', new_dir)
+    os.system(command)
+    
+    parent_dir = os.path.join(path, '0_results', new_dir)
+    
+    for s, map in zip(subjects, maps):
+        name = s
+        command = 'mkdir '+os.path.join(parent_dir, name)
+        os.system(command)
+        
+        results_dir = os.path.join(parent_dir, name)
+        fname = name+'_radius_'+str(radius)+'_searchlight_map.nii.gz'        
+        map_ = ds.a.mapper[:2].reverse(map)
+        map_ = np.rollaxis(map_.samples, 0, 4)
+        img = ni.Nifti1Image(map_, ds.a.imghdr.get_base_affine())
+        ni.save(img, os.path.join(results_dir, fname))
+        
+    
+    return maps
+    
+
+
 def test_searchlight_cross_decoding(path, subjects, conf_file, type, **kwargs):
     
     conf = read_configuration(path, conf_file, type)
@@ -470,7 +545,7 @@ def sources_merged_ds(path_list, subjects_list, conf_list, task, **kwargs):
     return ds_new, ['group'], conf_n
 
    
-def get_merged_ds(path, subjects, conf_file, source='task', **kwargs):
+def get_merged_ds(path, subjects, conf_file, source='task', dim=3, **kwargs):
     
     
     #Mettere source e target nel conf!
@@ -515,13 +590,23 @@ def get_merged_ds(path, subjects, conf_file, source='task', **kwargs):
             continue
         
         ds_src = preprocess_dataset(ds_src, source, **conf_src)
-        ds_src.sa['task'] = [source for s in range(ds_src.samples.shape[0])]
-        
         ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
+
+        if dim == 4:    
+            duration = np.min([e['duration'] for e in ds_src.a.events])      
+            ds_tar = build_events_ds(ds_tar, duration, overlap=duration-1)
+            ds_src = load_spatiotemporal_dataset(ds_src, duration=duration)
+        
+        print ds_src.samples.shape
+        print ds_tar.samples.shape 
+        
+        ds_src.sa['task'] = [source for s in range(ds_src.samples.shape[0])]
         ds_tar.sa['task'] = [target for s in range(ds_tar.samples.shape[0])]
         
         ds_merged = vstack((ds_src, ds_tar))
         ds_merged.a.update(ds_src.a)
+        
+        print ds_merged.sa.task
         
         ds_merged_list.append(ds_merged)
         '''
