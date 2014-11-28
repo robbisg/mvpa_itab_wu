@@ -1,5 +1,5 @@
 from nibabel.analyze import AnalyzeImage, AnalyzeHeader
-from nibabel.spm99analyze import Spm99AnalyzeHeader
+from nibabel.spm99analyze import Spm99AnalyzeHeader, Spm99AnalyzeImage
 from nibabel.spatialimages import HeaderTypeError
 import numpy as np
 from nibabel.volumeutils import (pretty_mapping, endian_codes, native_code,
@@ -86,7 +86,7 @@ _dtdefs = ( # code, conversion function, equivalent dtype, aliases
 data_type_codes = make_dt_codes(_dtdefs)
 
 
-class WashUHeader(Spm99AnalyzeHeader):
+class WashUHeader(AnalyzeHeader):
         
     # Copies of module-level definitions
     template_dtype = header_dtype
@@ -101,9 +101,9 @@ class WashUHeader(Spm99AnalyzeHeader):
     has_data_intercept = False
     
     
-    def __init__(self, header_dict):
+    def __init__(self, header_dict, endianness=None):
         
-        Spm99AnalyzeHeader.__init__(self)
+        AnalyzeHeader.__init__(self, endianness=endianness)
         self._general = None
         self._data_type = None
         self._header_dict = header_dict
@@ -119,8 +119,8 @@ class WashUHeader(Spm99AnalyzeHeader):
     def from_fileobj(klass, fileobj, endianness=None, check=True):
         
         header_dict = klass.file_to_dict(fileobj)
-
-        return klass(header_dict)
+        endianness = klass.guessed_endian(header_dict)
+        return klass(header_dict, endianness=endianness)
         
     @classmethod
     def file_to_dict(klass, fileobj, separator=':= '):
@@ -144,15 +144,15 @@ class WashUHeader(Spm99AnalyzeHeader):
         fileobj.close()
 
         return header_dict
-
+    
     @classmethod
     def guessed_endian(klass, hdr):
-        if hdr._header_dict['imagedata_byte_order'] == 'bigendian\n':
+        if hdr['imagedata_byte_order'] == 'bigendian\n':
             endianess = '>'
         else:
             endianess = '<'
         return endianess
-    
+       
     def set_header_info(self):
         
         hdr = self
