@@ -326,7 +326,18 @@ def test_searchlight_similarity(path,
         if arg == 'duration':
             duration = kwargs[arg]
             
+    #########################################################
+    datetime = get_time()
+    analysis = 'searchlight_measure'
+    mask = conf['mask_area']
+    task = type
     
+    new_dir = datetime+'_'+analysis+'_'+mask+'_'+task
+    command = 'mkdir '+os.path.join(path, '0_results', new_dir)
+    os.system(command)
+    
+    parent_dir = os.path.join(path, '0_results', new_dir)       
+    ##########################################################
     
     debug.active += ["SLC"]
     
@@ -346,27 +357,16 @@ def test_searchlight_similarity(path,
     voxel_num = ds_merged[0].samples.shape[1]/duration
     ids = np.arange(voxel_num)
     
-    for ds in ds_merged:
-                
+    for s, ds in zip(subjects, ds_merged):
+        
+        voxel_num = ds.samples.shape[1]/duration
+        ids = np.arange(voxel_num)        
         sl = Searchlight(cv, queryengine=queryengine, roi_ids=ids)
     
-        sl_map = sl(ds)
+        map = sl(ds)
             
-        maps.append(sl_map)
-        
-        
-    datetime = get_time()
-    analysis = 'searchlight_measure'
-    mask = conf['mask_area']
-    task = type
-    
-    new_dir = datetime+'_'+analysis+'_'+mask+'_'+task
-    command = 'mkdir '+os.path.join(path, '0_results', new_dir)
-    os.system(command)
-    
-    parent_dir = os.path.join(path, '0_results', new_dir)
-    
-    for s, map in zip(subjects, maps):
+        maps.append(map)
+
         name = s
         command = 'mkdir '+os.path.join(parent_dir, name)
         os.system(command)
