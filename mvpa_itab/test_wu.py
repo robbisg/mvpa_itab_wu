@@ -353,11 +353,10 @@ def test_searchlight_similarity(path,
     kwa = dict(voxel_indices=Sphere(radius), 
                event_offsetidx=Sphere(duration))
     queryengine = IndexQueryEngine(**kwa)
-    
-    voxel_num = ds_merged[0].samples.shape[1]/duration
-    ids = np.arange(voxel_num)
-    
+        
     for s, ds in zip(subjects, ds_merged):
+        
+        print ds.samples.shape
         
         voxel_num = ds.samples.shape[1]/duration
         ids = np.arange(voxel_num)        
@@ -377,7 +376,6 @@ def test_searchlight_similarity(path,
         map_ = np.rollaxis(map_.samples, 0, 4)
         img = ni.Nifti1Image(map_, ds.a.imghdr.get_base_affine())
         ni.save(img, os.path.join(results_dir, fname))
-        
     
     return maps
     

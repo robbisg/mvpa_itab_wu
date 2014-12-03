@@ -3,7 +3,7 @@
 #
 #     See the file license.txt for copying permission.
 ########################################################
-
+# pylint: disable=maybe-no-member, method-hidden, no-member
 
 import os
 import datetime as ora
@@ -12,39 +12,10 @@ import numpy as np
 import cPickle as pickle
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-
-
+from xlrd.biffh import XLRDError
+from mvpa2.base.hdf5 import h5load
 
 #from mvpa2.suite import h5load
-
-'''
-def writeConfiguration(name, experiment, zscoring = None, 
-                                            detrending = None,
-                                            classifier = None, 
-                                            featsel = None, 
-                                            modelSel = None):
-    fileRes = open 
-    
-    
-    nodeD = detrendeding.a.mapper.nodes[len(detrended_ds.a.mapper.nodes)-1]
-    
-    nodeZ = detrended_ds.a.mapper.nodes[len(detrended_ds.a.mapper.nodes)-1]
-    experimentInfo.append(str(nodeZ) + str(nodeZ.param_est))
-    
-    spcl = get_samples_per_chunk_target(fds)
-    experimentInfo.append(zip(fds.sa['targets'].unique, spcl[0]))
-    
-    summary = clf.summary()
-    clfName = summary[summary.find('<')+1:summary.find('>')]
-    experimentInfo.append(clfName)
-    
-    nodeFSL = fsel._SensitivityBasedFeatureSelection__feature_selector
-    nodeSENSA = fsel._SensitivityBasedFeatureSelection__sensitivity_analyzer
-    experimentInfo.append(str(nodeFSL)+str(nodeSENSA))
-    
-    experimentInfo.append(str(cvte.generator))
-    
-'''
 
 def writeResults(experiment, list):
     
@@ -197,7 +168,6 @@ def fidl2txt (fidlPath, outPath):
     
     outFile.close()
             
-
 def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
     '''
     exp_end = ???
@@ -268,209 +238,79 @@ def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
             
     outFile.close()   
 
-
-def roi_wu_data(path, name, task, init_vol=0):
+def extract_events_xls(filename, sheet_name):
+    import xlrd
     
-    imgFiles = os.listdir(path+'/'+name+'/'+task) 
-    imgFiles = [elem for elem in imgFiles if (elem.find('mni') == -1) & (elem.find('.img') != -1) & (elem.find('.rec') == -1)]
+    book = xlrd.open_workbook(filename)
+    try:
+        sh = book.sheet_by_name(sheet_name)
+    except XLRDError, e:
+        raise XLRDError(e)
     
-    for img in imgFiles:
-        
-        n_vols = ni.analyze.load(os.path.join(path, name, task, img)).get_shape()[3]
-        
-        roi = 'fslroi '+ \
-            os.path.join(path, name, task, img) + ' ' + \
-            os.path.join(path, name, task, img[:-4] + '_crop') + ' ' +\
-            str(init_vol) + ' ' + str(n_vols - init_vol)
-        print roi
-        os.system(roi)
+    onset = sh.col(0)
+    onset = np.array([s.value for s in onset[1:]])
     
+    events_num = sh.col_values(1)
+    events_num = np.array(events_num[1:])
     
-def bet_wu_data_(path, name, task):
+    duration = sh.col_values(2)
+    duration = np.array(duration[1:])
     
-    task = ''
-    print '--------- BRAIN EXTRACTION ----------'
+    duration = [onset[i+1] - onset[i] for i in range(len(onset)-1)]
     
+    event_labels = sh.col_values(5)
+    event_labels = np.array([e for e in event_labels if e != ''])
     
-    imgFiles = os.listdir(path+'/'+name+'/'+task) 
-    #imgFiles = [elem for elem in imgFiles if (elem.find('mni') == -1) & (elem.find('crop.') != -1) & (elem.find('.rec') == -1)]
-    imgFiles = [elem for elem in imgFiles if (elem.find('hdr') != -1)]
-   
-    for img in imgFiles:
-        
-        bet = 'bet '+ \
-            os.path.join(path, name, task, img) + ' ' + \
-            os.path.join(path, name, task, img[:-4] + '_brain') + ' ' +\
-            '-F -f 0.60 -g 0'
-        print bet
-        os.system(bet)
+    return onset, duration, event_labels, events_num
 
 
-def mc_wu_data(path, name, task):
+def build_attributes(out_path,
+                     onset, 
+                     duration, 
+                     TR, 
+                     events,
+                     event_labels,
+                     runs=12, vol_run=248, stim_vol=4, offset_tr=2):
+    
+    outFile = open(out_path, 'w')
+    if onset[0] != 0:
+        f = 0
+        while f < np.rint(onset[0]/TR):
+            outFile.write(u'FIX 0 0 0\n')
+            f = f + 1
      
-    # nameL = os.listdir('/media/DATA/fmri/learning/')
-    # nameL = [elem for elem in nameL if (elem.find('_') == -1) & (elem.find('.') == -1)]
-    print '      ---- > Motion Correction <-----   '
+    onset = np.append(onset, vol_run * runs * TR)
     
-    
-    
-    imgFiles = os.listdir(path+'/'+name+'/'+task) 
-    imgFiles = [elem for elem in imgFiles if (elem.find('mni') == -1) & (elem.find('brain.') != -1) & (elem.find('.rec') == -1)]
-    
-    imgFiles.sort()
-    
-    restList = os.listdir(path+'/'+name+'/rest')
-    restList = [elem for elem in restList if (elem.find('.img_') == -1) & (elem.find('rest1') != -1) & (elem.find('brain.') != -1) \
-                                                                    &   (elem.find('.rec') == -1)]
-    ref = restList.pop()
-    
-    #ref = imgFiles[len(imgFiles)-1    
-    
-    i = 0
-    for img in imgFiles:
-        i = i + 1
-        imgIn = path+'/'+name+'/'+task+'/'+img
-        refIn = path+'/'+name+'/rest/'+ref
+    for i in range(len(onset)-1):
         '''
-        flirtMC = pe.Node(
-                            interface = fsl.FLIRT(
-                                                 in_file = imgIn,
-                                                 reference = refIn, 
-                                                 dof = 6
-                                                 ),
-                            name = 'flirtMC_'+str(i)
-                            )
-        flirtMC.inputs.out_matrix_file = path+'/'+name+'/'+task+'/'+img+'.mat'
-        
-        #flirtMC.base_dir = (path+'/'+name+'/'+task)
-        flirtMC.run()  
+        if i <= 1:
+            runArr = np.array(np.ceil(np.bincount(np.int_(events[:2]))/4.) - 1, dtype=np.int)
+        else:
+            runArr = np.array(np.ceil(np.bincount(np.int_(events[:i+1]), 
+                                              minlength=noEvents)/4.) - 1, 
+                          dtype=np.int)
         '''
-        command =   'flirt '+ \
-                    ' -in ' + imgIn + \
-                    ' -ref '+refIn+ \
-                    ' -searchcost normmi' +\
-                    ' -omat '+path+'/'+name+'/'+task+'/'+img[:-7] +'_flirt.mat'+ \
-                    ' -dof 12'
-                  
-                  
-        
-        print command
-        os.system(command)
-       
-    i = 0
-    for img in imgFiles:  
-           
-        i = i + 1
-        imgIn = path+'/'+name+'/'+task+'/'+img
-        refIn = path+'/'+name+'/rest/'+ref
-        ''' 
-        flirt8 =  pe.Node(
-                            interface = fsl.ApplyXfm(
-                                                 in_file = imgIn,
-                                                 reference = refIn, 
-                                                 out_file = path+'/'+name+'/'+task+'/'+'flirt_'+img+'.nii.gz',
-                                                # out_matrix_file = path+'/'+name+'/'+task+'/'+img+'_flirt2.mat',
-                                                 apply_xfm = True,
-                                                 in_matrix_file = path+'/'+name+'/'+task+'/'+img +'.mat'
-                                                 ),
-                            name = 'flirt4D_'+str(i)
-                            )
-        
-        #flirt8.base_dir = (path+'/'+name+'/'+task)
-        flirt8.run()
+        j = 0
 
-        '''
-        command = 'flirt '+ \
-                  ' -in '+imgIn+ \
-                  ' -ref '+refIn+ \
-                  ' -init '+path+'/'+name+'/'+task+'/'+img[:-7] +'_flirt.mat'+ \
-                  ' -applyxfm -interp nearestneighbour' + \
-                  ' -out '+ path+'/'+name+'/'+task+'/'+img[:-7] +'_flirt.nii.gz' 
-                  
-        print command         
-        os.system(command)
+        while j < np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR):
+            
+            #if (j < np.rint(duration[i]/TR)):#-1
+            if (offset_tr <= j < offset_tr + stim_vol):#-1
+                #outFile.write(eventLabels[int(events[i])]+' '+str(runArr[int(events[i])])+'\n')
+                index = int(events[i])
+                # Condition, Chunk, Event, Frame
+                line = event_labels[index]+' '+str(i/30)+' '+str(i)+' '+str(j+1)+'\n'
+            else:
+                #outFile.write(u'fixation '+str(runArr[int(events[i])])+'\n')
+                line = u'FIX '+str(i/30)+' '+str(i)+' '+str(j+1)+'\n'
+            outFile.write(line)
+            j = j + 1
+            
+    outFile.close()
+    
+    return
+    
 
-
-
-def wu_to_mni (path, name, task): 
-    print '      ---- > MNI Coregistration <-----   '
-    
-    
-    imgFiles = os.listdir( os.path.join(path,name,task) )
-    imgFiles = [elem for elem in imgFiles if (elem.find('flirt.nii.gz') != -1) and (elem.find('mni') == -1)]
-    
-    imgFiles.sort()
-    
-    
-   
-    #ref = imgFiles[len(imgFiles)-1]
-    
-    i=0
-    
-    for img in imgFiles:
-        i = i + 1
-        imgIn = os.path.join(path,name,task,img)
-        refIn = '/media/DATA/fmri/MNI152_T1_3mm_brain.nii.gz'
-        '''
-        flirtMC = pe.Node(
-                            interface = fsl.FLIRT(
-                                                 in_file = imgIn,
-                                                 reference = refIn, 
-                                                 dof = 6
-                                                 ),
-                            name = 'flirtMC_'+str(i)
-                            )
-        flirtMC.inputs.out_matrix_file = path+'/'+name+'/'+task+'/'+img+'.mat'
-        
-        #flirtMC.base_dir = (path+'/'+name+'/'+task)
-        flirtMC.run()  
-        '''
-        command =   'flirt '+ \
-                    ' -in ' + imgIn + \
-                    ' -ref '+refIn+ \
-                    ' -omat '+  os.path.join(path,name,task,img[:-7]) +'_mni.mat'+ \
-                    ' -dof 12' + \
-                    ' -searchcost normmi' + \
-                    ' -searchrx -90 90' + \
-                    ' -searchry -90 90' + \
-                    ' -searchrz -90 90'
-        
-        print command
-        os.system(command)
-       
-    i = 0
-    for img in imgFiles:  
-           
-        i = i + 1
-        imgIn = os.path.join(path,name,task,img)
-
-        #refIn = path+'/'+name+'/rest/'+ref
-        ''' 
-        flirt8 =  pe.Node(
-                            interface = fsl.ApplyXfm(
-                                                 in_file = imgIn,
-                                                 reference = refIn, 
-                                                 out_file = path+'/'+name+'/'+task+'/'+'flirt_'+img+'.nii.gz',
-                                                # out_matrix_file = path+'/'+name+'/'+task+'/'+img+'_flirt2.mat',
-                                                 apply_xfm = True,
-                                                 in_matrix_file = path+'/'+name+'/'+task+'/'+img +'.mat'
-                                                 ),
-                            name = 'flirt4D_'+str(i)
-                            )
-        
-        #flirt8.base_dir = (path+'/'+name+'/'+task)
-        flirt8.run()
-
-        '''
-        command = 'flirt '+ \
-                  ' -in '+imgIn+ \
-                  ' -ref '+refIn+ \
-                  ' -init '+os.path.join(path,name,task,img[:-7]) +'_mni.mat'+ \
-                  ' -applyxfm' + \
-                  ' -out '+ os.path.join(path,name,task,img[:-7]) +'_mni.nii.gz' 
-                  
-        print command         
-        os.system(command)
 
 def watch_results (path, task):
     resFolder = '0_results'
@@ -679,8 +519,6 @@ def searchlight_to_mni(path, subj):
     
     brainFileList = os.listdir(os.path.join(path, subj, 'rest'))
     brainFileList = [elem for elem in brainFileList if elem.find('_crop_brain_flirt.nii.gz') != -1]
-    
-    
 
     imgIn = os.path.join(path, subj, 'rest',brainFileList[0])
     refIn = '/usr/share/fsl/4.1/data/standard/MNI152_T1_2mm_brain.nii.gz'
@@ -700,9 +538,9 @@ def searchlight_to_mni(path, subj):
     
     matrix = os.path.join(path, subj, subj+'_matrix_to_mni.mat')
     
-    for file in searchFileList:
+    for file_ in searchFileList:
         
-        imgIn = os.path.join(path, subj, file)
+        imgIn = os.path.join(path, subj, file_)
       
         command = 'flirt '+ \
                   ' -in '+ imgIn + \
@@ -713,124 +551,3 @@ def searchlight_to_mni(path, subj):
                   
         print command         
         os.system(command)
-
-def mask_searchlight(path, input, min):
-    
-    sl_map = ni.load(os.path.join(path, input))
-    
-    
-def map_to_mni(path, matrix):
-    
-    
-    return
- 
-'''
-def plot_matrix(matrix, labels, name):
-    
-    i = 0
-    for elem in resList:
-        fig = plt.figure(1)
-        ax = fig.add_subplot(3,4,i)
-        factor = 1
-        
-        if cmp(list[i], 'anndel') == 0:
-            factor = 1500./1000.
-        if cmp(list[i], 'augpel') == 0:
-            factor = 1500./1250.
-        
-        cax = ax.imshow(factor * elem.stats.matrix, interpolation='nearest', vmin = min, vmax = max)
-        ax.set_title(list[i])
-        
-        #axu = ax.twiny()
-        ax.set_xticklabels(['','RestPost', '','RestPre'])
-        ax.set_xlabel('Targets')       
-        
-        ax.set_yticklabels(['','RestPost', '','RestPre'])
-        ax.set_ylabel('Predictions')
-
-        ax.text(0,0, str(factor * elem.stats.matrix[0][0]), fontsize = 18, horizontalalignment='center')#, fontweight='bold')
-        ax.text(1,0, str(factor * elem.stats.matrix[1][0]), fontsize = 18, horizontalalignment='center')#, fontweight='bold')
-        ax.text(0,1, str(factor * elem.stats.matrix[0][1]), fontsize = 18, horizontalalignment='center')#, fontweight='bold')
-        ax.text(1,1, str(factor * elem.stats.matrix[1][1]), fontsize = 18, horizontalalignment='center')#, fontweight='bold')
-        
-        #cbar = fig.colorbar(cax)
-        #fig.savefig(os.path.join(path, '0_res_pictures',list[i]+'_conf_mat.png'))
-        i = i + 1
-    
-    
-    
-    i = 0
-    mat = np.zeros(resList[0].stats.matrix.shape)   
-    
-    for elem in resList:
-        factor = 1
-        if cmp(list[i], 'anndel') == 0:
-            factor = 1500./1000.
-        if cmp(list[i], 'augpel') == 0:
-            factor = 1500./1250.
-        mat = mat + factor * elem.stats.matrix
-        i = i + 1
-        
-        
-    X = matrix
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.imshow(X, cmap=cm.jet, interpolation='nearest')
-
-    numrows, numcols = X.shape
-
-    #fig.add_axes(['Label1', 'Label2'])
-    
-    ax.set_title('Confusion Matrix for '+name)
-    
-    #plt.xlabel('Predictions')
-    #plt.ylabel('Targets')
-    #plt.title('Confusion Matrix for '+name)
-    #plt.axis(['Label1', 'Label2','Label1', 'Label2'])
-    plt.show()
-    ----------------------------------------------------------------------
-    
-    for subj in nameL:
-        searchFileList = os.listdir(os.path.join(path, subj))
-        searchFileList = [elem for elem in searchFileList if elem.find('searchlight') != -1 and elem.find('mni')==-1]
-        for img in searchFileList:
-            ni_img = ni.load(os.path.join(path, subj, img))
-            mask = ni_img.get_data() != 0
-            mean = np.mean(ni_img.get_data()[mask])
-            std = np.std(ni_img.get_data()[mask])
-            numVx = np.sum(mask)
-            plt.hist()
-            print img[:-7]+' m: '+str(mean)+' s:'+str(std)
-            
-    ---------------------------------------------------------------------------
-    
-    for img in imgFiles:  
-           
-        i = i + 1
-        imgIn = os.path.join(path,name, 'task,img)
-
-        refIn = path+'/'+name+'/rest/'+ref
-       
-        command = 'flirt '+ \
-                  ' -in '+imgIn+ \
-                  ' -ref '+refIn+ \
-                  ' -init '+os.path.join(path,'andant','task',ref) + \
-                  ' -applyxfm' + \
-                  ' -out '+ os.path.join(path,'1_ROI_VC','MNI',img[:-7]) +'_mni.nii.gz' 
-                  
-        print command         
-        os.system(command)
-        ---------------------------------------------------
-        
-        for roi in roilist:
-            command = 'flirt ' + \
-              ' -in /media/DATA/fmri/ROI_MNI/' + roi + \
-              ' -applyxfm -init /media/DATA/fmri/mni_to_wu.mat ' +\
-              ' -out /media/DATA/fmri/' + roi[:-7] +'wu.nii.gz'+\
-              ' -paddingsize 0.0 -interp nearestneighbour' +\
-              ' -ref /media/DATA/fmri/MNI_to_func_3mm.nii.gz'
-            print command
-            os.system(command)
-
-        
-'''    

@@ -3,20 +3,28 @@
 #
 #     See the file license.txt for copying permission.
 ########################################################
-
+# pylint: disable=maybe-no-member, method-hidden
 import nibabel as ni
 import os
 from main_wu import *
 from utils import *
 import matplotlib.pyplot as plt
-from mvpa2.suite import find_events, fmri_dataset, SampleAttributes
-from itertools import cycle
-import cPickle as pickle
 
+from mvpa2.suite import find_events, fmri_dataset, SampleAttributes
+from mvpa2.suite import dataset_wizard
+import cPickle as pickle
+import logging
 #from memory_profiler import profile
 
 def get_time():
-        #Time acquisition for file name!
+    """Utility to format time used during results saving.
+       
+       Returns
+       -------
+        str : Datetime in format yymmdd_hhmmss
+    """
+    
+    #Time acquisition for file name!
     tempo = time.localtime()
     
     datetime = ''
@@ -31,401 +39,31 @@ def get_time():
         
     return datetime    
 
-def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
-    
-    from sklearn.linear_model import Ridge
-    from scipy.interpolate import UnivariateSpline
-    result_file = open(
-                       os.path.join(path, 
-                               '0_results', 
-                               analysis_folder, 
-                               name, 
-                               name+'_classifier.pyobj')
-                       , 'r')
-    
-    results = pickle.load(result_file)
-    
-    runs = 12
-    
-    probabilities = results.probabilities
-    prob = np.array([p[1][p[0]] for p in probabilities])
-    pred = np.array([p[0] for p in probabilities])
-    lab = np.unique(results.predictions)
-    run_length = len(prob)/runs
-       
-    ridge = Ridge()
-    
-    f = plt.figure(figsize=(11,8))
-    f2 = plt.figure(figsize=(11,8))
-    data_sm = dict()
-    data_or = dict()
-    for c in np.unique(lab):
-        data_sm[c] = []
-        data_or[c] = []
-    for i in range(12):
-        if i < 6:
-            add = 1
-            l = '_pre'
-        else:
-            add = 2
-            l = '_post'
-        avg = []
-        for c in np.unique(pred):
-            a = f.add_subplot(3,2,(c*2)+add)
-            a2 = f2.add_subplot(3,2,(c*2)+add)
-            a.set_title(lab[c]+l)
-            #v = prob[i*run_length:(i+1)*run_length]
-            v = prob[i*run_length:(i+1)*run_length] * (pred[i*run_length:(i+1)*run_length] == c)
-            v[len(v)-1] = 0
-            yy = v.copy()
-            
-            
-            
-            xx = np.linspace(0, len(v), len(v))
-            s = UnivariateSpline(xx, yy, s=5)
-            ys = s(xx)
-            try:
-                ridge.fit(np.vander(xx, 7), yy)
-                y_fit = ridge.predict(np.vander(xx, 7))
-            except LinAlgError,err:
-                ridge.fit(np.vander(xx, 9), yy)
-                y_fit = ridge.predict(np.vander(xx, 9))
-            
-            data_sm[lab[c]].append(ys)
-            data_or[lab[c]].append(v)
-            
-            
-            
-            a.plot(y_fit)
-            a2.plot(ys)
-            
-            
-            a.set_ybound(upper=1.1, lower=-0.1)
-            a2.set_ybound(upper=1.1, lower=-0.1)
-            
-    f.legend(a.get_lines()[:],range(runs), loc=0)
-    fname = os.path.join(path,'0_results', 
-                               analysis_folder, 
-                               name, 
-                               name+'_values_fitted_ov.png')
-    f.savefig(fname)
-    f2.savefig(fname[:-3]+'smooth.png')
-    plt.close('all')
-    return data_sm, data_or
-    
-
-
-def plot_transfer_graph_fitted(path, name, analysis_folder):
-    
-    from sklearn.linear_model import Ridge
-    from scipy.interpolate import UnivariateSpline
-    result_file = open(
-                       os.path.join(path, 
-                               '0_results', 
-                               analysis_folder, 
-                               name, 
-                               name+'_classifier.pyobj')
-                       , 'r')
-    
-    results = pickle.load(result_file)
-    
-    runs = 6
-    
-    values = results.estimates
-    run_length = len(values)/runs
-    
-    ridge = Ridge()
-    
-    f = plt.figure()
-    a = f.add_subplot(111)
-    for i in range(runs):
-        
-        v = values[i*run_length:(i+1)*run_length]
-        yy = v.copy()
-        
-        xx = np.linspace(0, len(v), len(v))
-        
-        try:
-            ridge.fit(np.vander(xx, 12), yy)
-            y_fit = ridge.predict(np.vander(xx, 12))
-        except LinAlgError,err:
-            ridge.fit(np.vander(xx, 9), yy)
-            y_fit = ridge.predict(np.vander(xx, 9))
-        
-        a.plot(y_fit)
-    
-    a.legend(range(runs))
-    fname = os.path.join(path,'0_results', 
-                               analysis_folder, 
-                               name, 
-                               name+'_values_fitted.png')
-    f.savefig(fname)
-    plt.close('all')
-
-
-def plot_transfer_graph(path, name, results):
-    
-    r_targets = np.array(results['targets'])
-    r_prediction = np.array(results['classifier'].ca.predictions)
-    if str(results['classifier'].find('SVM') != -1):
-        r_probabilities = np.array(results['classifier'].ca.probabilities)
-    r_values = np.array(results['classifier'].ca.estimates)      
-
-    p_probabilities = np.array([p[1][p[0]] for p in r_probabilities])
-      
-    report = ''
-        
-    for target in np.unique(r_targets):
-            
-        mask_target = r_targets == target
-        prediction = r_prediction[mask_target]
-        probabilities = p_probabilities[mask_target]
-        values = r_values[mask_target]
-            
-        f_pred = plt.figure()
-        a_prob = f_pred.add_subplot(111)
-        #a_pred = f_pred.add_subplot(212)
-            
-        report = report +'--------- '+target+' -------------\n'
-            
-        for label in np.unique(prediction):
-            mask_label = prediction == label
-            n_pred = np.count_nonzero(mask_label)
-            n_vols = len(prediction)
-                
-            perc = float(n_pred)/float(n_vols)
-            report = report+'percentage of volumes labelled as '+label+' : '+str(perc)+' \n'
-            
-            mean = np.mean(probabilities[mask_label])
-            plt_mean = np.linspace(mean, mean, num=len(probabilities))
-            
-            report = report+'mean probability: '+str(mean)+'\n'
-            
-            a_prob.plot(probabilities * mask_label)
-            color = a_prob.get_lines()[-1:][0].get_color()
-            a_prob.plot(plt_mean, color+'--', linewidth=2)
-            a_prob.set_ylim(bottom=0.55)
-            #a_pred.plot(values * mask_label)
-        a_prob.legend(np.unique(prediction))     
-        #a_prob.legend(np.unique(prediction))
-        #a_pred.legend(np.unique(prediction))
-
-        for axes in f_pred.get_axes():
-            max = np.max(axes.get_lines()[0].get_data()[1])
-            for i in range(3):
-                axes.fill_between(np.arange(2*i*125, (2*i*125)+125), 
-                                  -max, max,facecolor='yellow', alpha=0.2)
-        
-        
-        fname = os.path.join(path, name+'_'+target+'_probabilities_values.png')
-        f_pred.savefig(fname)
-    
-    
-    rep_txt = name+'_stats_probab.txt'   
-    
-    rep = open(os.path.join(path, rep_txt), 'w')
-    rep.write(report)
-    rep.close()  
-    plt.close('all')
-
-def plot_clusters_graph(path, name, results):
-    
-    
-    color = dict({'trained':'r', 
-              'fixation':'b', 
-              'RestPre':'y', 
-              'RestPost':'g',
-              'untrained': 'k'})
-    
-    
-    markers = dict({'trained':'p', 
-              'fixation':'s', 
-              'RestPre':'^', 
-              'RestPost':'o',
-              'untrained': '*'})
-    
-    colors = cycle('bgrcmykbgrmykbgrcmykbgrcmyk')
-    
-    clusters = results['clusters']
-    predictions = np.array(results['predictions'])
-    targets = np.array(results['targets'])
-    print targets
-    report = ''
-    
-    for condition in clusters:
-        print condition
-        mask_target = targets == str(condition)
-        m_predictions = predictions[mask_target]
-        
-        #####################################
-        f_dist = plt.figure()
-        a_dist = f_dist.add_subplot(111)
-        a_dist.imshow(clusters[condition]['dist'])
-        f_dist.colorbar(a_dist.get_images()[0])
-        fname = os.path.join(path, name+'_'+condition+'_dist.png')
-        f_dist.savefig(fname)
-        #####################################
-        
-        cluster_labels = clusters[condition]['clusters']
-        pos = clusters[condition]['pos']
-        
-        f_cluster = plt.figure()
-        a_cluster = f_cluster.add_subplot(111)
-        
-        f_predict = plt.figure()
-        a_predict = f_predict.add_subplot(111)
-        
-        report = report + '---------- '+condition+' -----------\n'
-        
-        for cluster in np.unique(cluster_labels):
-            
-            cl_mask = cluster_labels == cluster
-            c_pos = pos[cl_mask]
-            col = colors.next()
-            a_cluster.scatter(c_pos.T[0], c_pos.T[1], color = col)
-            
-            report = report+'\nCluster n. '+str(cluster)+'\n'
-            
-            for label in np.unique(m_predictions):
-                p_mask = m_predictions[cl_mask] == label
-                labelled = np.count_nonzero(p_mask)
-                
-                a_predict.scatter(c_pos.T[0][p_mask], c_pos.T[1][p_mask], color = col, 
-                         marker = markers[label])
-                
-                perc = np.float(labelled)/np.count_nonzero(cl_mask)
-                report = report + label+' : '+str(perc*100)+'\n'
-        
-        
-        a_cluster.legend(np.unique(cluster_labels))
-        fname = os.path.join(path, name+'_'+condition+'_mds_clusters.png')
-        f_cluster.savefig(fname)
-        
-        a_predict.legend(np.unique(predictions))
-        fname = os.path.join(path, name+'_'+condition+'_mds_predictions.png')
-        f_predict.savefig(fname)
-    
-    
-    rep_txt = name+'_stats.txt'
-    
-    rep = open(os.path.join(path, rep_txt), 'w')
-    rep.write(report)
-    rep.close()
-    plt.close('all')
-    
-def plot_cv_results(cv, err, title):
-    # make new figure
-    pl.figure()
-    colors = cycle('bgrcmykbgrcmykbgrcmykbgrcmyk')
-    # null distribution samples
-    dist_samples = np.asarray(cv.null_dist.ca.dist_samples)
-    for i in range(len(err)):
-        c = colors.next()
-        # histogram of all computed errors from permuted data per CV-fold
-        pl.hist(np.ravel(dist_samples[i]), bins=20, color=c,
-                label='CV-fold %i' %i, alpha=0.5,
-                range=(dist_samples.min(), dist_samples.max()))
-        # empirical error
-        pl.axvline(np.asscalar(err[i]), color=c)
-
-    # chance-level for a binary classification with balanced samples
-    pl.axvline(0.5, color='black', ls='--')
-    # scale x-axis to full range of possible error values
-    pl.xlim(0,1)
-    pl.xlabel(title)
-
-
-def plot_scatter_2d(ds_merged, method='mds', fig_number = 1):
-    
-    from sklearn import decomposition, manifold, lda, ensemble
-    """
-    methods: 'mds', 'pca', 'iso', 'forest', 'embedding'
-    """
-    
-    data = ds_merged.samples
-    
-    stringa=''
-    if method == 'pca':
-        clf = decomposition.RandomizedPCA(n_components=2)
-        stringa = 'Principal Component Analysis'
-    ########    
-    elif method == 'iso':
-        clf = manifold.Isomap(30, n_components=2)
-        stringa = 'Iso surfaces '
-    #########    
-    elif method == 'forest':
-        hasher = ensemble.RandomTreesEmbedding(n_estimators=200, random_state=0,
-                                       max_depth=5)
-        data = hasher.fit_transform(data)
-        clf = decomposition.RandomizedPCA(n_components=2)
-        stringa = 'Random Forests'
-    ########
-    elif method == 'embedding':
-        clf = manifold.SpectralEmbedding(n_components=2, random_state=0,
-                                      eigen_solver="arpack")
-        stringa = 'Spectral Embedding'
-    #########
-    else:
-        clf = manifold.MDS(n_components=2, n_init=1, max_iter=100)
-        stringa = 'Multidimensional scaling'
-        
-        
-    ###########################
-    #dist_matrix = squareform(pdist(data, 'euclidean'))
-
-    print stringa+' is performing...'
-
-    pos = clf.fit_transform(data)
-
-    colors = cycle('bgrymkybgrcmybgrcmybgrcmy')
-    
-    f = plt.figure()
-    a = f.add_subplot(111)
-    a.set_title(stringa)
-    for label in np.unique(ds_merged.targets):
-        m = ds_merged.targets == label
-        data_m = pos[m]
-        c = colors.next()
-        a.scatter(data_m.T[0].mean(), data_m.T[1].mean(), label=label, color=c, s=120)
-        a.scatter(data_m.T[0][::2], data_m.T[1][::2], color=c)
-        '''
-        cov_ = np.cov(data_m.T)
-        v, w = np.linalg.eigh(cov_)
-        u = w[0] / np.linalg.norm(w[0])
-        angle = np.arctan2(u[1], u[0])
-        angle = 180 * angle / np.pi  # convert to degrees
-        v *= 0.5
-        ell = mpl.patches.Ellipse(np.mean(data_m, axis=0), v[0], v[1],
-                                  180 + angle, color=c)
-        ell.set_clip_box(a.bbox)
-        ell.set_alpha(0.2)
-        a.add_artist(ell)
-        '''
-    a.legend()
-    return
-
-
 def load_conc_fmri_data(conc_file_list, el_vols = 0, **kwargs):
+    """This function loads fmri data from a list of.
+       
+       Returns
+       -------
+        str : Datetime in format yymmdd_hhmmss
+    """   
+    imgList = []
         
-        imgList = []
+    for file_ in conc_file_list:
         
-        for file in conc_file_list:
-            
-            print 'Now loading... '+file        
-            
-            im = ni.load(file)
-            data = im.get_data()
+        logging.info('Now loading '+file_)     
         
-            print data.shape
-        
-            new_im = ni.Nifti1Image(data[:,:,:,el_vols:], 
-                                    affine = im.get_affine(), 
-                                    header = im.get_header()) 
-        
-            del data, im
-            imgList.append(new_im)
-        
-        return imgList
+        im = ni.load(file_)
+        data = im.get_data()
+    
+        logging.debug(data.shape)
+    
+        new_im = ni.Nifti1Image(data[:,:,:,el_vols:], 
+                                affine = im.get_affine(), 
+                                header = im.get_header())
+        del data, im
+        imgList.append(new_im)
+    
+    return imgList
 
 #@profile    
 def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
@@ -438,8 +76,8 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     @param el_vols: 
     """
     
+    #What does it means analysis=single???
     analysis = 'single'
-    #sub_dirs = ['']
     img_pattern=''
     
     for arg in kwargs:
@@ -457,56 +95,36 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
     if use_task_name == 'False':
         task = ''
     
-    for dir in sub_dirs:
-        if dir == 'none':
-            dir = ''
-        if dir.find('/') == -1:
-            path_file_dirs.append(os.path.join(path,name,dir))
+    for dir_ in sub_dirs:
+        if dir_ == 'none':
+            dir_ = ''
+        if dir_.find('/') == -1:
+            path_file_dirs.append(os.path.join(path,name,dir_))
 
    
-    print 'Loading...'
+    logging.info('Loading...')
     
     fileL = []
     #Verifying which type of task I've to classify (task or rest) and loads filename in different dirs
     for path in path_file_dirs:
         fileL = fileL + os.listdir(path)
 
-    #print fileL
+    logging.debug(' '.join(fileL))
+
     #Verifying which kind of analysis I've to perform (single or group) and filter list elements   
     if cmp(analysis, 'single') == 0:
-        fileL = [elem for elem in fileL if (elem.find(img_pattern) != -1) and (elem.find(task) != -1) ]#and (elem.find('mni') == -1)]
+        fileL = [elem for elem in fileL if (elem.find(img_pattern) != -1) or (elem.find(task) != -1) ]#and (elem.find('mni') == -1)]
     else:
         fileL = [elem for elem in fileL if elem.find(img_pattern) != -1 and elem.find(task) != -1 and elem.find('mni') != -1]
 
-    #print fileL
+    logging.debug(' '.join(fileL))
+    
     #if no file are found I perform previous analysis!        
     if (len(fileL) <= runs and len(fileL) == 0):
-        """
-        print ' **** File corrected not found... ****'
-        if cmp(analysis, 'single') == 0:
-            mc_wu_data(path, name, task = 'task')
-            mc_wu_data(path, name, task = 'rest')
-        else:
-            wu_to_mni(path, name, task = 'rest')
-            wu_to_mni(path, name, task = 'task')
-        
-        if cmp(task, 'task') == 0:
-            mc_wu_data(path, name, task)
-            fileL = os.listdir(path_file_dirs[0])
-        else:
-            fileL = os.listdir(path_file_dirs[0]) + os.listdir(path_file_dirs[1])
-        
-        if cmp(analysis, 'single') == 0:
-            fileL = [elem for elem in fileL if (elem.find(img_pattern) != -1) and (elem.find(task) != -1) and (elem.find('mni') == -1)]
-        else:
-            fileL = [elem for elem in fileL if (elem.find(img_pattern) != -1) and (elem.find(task) != -1) and (elem.find('mni') != -1)]
-        
-        """
         raise OSError('Files not found, please check if data exists in '+str(path_file_dirs))
     else:
-        print 'File corrected found ....'   
-    
-        
+        logging.debug('File corrected found ....')  
+
     ### Data loading ###
     fileL.sort()
     
@@ -519,23 +137,24 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
         else:
             pathF = os.path.join(path_file_dirs[1], img)
             
-        #if (str(len(imgList))) < 1:
-        print 'Now loading... '+pathF        
+        logging.info('Now loading '+pathF)     
         
         im = ni.load(pathF)
         data = im.get_data()
         
-        #if (str(len(imgList))) < 1:
-        print data.shape
+        logging.debug(data.shape)
         
-        new_im = im.__class__(data[:,:,:,el_vols:], affine = im.get_affine(), header = im.get_header()) 
+        new_im = im.__class__(data[:,:,:,el_vols:], 
+                              affine = im.get_affine(), 
+                              header = im.get_header()) 
+        
         new_im.set_filename(pathF)
         
         del data
         del im
         imgList.append(new_im)
         
-    #print 'The image list is of ' + str(len(imgList)) + ' images.'
+    logging.debug('The image list is of ' + str(len(imgList)) + ' images.')
         
     del fileL
     return imgList
@@ -621,8 +240,7 @@ def read_beta_file(f, run, time_begin=1, time_end=14, **kwargs):
                     voxel_per_condition += int(voxel_num)
                     data_flag = True
                     line_ctr = 0
-                    
-                                        
+           
         #print line
         if data_flag == True:
             #print line
@@ -673,9 +291,8 @@ def decode_line(line, keyword):
 
 def read_beta_data(line, voxel_num, time_points):
     
-    
-    
-    return
+
+    return NotImplementedError()
     
     
 #@profile
@@ -702,14 +319,12 @@ def load_dataset(path, subj, type, **kwargs):
             use_conc = kwargs[arg]
         if arg == 'conc_file':
             conc_file = kwargs[arg]
-    
-    
-    
+
     if use_conc == 'False':      
         try:
             niftiFilez = load_wu_fmri_data(path, name = subj, task = type, el_vols = skip_vols, **kwargs)
         except OSError, err:
-            print err
+            logging.err(err)
             return 0
     else:
         conc_file_list = read_conc(path, subj, conc_file)
@@ -717,7 +332,7 @@ def load_dataset(path, subj, type, **kwargs):
         try:
             niftiFilez = load_conc_fmri_data(conc_file_list, el_vols = skip_vols, **kwargs)
         except IOError, err:
-            print err
+            logging.err(err)
             return 0
         
         kwargs = update_subdirs(conc_file_list, subj, **kwargs)
@@ -733,9 +348,7 @@ def load_dataset(path, subj, type, **kwargs):
     #Mask issues     
   
     mask = load_mask(path, subj, **kwargs)        
-    
-    #print 'Mask used: '+ mask
-    
+       
     volSum = 0;
         
     for i in range(len(niftiFilez)):
@@ -744,18 +357,15 @@ def load_dataset(path, subj, type, **kwargs):
 
     if volSum != len(attr.targets):
         del niftiFilez
-        print subj + ' *** ERROR: Attributes Length mismatches with fMRI volumes! ***'
+        logging.error(subj + ' *** ERROR: Attributes Length mismatches with fMRI volumes! ***')
         raise ValueError('Attributes Length mismatches with fMRI volumes!')       
-        
-        
+
     try:
-        print 'Loading dataset...'
+        logging.info('Loading dataset...')
         ds = fmri_dataset(niftiFilez, targets = attr.targets, chunks = attr.chunks, mask = mask) 
-        print  'Dataset loaded...'
-        
-            
+        logging.info('Dataset loaded...')
     except ValueError, e:
-        print subj + ' *** ERROR: '+ str(e)
+        logging.error(subj + ' *** ERROR: '+ str(e))
         del niftiFilez
         return 0;
     
@@ -771,12 +381,20 @@ def load_dataset(path, subj, type, **kwargs):
     ds.sa['events_number'] = ev_list
     ds.sa['name'] = [subj for i in range(len(ds.sa.chunks))]
     
+    '''
+    try:
+        ds.sa['frame'] = attr.frame
+        ds.sa['trial'] = attr.trial
+    except AttributeError, e:
+        print 'Ciao!'
+    '''
+    
     #Inserted for searchlight proof!
     ds.sa['block'] = np.int_(np.array([(i/14.) for i in range(len(ds.sa.chunks))])-5*ds.sa.chunks)
     
     f_list = []
     for i in range(files):
-        for j in range(niftiFilez[i].shape[-1:][0]):
+        for _ in range(niftiFilez[i].shape[-1:][0]):
                 f_list.append(i+1)
 
     ds.sa['file'] = f_list
@@ -896,7 +514,9 @@ def load_mask_wu(path, subj, **kwargs):
     mask_path = os.path.join(path, roi_folder)
     
     scaled = ''
-    #print mask_area
+    
+    logging.debug(mask_area)
+    
     if isScaled == 'True':
         scaled = 'scaled'
     
@@ -927,8 +547,8 @@ def load_mask_wu(path, subj, **kwargs):
                       ((m[:].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('nii.gz') != -1) or
                       ((m[:].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('hdr') != -1)]
       
-    
-    print 'Mask searched in '+mask_path+' Mask(s) found: '+str(len(mask_list))
+    logging.debug(' '.join(mask_list))
+    logging.info('Mask searched in '+mask_path+' Mask(s) found: '+str(len(mask_list)))
     
     files = []
     if len(mask_list) == 0:
@@ -950,7 +570,7 @@ def load_mask_wu(path, subj, **kwargs):
     for m in mask_list:
         img = ni.load(os.path.join(mask_path,m))
         data = data + img.get_data() 
-        print 'Mask used: '+img.get_filename()
+        logging.info('Mask used: '+img.get_filename())
 
     mask = ni.Nifti1Image(data.squeeze(), img.get_affine())
         
@@ -983,17 +603,18 @@ def load_mask_juelich(**kwargs):
     for m in mask_list:
         img = ni.load(os.path.join(mask_path,m))
         data = data + img.get_data() 
-        print 'Mask used: '+img.get_filename()
+        logging.info('Mask used: '+img.get_filename())
 
     mask = ni.Nifti1Image(data, img.get_affine())
 
     
     return mask    
     
-
 def load_attributes (path, task, subj, **kwargs):
     ## Should return attr and a code to check if loading has been exploited #####
     
+    #Default header struct
+    header = ['targets', 'chunks']
     
     for arg in kwargs:
         if (arg == 'sub_dir'):
@@ -1001,7 +622,9 @@ def load_attributes (path, task, subj, **kwargs):
         if (arg == 'event_file'):
             event_file = kwargs[arg]
         if (arg == 'fidl_type'):
-            fidl_type = int(kwargs[arg])  
+            fidl_type = int(kwargs[arg])
+        if (arg == 'event_header'):
+            header = kwargs[arg].split(',')
             
     completeDirs = []
     for dir in sub_dirs:
@@ -1020,14 +643,14 @@ def load_attributes (path, task, subj, **kwargs):
         attrFiles = attrFiles + os.listdir(dir)
 
     attrFiles = [f for f in attrFiles if f.find(event_file) != -1]
-    print attrFiles
+    #print attrFiles
     if len(attrFiles) > 2:
         attrFiles = [f for f in attrFiles if f.find(subj) != -1]
         
     
     if len(attrFiles) == 0:
-        print ' *******       ERROR: No attribute file found!        *********'
-        print ' ***** Check in '+str(completeDirs)+' ********'
+        logging.error(' *******       ERROR: No attribute file found!        *********')
+        logging.error( ' ***** Check in '+str(completeDirs)+' ********')
         return [0, None]
     
     
@@ -1049,7 +672,7 @@ def load_attributes (path, task, subj, **kwargs):
                 attrFilename = os.path.join(dir, attrFiles[0][:-5]+'.txt')
 
     
-    attr = SampleAttributes(attrFilename)
+    attr = SampleAttributes(attrFilename, header=header)
     return [1, attr]
 
 def modify_conc_list(path, subj, conc_filelist):
@@ -1070,11 +693,14 @@ def modify_conc_list(path, subj, conc_filelist):
 def read_conc(path, subj, conc_file_patt):
     
     conc_file_list = os.listdir(os.path.join(path, subj))
-    conc_file_list = [f for f in conc_file_list if f.find('.conc') != -1 and f.find(conc_file_patt) != -1]
+    #Logging
+    logging.debug(' '.join(conc_file_list))
     
+    conc_file_list = [f for f in conc_file_list if f.find('.conc') != -1 and f.find(conc_file_patt) != -1]
     c_file = conc_file_list[0]
     
-    print conc_file_list
+    #Logging
+    logging.debug(' '.join(conc_file_list))
     
     conc_file = open(os.path.join(path, subj, c_file), 'r')
     s = conc_file.readline()
@@ -1091,7 +717,6 @@ def read_conc(path, subj, conc_file_patt):
     return filename_list
 
 
-
 def read_remote_configuration(path):
         
     import ConfigParser
@@ -1104,12 +729,13 @@ def read_remote_configuration(path):
         
         for item in config.items(sec):
             configuration.append(item)
-            print item
+            logging.debug(item)
     
     return dict(configuration) 
     
     
-    print 'Reading remote config file '+os.path.join(path,'remote.conf')
+    logging.info('Reading remote config file '+os.path.join(path,'remote.conf'))
+
 
 #@profile
 def read_configuration (path, experiment, section):
@@ -1121,7 +747,7 @@ def read_configuration (path, experiment, section):
     config.read(os.path.join(path,experiment))
     
     
-    print 'Reading config file '+os.path.join(path,experiment)
+    logging.info('Reading config file '+os.path.join(path,experiment))
     
     types = config.get('path', 'types').split(',')
     
@@ -1137,7 +763,7 @@ def read_configuration (path, experiment, section):
         
         for item in config.items(sec):
             configuration.append(item)
-            #print item
+            logging.debug(item)
     
     return dict(configuration)   
 
@@ -1175,8 +801,8 @@ def save_results(path, results, configuration):
     #######################################################################
     
     if analysis == 'searchlight':
-        print 'Result saved in '+parent_dir
-        return 'OK'
+        logging.info('Result saved in '+parent_dir)
+        return 'OK' #WTF?
     else:
         file_summary = open(os.path.join(parent_dir, 'analysis_summary_'+mask+'_'+task+'.txt'), "w")
         res_list = []
@@ -1211,7 +837,7 @@ def save_results(path, results, configuration):
         
         file_summary.close()
     
-    print 'Result saved in '+parent_dir
+    logging.info('Result saved in '+parent_dir)
     
     return 'OK' 
 
@@ -1252,7 +878,7 @@ def save_results_searchlight (path, results):
     fname = 'accuracy_map_radius_'+str(radius)+'_searchlight_all_subj.nii.gz'
     ni.save(total_img, os.path.join(path,fname))
                    
-    print 'Results writed in '+path    
+    logging.info('Results writed in '+path)
     return path
 
 def save_results_basic(path, results):
@@ -1300,7 +926,7 @@ def save_results_basic(path, results):
     ###################################################################          
     
     
-    print 'Result saved in '+parent_dir
+    logging.info('Result saved in '+parent_dir)
     
     return 'OK' 
 
@@ -1326,10 +952,7 @@ def save_results_transfer_learning(path, results):
         command = 'mkdir '+os.path.join(path, name)
         os.system(command)
         
-        results_dir = os.path.join(path, name)        
-
-        print '----------------------------'
-                
+        results_dir = os.path.join(path, name)                        
         
         stats = results[name]['stats']
         fname = name+'_stats.txt'
@@ -1483,10 +1106,7 @@ def save_results_transfer_learning(path, results):
             
                 np.savetxt(os.path.join(results_dir,name+'_distance_txt_'+c+'_'+tar+'_.txt'), 
                            distances[c][full_data.T[0] == tar], fmt='%.4f')               
-                
-                
-                
-            
+
         
         for k in plot_list.keys():
             ax1 = plot_list[k][1][0]
@@ -1497,9 +1117,7 @@ def save_results_transfer_learning(path, results):
             ax2.axvline(x=0.99, ymax=ax2.get_ylim()[1], color='r', linestyle='--', linewidth=3)
             fig_name = os.path.join(results_dir,name+'_histogram_'+k+'.png')
             plot_list[k][0].savefig(fig_name)
-        
-        
-            
+
         file_.write('\nthreshold '+str(threshold))       
         file_.close()
         
@@ -1600,9 +1218,9 @@ def save_results_clustering(path, results):
   
     return
 
-def write_all_subjects_map(path, dir):
+def write_all_subjects_map(path, dir_):
     
-    res_path = os.path.join(path, '0_results', dir)
+    res_path = os.path.join(path, '0_results', dir_)
     
     subjects = os.listdir(res_path)
     subjects = [s for s in subjects if s.find('.') == -1]

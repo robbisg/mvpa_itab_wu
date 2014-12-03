@@ -1,3 +1,10 @@
+#######################################################
+#     Copyright (c) 2013 Roberto Guidotti
+#
+#     See the file license.txt for copying permission.
+########################################################
+# pylint: disable=maybe-no-member, method-hidden, no-member
+
 from nibabel.analyze import AnalyzeImage, AnalyzeHeader
 from nibabel.spm99analyze import Spm99AnalyzeHeader, Spm99AnalyzeImage
 from nibabel.spatialimages import HeaderTypeError
@@ -42,7 +49,7 @@ image_size_dtd = [
     ('matrix_size_[2]', 'i2'),
     ('matrix_size_[3]', 'i2'),
     ('matrix_size_[4]', 'i2'),
-                  ]
+    ]
 image_dimension_dtd = [
     ('time_series_flag', 'i2'),
     ('number_of_dimensions', 'i2'),
@@ -53,9 +60,9 @@ image_dimension_dtd = [
 data_dtype_dtd = [
     ('number_format', 'S10'),
     ('number_of_bytes_per_pixel', 'i2'),
-    ('orientation', 'i2'), 
+    ('orientation', 'i2'),
     ('imagedata_byte_order', 'S10'),
-                  ]
+    ]
 mri_info_dtd = [
     ('mri_parameter_file_name', 'S80'),
     ('mri_sequence_file_name', 'S30'),
@@ -85,7 +92,7 @@ _dtdefs = ( # code, conversion function, equivalent dtype, aliases
     #(16, 'float32', np.dtype('>f4')),
     (32, 'complex64', np.complex64), # numpy complex format?
     (64, 'float64', np.float64),
-    (128, 'RGB', np.dtype([('R','u1'),
+    (128, 'RGB', np.dtype([('R', 'u1'),
                   ('G', 'u1'),
                   ('B', 'u1')])),
     (255, 'all', np.void))
@@ -95,7 +102,7 @@ data_type_codes = make_dt_codes(_dtdefs)
 
 
 class WashUHeader(Spm99AnalyzeHeader):
-        
+    
     # Copies of module-level definitions
     template_dtype = header_dtype
     _data_type_codes = data_type_codes
@@ -174,7 +181,8 @@ class WashUHeader(Spm99AnalyzeHeader):
     
     def copy(self):
         print self.__class__
-        hdr_copy = self.__class__(header_dict=self._header_dict, endianness=self.endianness)
+        hdr_copy = self.__class__(header_dict=self._header_dict, 
+                                  endianness=self.endianness)
         return hdr_copy
     
     def set_header_info(self):
@@ -198,7 +206,9 @@ class WashUHeader(Spm99AnalyzeHeader):
             zooms = np.abs(np.fromstring(header_dict['mmppix'], sep=' '))
             zooms = np.append(zooms, [1.])
         else:
-            #hdr['orient'] = self.get_flip_orientation(header_dict['orientation'])
+            #hdr['orient'] = self.get_flip_orientation(
+            #        header_dict['orientation'])
+            
             for i in range(3):
                 key_ = 'scaling_factor_(mm/pixel)_['+str(i+1)+']'
                 zooms.append(header_dict[key_])
@@ -234,8 +244,8 @@ class WashUHeader(Spm99AnalyzeHeader):
 
 class WashUImage(Spm99AnalyzeImage):
     
-    files_types = (('image','.img'), 
-                   ('header','.ifh'),
+    files_types = (('image', '.img'), 
+                   ('header', '.ifh'),
                    ('mat', '.mat'))
     header_class = WashUHeader
     ImageArrayProxy = ArrayProxy
@@ -243,7 +253,12 @@ class WashUImage(Spm99AnalyzeImage):
     def __init__(self, dataobj, affine, header=None,
                  extra=None, file_map=None):
         
-        Spm99AnalyzeImage.__init__(self, dataobj, affine, header, extra, file_map)
+        Spm99AnalyzeImage.__init__(self,
+                                   dataobj,
+                                   affine,
+                                   header,
+                                   extra,
+                                   file_map)
         
     @classmethod
     def from_filename(klass, filename):
@@ -267,9 +282,6 @@ def guessed_image_type(filename):
     else:
         
         return WashUImage
-    
-    
-
 
 def clean_key(key_):
         
