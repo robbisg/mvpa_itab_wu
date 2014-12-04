@@ -9,7 +9,7 @@ import os
 from main_wu import *
 from utils import *
 import matplotlib.pyplot as plt
-
+from fsl_wrapper import *
 from mvpa2.suite import find_events, fmri_dataset, SampleAttributes
 from mvpa2.suite import dataset_wizard
 import cPickle as pickle
@@ -39,6 +39,7 @@ def get_time():
         
     return datetime    
 
+
 def load_conc_fmri_data(conc_file_list, el_vols = 0, **kwargs):
     """This function loads fmri data from a list of.
        
@@ -66,7 +67,7 @@ def load_conc_fmri_data(conc_file_list, el_vols = 0, **kwargs):
     return imgList
 
 #@profile    
-def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
+def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
     """
     returns imgList
     
@@ -104,60 +105,69 @@ def load_wu_fmri_data(path, name, task, el_vols=None, **kwargs):
    
     logging.info('Loading...')
     
-    fileL = []
+    file_list = []
     #Verifying which type of task I've to classify (task or rest) and loads filename in different dirs
     for path in path_file_dirs:
-        fileL = fileL + os.listdir(path)
+        file_list = file_list + os.listdir(path)
 
-    logging.debug(' '.join(fileL))
+    logging.debug(' '.join(file_list))
 
     #Verifying which kind of analysis I've to perform (single or group) and filter list elements   
     if cmp(analysis, 'single') == 0:
-        fileL = [elem for elem in fileL if (elem.find(img_pattern) != -1) or (elem.find(task) != -1) ]#and (elem.find('mni') == -1)]
+        file_list = [elem for elem in file_list 
+                     if (elem.find(img_pattern) != -1) and (elem.find(task) != -1) ]#and (elem.find('mni') == -1)]
     else:
-        fileL = [elem for elem in fileL if elem.find(img_pattern) != -1 and elem.find(task) != -1 and elem.find('mni') != -1]
+        file_list = [elem for elem in file_list 
+                     if elem.find(img_pattern) != -1 and elem.find(task) != -1 and elem.find('mni') != -1]
 
-    logging.debug(' '.join(fileL))
+    logging.debug(' '.join(file_list))
     
     #if no file are found I perform previous analysis!        
-    if (len(fileL) <= runs and len(fileL) == 0):
+    if (len(file_list) <= runs and len(file_list) == 0):
         raise OSError('Files not found, please check if data exists in '+str(path_file_dirs))
     else:
         logging.debug('File corrected found ....')  
 
     ### Data loading ###
-    fileL.sort()
+    file_list.sort()
     
-    imgList = []
+    image_list = []
     
-    for img in fileL:
+    for img in file_list:
          
         if os.path.exists(os.path.join(path_file_dirs[0], img)):
-            pathF = os.path.join(path_file_dirs[0], img)
+            filepath = os.path.join(path_file_dirs[0], img)
         else:
-            pathF = os.path.join(path_file_dirs[1], img)
+            filepath = os.path.join(path_file_dirs[1], img)
+    
+        image_list.append(filepath)
             
-        logging.info('Now loading '+pathF)     
+    return image_list
+
+def load_fmri(fname_list, skip_vols=0):
+    
+    image_list = []
         
-        im = ni.load(pathF)
+    for file_ in fname_list:
+        
+        logging.info('Now loading '+file_)     
+        
+        im = ni.load(file_)
         data = im.get_data()
-        
+    
         logging.debug(data.shape)
-        
-        new_im = im.__class__(data[:,:,:,el_vols:], 
-                              affine = im.get_affine(), 
-                              header = im.get_header()) 
-        
-        new_im.set_filename(pathF)
-        
-        del data
-        del im
-        imgList.append(new_im)
-        
-    logging.debug('The image list is of ' + str(len(imgList)) + ' images.')
-        
-    del fileL
-    return imgList
+    
+        new_im = im.__class__(data[:,:,:,skip_vols:], 
+                                affine = im.get_affine(), 
+                                header = im.get_header())
+        del data, im
+        image_list.append(new_im)
+    
+    logging.debug('The image list is of ' + str(len(image_list)) + ' images.')
+    return image_list
+    
+    
+    
 
 def load_beta_dataset(path, subj, type, **kwargs):
     
@@ -296,7 +306,7 @@ def read_beta_data(line, voxel_num, time_points):
     
     
 #@profile
-def load_dataset(path, subj, type, **kwargs):
+def load_dataset(path, subj, type_, **kwargs):
     '''
     @param mask: mask is a string indicating the area to be analyzed
             - total: the entire brain voxels;
@@ -309,7 +319,7 @@ def load_dataset(path, subj, type, **kwargs):
     
     use_conc = 'False'
     skip_vols = 0
-    
+    ext=''
     #print kwargs
     
     for arg in kwargs:
@@ -319,57 +329,60 @@ def load_dataset(path, subj, type, **kwargs):
             use_conc = kwargs[arg]
         if arg == 'conc_file':
             conc_file = kwargs[arg]
-
-    if use_conc == 'False':      
-        try:
-            niftiFilez = load_wu_fmri_data(path, name = subj, task = type, el_vols = skip_vols, **kwargs)
-        except OSError, err:
-            logging.err(err)
-            return 0
+        if arg == 'sub_dir':
+            sub_dir = kwargs[arg].split(',')
+        if arg == 'img_extension':
+            ext = kwargs[arg]
+            
+    if use_conc == 'False':
+        file_list = load_wu_file_list(path, name=subj, task=type_, **kwargs)   
     else:
-        conc_file_list = read_conc(path, subj, conc_file)
-        conc_file_list = modify_conc_list(path, subj, conc_file_list)
-        try:
-            niftiFilez = load_conc_fmri_data(conc_file_list, el_vols = skip_vols, **kwargs)
-        except IOError, err:
-            logging.err(err)
-            return 0
-        
-        kwargs = update_subdirs(conc_file_list, subj, **kwargs)
-        #print kwargs
+        file_list = read_conc(path, subj, conc_file, sub_dir=sub_dir)
+        file_list = modify_conc_list(path, subj, file_list, extension=ext)
 
+        kwargs = update_subdirs(file_list, subj, **kwargs)
+        #print kwargs
+    
+    try:
+        fmri_list = load_fmri(file_list, skip_vols=skip_vols)
+    except IOError, err:
+        logging.error(err)
+        return 0
+    
     ### Code to substitute   
-    [code, attr] = load_attributes(path, type, subj, **kwargs)        
+    [code, attr] = load_attributes(path, type_, subj, **kwargs)        
     if code == 0:
-        del niftiFilez
+        del fmri_list
         raise IOError('Attributes file not found')
         
-    files = len(niftiFilez)  
-    #Mask issues     
-  
+    files = len(fmri_list)  
+    
+    #Loading mask 
     mask = load_mask(path, subj, **kwargs)        
        
     volSum = 0;
         
-    for i in range(len(niftiFilez)):
+    for i in range(len(fmri_list)):
             
-        volSum += niftiFilez[i].shape[3]
-
+        volSum += fmri_list[i].shape[3]
+    
+    #Check attributes/dataset sample mismatches
     if volSum != len(attr.targets):
-        del niftiFilez
+        del fmri_list
         logging.error(subj + ' *** ERROR: Attributes Length mismatches with fMRI volumes! ***')
         raise ValueError('Attributes Length mismatches with fMRI volumes!')       
-
+    
+    #Load the dataset.
     try:
         logging.info('Loading dataset...')
-        ds = fmri_dataset(niftiFilez, targets = attr.targets, chunks = attr.chunks, mask = mask) 
+        ds = fmri_dataset(fmri_list, targets=attr.targets, chunks=attr.chunks, mask=mask) 
         logging.info('Dataset loaded...')
     except ValueError, e:
         logging.error(subj + ' *** ERROR: '+ str(e))
-        del niftiFilez
+        del fmri_list
         return 0;
     
-    
+    #Update dataset attributes
     ev_list = []
     events = find_events(targets = ds.sa.targets, chunks = ds.sa.chunks)
     for i in range(len(events)):
@@ -381,25 +394,24 @@ def load_dataset(path, subj, type, **kwargs):
     ds.sa['events_number'] = ev_list
     ds.sa['name'] = [subj for i in range(len(ds.sa.chunks))]
     
-    '''
     try:
         ds.sa['frame'] = attr.frame
         ds.sa['trial'] = attr.trial
-    except AttributeError, e:
-        print 'Ciao!'
-    '''
+    except ValueError, e:
+        logging.error('Frame and Trial attributes not found.')
+    
     
     #Inserted for searchlight proof!
-    ds.sa['block'] = np.int_(np.array([(i/14.) for i in range(len(ds.sa.chunks))])-5*ds.sa.chunks)
+    #ds.sa['block'] = np.int_(np.array([(i/14.) for i in range(len(ds.sa.chunks))])-5*ds.sa.chunks)
     
     f_list = []
     for i in range(files):
-        for _ in range(niftiFilez[i].shape[-1:][0]):
-                f_list.append(i+1)
+        for _ in range(fmri_list[i].shape[-1:][0]):
+            f_list.append(i+1)
 
     ds.sa['file'] = f_list
     
-    del niftiFilez
+    del fmri_list
     
     return ds    
 
@@ -675,36 +687,86 @@ def load_attributes (path, task, subj, **kwargs):
     attr = SampleAttributes(attrFilename, header=header)
     return [1, attr]
 
-def modify_conc_list(path, subj, conc_filelist):
+
+def modify_conc_list(path, subj, conc_filelist, extension=''):
     """
     Function used to internally modify conc path, if remote directory is mounted at different
     location, the new mounting directory is passed as parameter.
     """
+    import glob
     new_list = []
+    
     for fl in conc_filelist:
         
-        fl = fl[fl.find(subj):-3]+'hdr'
-        new_list.append(os.path.join(path,fl))
+        #Leave the first path part
+        fl = fl[fl.find(subj):]
+        logging.debug(fl)
         
+        #Leave file extension
+        fname, ext1, ext2 = fl.split('.')
+        new_filename = os.path.join(path,fname)
+
+        new_list += glob.glob(new_filename+'.*'+extension)
+
+        logging.debug(fname)
+    
+    logging.debug(new_list)
+    
     del conc_filelist
     return new_list
 
 
-def read_conc(path, subj, conc_file_patt):
+def read_file(filename):
     
-    conc_file_list = os.listdir(os.path.join(path, subj))
-    #Logging
-    logging.debug(' '.join(conc_file_list))
+    filename_list = []
+    with open(filename, 'r') as fileholder:
+        for name in fileholder:
+            filename_list.append(name[name.find('/'):-1])
     
-    conc_file_list = [f for f in conc_file_list if f.find('.conc') != -1 and f.find(conc_file_patt) != -1]
+    logging.debug(' '.join(filename_list))
+        
+    return filename_list
+
+
+def read_conc(path, subj, conc_file_patt, sub_dir=['']):
+    
+    logging.debug(path)
+    
+    #First we look for the conc file in the task folder
+    conc_file_list = []
+    for dir_ in sub_dir:
+        conc_path = os.path.join(path, subj, dir_)
+        logging.debug(conc_path)
+        if os.path.exists(conc_path):
+            file_list = os.listdir(conc_path)
+            logging.debug(conc_file_list)
+            conc_file_list += [f for f in file_list if f.find('.conc') != -1 and f.find(conc_file_patt) != -1]
+    
+    logging.debug('.conc files in sub dirs: '+str(len(conc_file_list)))
+    #Then we look in the subject directory
+    if len(conc_file_list) == 0:
+        conc_path = os.path.join(path, subj)
+        file_list = os.listdir(conc_path)
+        conc_file_list += [f for f in file_list \
+                          if f.find('.conc') != -1 and f.find(conc_file_patt) != -1]
+        logging.debug(' '.join(conc_file_list))
+        logging.debug('.conc files in sub dirs: '+str(len(conc_file_list)))
+    
     c_file = conc_file_list[0]
     
     #Logging
     logging.debug(' '.join(conc_file_list))
     
-    conc_file = open(os.path.join(path, subj, c_file), 'r')
+    conc_file = open(os.path.join(conc_path, c_file), 'r')
     s = conc_file.readline()
-    n_files = np.int(s.split(':')[1])
+    logging.debug(s)
+    try:
+        n_files = np.int(s.split(':')[1])
+    except IndexError, err:
+        logging.error('The conc file is not recognized.')
+        return read_file(os.path.join(conc_path, c_file))
+        
+    logging.debug('Number of files in conc file is '+str(n_files))
     
     i = 0
     filename_list = []
@@ -713,7 +775,9 @@ def read_conc(path, subj, conc_file_patt):
         name = conc_file.readline()
         filename_list.append(name[name.find('/'):-1])
         i = i + 1
-        
+    
+    conc_file.close()
+    logging.debug('\n'.join(filename_list))
     return filename_list
 
 
@@ -1296,7 +1360,9 @@ def update_subdirs(conc_file_list, subj, **kwargs):
             sub_dirs = kwargs[arg].split(',')
         
     i = 0
-
+    
+    logging.debug('Old subdir '+kwargs['sub_dir'])
+    
     for directory in conc_file_list:
         
         #Find the directory name
@@ -1312,7 +1378,7 @@ def update_subdirs(conc_file_list, subj, **kwargs):
         i = i + 1
         
     kwargs['sub_dir'] = ','.join(sub_dirs)
-    
+    logging.debug('New subdir '+kwargs['sub_dir'])
     return kwargs
             
 def _find_file(path, subj, pattern):
