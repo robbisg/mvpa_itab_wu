@@ -10,6 +10,7 @@ from mvpa2.clfs.transerror import ConfusionMatrix
 import os
 import copy
 from similarity import *
+from mvpa2.suite import vstack, Sphere, Searchlight, IndexQueryEngine, Splitter
     
     
 def test_spatiotemporal(path, subjects, conf_file, type, **kwargs):
@@ -241,7 +242,7 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
             print r['ds_src'].shape
             
             mahala_data = similarity_measure(r['ds_tar'], r['ds_src'], 
-                                             r, p_value=p, method='correlation')
+                                             r, p_value=p, method='mahalanobis')
             r['mahalanobis_similarity'] = mahala_data
             #print tr_pred
         
@@ -378,7 +379,6 @@ def test_searchlight_similarity(path,
         ni.save(img, os.path.join(results_dir, fname))
     
     return maps
-    
 
 
 def test_searchlight_cross_decoding(path, subjects, conf_file, type, **kwargs):

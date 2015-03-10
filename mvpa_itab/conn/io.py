@@ -4,6 +4,30 @@ from scipy.stats import zscore as sc_zscore
 from mvpa2.suite import dataset_wizard, zscore
 import os
 
+def load_fcmri_dataset(data, subjects, conditions, group, level, n_run=3):
+    
+    attributes = []
+    samples = []
+    
+    for ic, c in enumerate(conditions):
+        for isb, s in enumerate(subjects):
+            for i in range(n_run):
+                      
+                matrix = data[ic,isb,i,:]
+                fmatrix = flatten_correlation_matrix(matrix)
+                
+                samples.append(fmatrix)
+                attributes.append([c, s, i, group[isb], level[isb]])
+    
+    attributes = np.array(attributes)
+    
+    ds = dataset_wizard(np.array(samples), targets=attributes.T[0], chunks=attributes.T[1])
+    ds.sa['run'] = attributes.T[2]
+    ds.sa['group'] = attributes.T[3]
+    ds.sa['meditation'] = attributes.T[0]
+    ds.sa['level'] = np.int_(attributes.T[4])
+    return ds
+    
 
 
 def load_mat_dataset(datapath, bands, conditions, networks=None):
@@ -84,15 +108,17 @@ def flatten_correlation_matrix(matrix):
     
     il = np.tril_indices(matrix.shape[0])
     out_matrix = matrix.copy()
-    out_matrix[il] = 0
+    out_matrix[il] = np.nan
     
+    out_matrix[range(matrix.shape[0]),range(matrix.shape[0])] = np.nan
+    '''
     iu = np.triu_indices(matrix.shape[0])
-    out_matrix[out_matrix[iu] == 0] = np.isnan
+    out_matrix[out_matrix[iu] == 0] = np.nan
     
     out_matrix = out_matrix[np.nonzero(out_matrix)]
     out_matrix[np.isnan(out_matrix)] == 0
-    
-    return out_matrix
+    '''
+    return matrix[~np.isnan(out_matrix)]
     
 
 

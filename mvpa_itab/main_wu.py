@@ -18,6 +18,7 @@ from mvpa2.suite import LinearCSVMC, GNB, QDA, LDA, SMLR, GPR, SKLLearnerAdapter
 from mvpa2.suite import map2nifti, mean_mismatch_error, sphere_searchlight
 from mvpa2.suite import FractionTailSelector, FixedNElementTailSelector
 from mvpa2.generators.partition import HalfPartitioner, NFoldPartitioner
+from mvpa2.generators.resampling import Balancer
 from mvpa2.measures.anova import OneWayAnova
 from mvpa2.featsel.base import SensitivityBasedFeatureSelection
 from mvpa2.suite import ChainNode, MCNullDist, Repeater, AttributePermutator
@@ -683,15 +684,23 @@ def setup_classifier(**kwargs):
             splitter_used = NFoldPartitioner(cvtype=1, attr=attribute)
     else:
         splitter_used = HalfPartitioner(attr=attribute)
+        
+    
+    chain_splitter = ChainNode([splitter_used, 
+                                Balancer(attr='targets',
+                                         count=1,
+                                         limit='partitions',
+                                         apply_selection=True)],
+                               space='partitions')
 
     #############################################################
     if distr_est == None:
         cvte = CrossValidation(fclf,
-                               splitter_used,
+                               chain_splitter,
                                enable_ca=['stats', 'repetition_results'])
     else:
         cvte = CrossValidation(fclf,
-                               splitter_used,
+                               chain_splitter,
                                errorfx=mean_mismatch_error,
                                null_dist=distr_est,
                                enable_ca=['stats', 'repetition_results'])

@@ -11,9 +11,10 @@ from utils import *
 import matplotlib.pyplot as plt
 from fsl_wrapper import *
 from mvpa2.suite import find_events, fmri_dataset, SampleAttributes
-from mvpa2.suite import dataset_wizard
+from mvpa2.suite import dataset_wizard, eventrelated_dataset, vstack
 import cPickle as pickle
 import logging
+import time
 #from memory_profiler import profile
 
 def get_time():
@@ -368,6 +369,7 @@ def load_dataset(path, subj, type_, **kwargs):
     
     #Check attributes/dataset sample mismatches
     if volSum != len(attr.targets):
+        logging.debug('volume number: '+str(volSum)+' targets: '+str(len(attr.targets)))
         del fmri_list
         logging.error(subj + ' *** ERROR: Attributes Length mismatches with fMRI volumes! ***')
         raise ValueError('Attributes Length mismatches with fMRI volumes!')       
@@ -397,7 +399,7 @@ def load_dataset(path, subj, type_, **kwargs):
     try:
         ds.sa['frame'] = attr.frame
         ds.sa['trial'] = attr.trial
-    except ValueError, e:
+    except BaseException, e:
         logging.error('Frame and Trial attributes not found.')
     
     
@@ -683,7 +685,7 @@ def load_attributes (path, task, subj, **kwargs):
                 fidl_convert(os.path.join(dir, attrFiles[0]), os.path.join(dir, attrFiles[0][:-5]+'.txt'), type=fidl_type)
                 attrFilename = os.path.join(dir, attrFiles[0][:-5]+'.txt')
 
-    
+    logging.debug(header)
     attr = SampleAttributes(attrFilename, header=header)
     return [1, attr]
 
@@ -709,6 +711,7 @@ def modify_conc_list(path, subj, conc_filelist, extension=''):
         new_list += glob.glob(new_filename+'.*'+extension)
 
         logging.debug(fname)
+        logging.debug(new_filename)
     
     logging.debug(new_list)
     
@@ -717,6 +720,7 @@ def modify_conc_list(path, subj, conc_filelist, extension=''):
 
 
 def read_file(filename):
+    
     
     filename_list = []
     with open(filename, 'r') as fileholder:
@@ -757,10 +761,12 @@ def read_conc(path, subj, conc_file_patt, sub_dir=['']):
     #Logging
     logging.debug(' '.join(conc_file_list))
     
+    #Open and check conc file
     conc_file = open(os.path.join(conc_path, c_file), 'r')
     s = conc_file.readline()
     logging.debug(s)
     try:
+        #conc file used to have first row with file number
         n_files = np.int(s.split(':')[1])
     except IndexError, err:
         logging.error('The conc file is not recognized.')
@@ -768,11 +774,13 @@ def read_conc(path, subj, conc_file_patt, sub_dir=['']):
         
     logging.debug('Number of files in conc file is '+str(n_files))
     
+    
+    #Read conc file
     i = 0
     filename_list = []
-    
     while i < n_files:
         name = conc_file.readline()
+        #Find the path that did not correspond to local file namespace
         filename_list.append(name[name.find('/'):-1])
         i = i + 1
     
@@ -796,8 +804,7 @@ def read_remote_configuration(path):
             logging.debug(item)
     
     return dict(configuration) 
-    
-    
+
     logging.info('Reading remote config file '+os.path.join(path,'remote.conf'))
 
 
@@ -962,15 +969,19 @@ def save_results_basic(path, results):
             if key == 'map':
                 
                 m_mean = results[name]['map'].pop()
+                m_mean_data = m_mean.get_data()
                 fname = name+'_mean_map.nii.gz'
-                m_mean._data = (m_mean._data - np.mean(m_mean._data))/np.std(m_mean._data)
-                ni.save(m_mean, os.path.join(results_dir,fname))
+                m_mean_data = (m_mean_data - np.mean(m_mean_data))/np.std(m_mean_data)
+                m_mean_zscore = ni.Nifti1Image(m_mean_data, m_mean.get_affine())
+                ni.save(m_mean_zscore, os.path.join(results_dir,fname))
                 
                 for map, t in zip(results[name][key], results[name]['sensitivities'].sa.targets):
                     cl = '_'.join(t)
                     fname = name+'_'+cl+'_map.nii.gz'
-                    map._data = (map._data - np.mean(map._data))/np.std(map._data)
-                    ni.save(map, os.path.join(results_dir,fname))
+                    map_data = map.get_data()
+                    map_data_zscore = (map_data - np.mean(map_data))/np.std(map_data)
+                    map_zscore = ni.Nifti1Image(map_data_zscore, map.get_affine())
+                    ni.save(map_zscore, os.path.join(results_dir,fname))
                     
             elif key == 'stats':
                 stats = results[name][key]
@@ -1219,7 +1230,8 @@ def save_results_transfer_learning(path, results):
                     cl = '_'.join(t)
                     fname = name+'_'+cl+'_map.nii.gz'
     
-                    map._data = (map._data - np.mean(map._data))/np.std(map._data)
+                    #map._data = (map._data - np.mean(map._data))/np.std(map._data)
+                    map._dataobj = (map._dataobj - np.mean(map._dataobj))/np.std(map._dataobj)
                     ni.save(map, os.path.join(results_dir,fname))
     
     

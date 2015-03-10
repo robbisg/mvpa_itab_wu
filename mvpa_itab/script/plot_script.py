@@ -398,29 +398,3 @@ for name in subjects:
         j = j + 1 
         fname = name+'_mds_total.png'  
         f.savefig(fname)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    

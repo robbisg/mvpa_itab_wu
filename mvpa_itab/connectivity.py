@@ -11,7 +11,7 @@ from scipy.signal.windows import boxcar
 from scipy.signal.signaltools import convolve
 from scipy.stats.mstats import zscore
 
-from lib_io import load_wu_fmri_data, read_configuration
+from lib_io import load_wu_file_list, read_configuration
 
 import matplotlib.pyplot as pl
 

@@ -3,6 +3,7 @@ import scipy
 from mvpa2.suite import FeatureSelectionClassifier, Measure, TransferMeasure
 from scipy.spatial.distance import mahalanobis, euclidean
 from scipy.stats import pearsonr
+import sklearn.covariance
 from sklearn.covariance import EmpiricalCovariance, LedoitWolf, MinCovDet, \
                         GraphLasso, ShrunkCovariance
 from mvpa2.generators.partition import Partitioner
@@ -17,7 +18,6 @@ def similarity_measure(ds_tar, ds_src, results, p_value=0.05, method='mahalanobi
         return similarity_measure_euclidean (ds_tar, ds_src, results, p_value)
     elif method == 'correlation':
         return similarity_measure_correlation (ds_tar, ds_src, results, p_value)
-
 
 def similarity_measure_euclidean (ds_tar, ds_src, results, p_value):
     
@@ -144,8 +144,7 @@ def similarity_measure_euclidean (ds_tar, ds_src, results, p_value):
     #true_data = full_data[true_predictions]
 
     return full_data, np.bool_(true_predictions), threshold, p_values, distances    
-    
-    
+        
 def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.95):
     
     print 'Computing Mahalanobis similarity...'
@@ -375,6 +374,7 @@ def similarity_measure_correlation (ds_tar, ds_src, results, p_value):
 
     return full_data, true_predictions, threshold, p_correlation, distances       
 ##################################################################################
+
 def similarity_confidence(ds_src, ds_tar, results):
     
     classifier = results['classifier']
@@ -475,7 +475,7 @@ class SimilarityMeasure(Measure):
 
 class MahalanobisMeasure(SimilarityMeasure):
     
-    def __init__(self, p=0.05):
+    def __init__(self, p=0.05, method=sklearn.covariance.EmpiricalCovariance):
         
         SimilarityMeasure.__init__(self)
         #self.space = 'targets'
@@ -485,7 +485,7 @@ class MahalanobisMeasure(SimilarityMeasure):
     def train(self, ds):
         
         super(MahalanobisMeasure, self).train(ds)
-        self.params['icov'] = EmpiricalCovariance().fit(ds.samples).precision_
+        self.params['icov'] = self.method().fit(ds.samples).precision_
         self.is_trained = True
         
     

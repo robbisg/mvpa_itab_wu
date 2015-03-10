@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from xlrd.biffh import XLRDError
 from mvpa2.base.hdf5 import h5load
+import logging
 
 #from mvpa2.suite import h5load
 
@@ -170,26 +171,50 @@ def fidl2txt (fidlPath, outPath):
             
 def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
     '''
-    exp_end = ???
+    Fidl file event to text utility.
+    
+    Parameters:
+    ----------------------------------
+    fidlPath: path to fidl file.
+    outPath: output pathname
+    runs: number of runs 
+    vol_run: number of volumes per run
+    stim_tr: number of event/stimulus volumes
+    offset_tr: number of volumes to eliminate at event/stimulus beginning
     '''
     print 'Converting fidl file '+fidlPath+' in '+outPath
+    
+    fname, ext = fidlPath.split('.')
+    
+    if ext == 'csv':
+        delimiter = ','
+    else:
+        delimiter = '\t'
     
     exp_end = vol_run * runs
     
     fidlFile = open(fidlPath)
     
-    firstRow = fidlFile.readline().split(',')
+    firstRow = fidlFile.readline().split(delimiter)
     tokens = firstRow
     tokens.reverse()
     TR = float(tokens.pop())
        
     fidlFile.close()
-    data = np.loadtxt(fidlPath, skiprows = 1, delimiter=',')
+    data = np.loadtxt(fidlPath, 
+                      skiprows = 1, 
+                      delimiter=delimiter, 
+                      dtype=np.str_)
     
-    onset = data.T[0]
+    try:
+        _ = np.float_(data[0])
+    except ValueError, _:
+        data = data[1:]
+    
+    onset = np.float_(data.T[0])
     #duration = data.T[2]
     #
-    events = data.T[1]
+    events = np.int_(data.T[1])
     
     outFile = open(outPath, 'w')
     
@@ -253,13 +278,17 @@ def extract_events_xls(filename, sheet_name):
     events_num = sh.col_values(1)
     events_num = np.array(events_num[1:])
     
+    logging.debug(events_num)
+    
     duration = sh.col_values(2)
     duration = np.array(duration[1:])
+    logging.debug(duration)
     
     duration = [onset[i+1] - onset[i] for i in range(len(onset)-1)]
     
     event_labels = sh.col_values(5)
     event_labels = np.array([e for e in event_labels if e != ''])
+    logging.debug(event_labels)
     
     return onset, duration, event_labels, events_num
 
@@ -270,7 +299,7 @@ def build_attributes(out_path,
                      TR, 
                      events,
                      event_labels,
-                     runs=12, vol_run=248, stim_vol=4, offset_tr=2):
+                     runs=12, vol_run=250, stim_vol=4, offset_tr=2):
     
     outFile = open(out_path, 'w')
     if onset[0] != 0:
