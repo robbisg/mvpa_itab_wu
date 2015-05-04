@@ -335,7 +335,7 @@ def similarity_measure_correlation (ds_tar, ds_src, results, p_value):
     for c in np.unique(prediction_target):
             distances[c] = []
             for ex in ds_tar.samples:
-                distances[c].append(1-pearsonr(example_dist[l]['mean'], ex)[0])
+                distances[c].append(1-pearsonr(example_dist[c]['mean'], ex)[0])
             
             distances[c] = np.array(distances[c])
     '''

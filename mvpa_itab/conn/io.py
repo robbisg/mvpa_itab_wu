@@ -3,6 +3,9 @@ from scipy.io import loadmat
 from scipy.stats import zscore as sc_zscore
 from mvpa2.suite import dataset_wizard, zscore
 import os
+from nitime.analysis.base import BaseAnalyzer
+from scipy.spatial.distance import euclidean
+from nitime import descriptors as desc
 
 def load_fcmri_dataset(data, subjects, conditions, group, level, n_run=3):
     
@@ -125,6 +128,38 @@ def flatten_correlation_matrix(matrix):
 def load_correlation():
     # To be implemented
     
-    
-    
     return
+
+class SeedMutualInformationAnalysis(BaseAnalyzer):
+    
+    def __init__(self, seed_time_series=None, target_time_series=None):
+        
+        self.seed = seed_time_series
+        self.target = target_time_series
+        
+    @desc.setattr_on_read
+    def euclidean(self):
+        
+        # If there is more than one channel in the seed time-series:
+        if len(self.seed.shape) > 1:
+
+            # Preallocate results
+            Cxy = np.empty((self.seed.data.shape[0],
+                            self.target.data.shape[0]), dtype=np.float)
+
+            for seed_idx, this_seed in enumerate(self.seed.data):
+                res = []
+                for single_ts in self.target.data:
+                    
+                    euclidean_sim = euclidean(this_seed, single_ts)
+                    res.append(euclidean_sim)
+                
+                Cxy[seed_idx] = np.array(res)
+        # In the case where there is only one channel in the seed time-series:
+        else:
+            #To correct!!!
+            euclidean_sim = euclidean(self.seed.data, self.target.data)
+            Cxy = euclidean(euclidean_sim)
+
+        return Cxy.squeeze()
+        

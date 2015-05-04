@@ -20,7 +20,12 @@ from mvpa2.suite import Repeater, FractionTailSelector, BestDetector, \
                         NFoldPartitioner
 from mvpa2.suite import NBackHistoryStopCrit, l2_normed, ChainMapper, \
                         FeatureSelectionClassifier
+from nitime import timeseries
+from nitime.timeseries import TimeSeries
+from nitime.analysis.correlation import SeedCorrelationAnalyzer
+from scipy.stats.stats import ttest_ind
 
+import matplotlib.pyplot as pl
 datapath = '/media/DATA/fmri/movie_viviana/corr_raw/RAW_mat_corr/'
 
 filelist = os.listdir(datapath)
@@ -330,4 +335,96 @@ if __name__ == '__main__':
             print perc
             
             results.append([net, b, 1 - np.mean(err), perc])
+############################################
+path = '/home/robbis/Share/Vivi/'
+mat_list = os.listdir('/home/robbis/Share/Vivi/')
+mat_list = [f for f in mat_list if f.find('.mat') != -1]
+data = dict()
+
+mask_mat = np.ones((50,50))
+mask_mat[np.tril_indices(50)] = 0
+mat_list.sort()
+
+roi_mat = np.zeros((50,50))
+roi_labels = np.loadtxt(os.path.join(roi_path, 'roi_labels.txt'),
+                    dtype=np.str_,
+                    delimiter='\t')
+
+
+un_vec, ind = np.unique(roi_labels.T[-1], return_index=True)
+o_ind = np.argsort(np.argsort(ind))
+
+for i, n in enumerate(np.unique(roi_labels.T[-1])):
+    mask = roi_labels.T[-1] == n
+    mask_roi = np.meshgrid(mask, mask)[1] * np.meshgrid(mask, mask)[0]
+    roi_mat = mask_roi*(o_ind[i]+1) + roi_mat
+
+index = 3
+
+for f in mat_list[:3]:
     
+    key = f[:f.find('1')]
+    mat_file = loadmat(os.path.join(path, f))
+    klist = key.split('_')
+    condition = klist[-1]
+    klist.pop()
+    klist.pop()
+    klist.append(condition)
+    key = '_'.join(klist)
+    ts_matrix = mat_file[key][:,:,np.bool_(mask_mat)]
+    #ts_matrix = sc_zscore(ts_matrix, axis=0)
+    roi_mask_mat = mask_mat * (roi_mat == index)
+    data[str.lower(condition)] = mat_file[key][:,:,np.bool_(roi_mask_mat)]
+
+roi_path = '/media/robbis/DATA/fmri/movie_viviana/corr_raw/RAW_mat_corr'
+
+ts = dict()
+correlation = []
+for i in range(11):
+    for k in data.keys():
+        ts[k] = TimeSeries(data[k][i,:], sampling_interval=1.)
+    
+    C1 = SeedCorrelationAnalyzer(ts['rest'], ts['movie'])
+    C2 = SeedCorrelationAnalyzer(ts['rest'], ts['scramble'])
+    
+    correlation.append([C1.corrcoef, C2.corrcoef])
+
+for c in correlation:
+    c[0] = c[0][:c[1].shape[0], :c[1].shape[1]]
+
+corr = np.array(correlation)
+
+#Plots
+mat_movie_time = loadmat('/home/robbis/Share/Vivi/time_corr_movie1.mat')
+mat_rest_time = loadmat('/home/robbis/Share/Vivi/time_corr_rest.mat')
+mat_scramble_time = loadmat('/home/robbis/Share/Vivi/time_corr_scramble1.mat')
+
+key = 'time_corr'
+time_movie = mat_movie_time[key]
+time_rest = mat_rest_time[key]
+time_scramble = mat_scramble_time[key]
+
+trail_ = str.lower(un_vec[np.argsort(ind)][index-1])
+
+path__ = '/media/robbis/DATA/fmri/movie_viviana/similarity_results/'+trail_
+for i in range(11):
+    pl.figure()
+    pl.imshow(corr[i,0,...], vmax=1, vmin=-1)
+    pl.colorbar()
+    pl.savefig(os.path.join(path__, str(i+1)+'_sbj_movie_'+trail_+'.png'), dpi=150)
+    pl.figure()
+    pl.imshow(corr[i,1,...], vmax=1, vmin=-1)
+    pl.colorbar()
+    pl.savefig(os.path.join(path__, str(i+1)+'_sbj_scramble_'+trail_+'.png'), dpi=150)
+
+pl.close('all')
+
+pl.figure()
+for i in range(11):
+    pl.plot(corr[i,0,...].mean(0), c='r', alpha=0.2)
+    pl.plot(corr[i,1,...].mean(0), c='b', alpha=0.2)
+pl.plot(corr[:,0,...].mean(1).mean(0), c='r', linewidth=1.5, label='movie')
+pl.plot(corr[:,1,...].mean(1).mean(0), c='b', linewidth=1.5, label='scramble')
+pl.legend()
+pl.savefig(os.path.join(path__, 'plot_movie_scramble_'+trail_+'.png'), dpi=300)
+

@@ -52,8 +52,8 @@ def plot_circle(matrix, roi_names, roi_color, n_lines=50):
                                     node_edgecolor='white',
                                     colorbar_size=0.5,
                                     fig=pl.figure(figsize=(13,13)),
-                                    vmin=-4.5,
-                                    vmax=4.5,                          
+                                    #vmin=-4.5,
+                                    #vmax=4.5,                          
                                     )
     return f,sp
 

@@ -6,10 +6,10 @@
 # pylint: disable=maybe-no-member, method-hidden
 import nibabel as ni
 import os
-from main_wu import *
-from utils import *
+from ..main_wu import *
+from ..utils import *
 import matplotlib.pyplot as plt
-from fsl_wrapper import *
+from ..fsl_wrapper import *
 from mvpa2.suite import find_events, fmri_dataset, SampleAttributes
 from mvpa2.suite import dataset_wizard, eventrelated_dataset, vstack
 import cPickle as pickle
@@ -18,14 +18,14 @@ import time
 #from memory_profiler import profile
 
 def get_time():
-    """Utility to format time used during results saving.
-       
-       Returns
-       -------
-        str : Datetime in format yymmdd_hhmmss
+    
+    """Get the current time and returns a string (fmt: yymmdd_hhmmss)
+    
+    !!! THIS HAS BEEN INCLUDED IN results MODULE !!!
+    
     """
     
-    #Time acquisition for file name!
+    # Time acquisition
     tempo = time.localtime()
     
     datetime = ''
@@ -40,45 +40,151 @@ def get_time():
         
     return datetime    
 
+#@profile
+def load_dataset(path, subj, folder, **kwargs):
+    ''' Load file given filename, the 
 
-def load_conc_fmri_data(conc_file_list, el_vols = 0, **kwargs):
-    """This function loads fmri data from a list of.
+    Parameters
+    ----------
+    path : string
+       specification of filepath to load
+    subj : string
+        subject name (in general it specifies a subfolder under path)
+    folder : string
+        subfolder under subject folder (in general is the experiment name)
+    \*\*kwargs : keyword arguments
+        Keyword arguments to format-specific load
+
+    Returns
+    -------
+    ds : ``Dataset``
+       Instance of ``mvpa2.datasets.Dataset``
+    '''
+
+    # TODO: Slim down algorithm parts and checks
+    
+    use_conc = 'False'
+    skip_vols = 0
+    ext=''
+    
+    logging.debug(str(kwargs))
+    
+    for arg in kwargs:
+        if arg == 'skip_vols':              # no. of canceled volumes
+            skip_vols = np.int(kwargs[arg])
+        if arg == 'use_conc':               # .conc file used (True/False)
+            use_conc = kwargs[arg]
+        if arg == 'conc_file':              # .conc pathname
+            conc_file = kwargs[arg]
+        if arg == 'sub_dir':                # subdirs to look for files
+            sub_dir = kwargs[arg].split(',')
+        if arg == 'img_extension':          # image extension
+            ext = kwargs[arg]
+    
+    # Load the filename list        
+    if use_conc == 'False':
+        file_list = load_wu_file_list(path, name=subj, task=folder, **kwargs)   
+    else:
+        file_list = read_conc(path, subj, conc_file, sub_dir=sub_dir)
+        file_list = modify_conc_list(path, subj, file_list, extension=ext)
+
+        kwargs = update_subdirs(file_list, subj, **kwargs) # updating args
+
+    
+    try:
+        fmri_list = load_fmri(file_list, skip_vols=skip_vols)
+    except IOError, err:
+        logging.error(err)
+        return 0
+    
+    ### Code to substitute   
+    [code, attr] = load_attributes(path, folder, subj, **kwargs)        
+    if code == 0:
+        del fmri_list
+        raise IOError('Attributes file not found')
+        
+     
+    
+    # Loading mask 
+    mask = load_mask(path, subj, **kwargs)        
        
-       Returns
-       -------
-        str : Datetime in format yymmdd_hhmmss
-    """   
-    imgList = []
-        
-    for file_ in conc_file_list:
-        
-        logging.info('Now loading '+file_)     
-        
-        im = ni.load(file_)
-        data = im.get_data()
+    # Check attributes/dataset sample mismatches
+    vol_sum = np.sum([img.shape[3] for img in fmri_list])
+
+    if vol_sum != len(attr.targets):
+        logging.debug('Volumes no.: '+str(vol_sum)+' Targets no.: '+str(len(attr.targets)))
+        del fmri_list
+        logging.error(subj + ' *** ERROR: Attributes Length mismatches with fMRI volumes! ***')
+        raise ValueError('Attributes Length mismatches with fMRI volumes!')       
     
-        logging.debug(data.shape)
+    # Load the dataset.
+    try:
+        logging.info('Loading dataset...')
+        ds = fmri_dataset(fmri_list, targets=attr.targets, chunks=attr.chunks, mask=mask) 
+        logging.info('Dataset loaded...')
+    except ValueError, e:
+        logging.error(subj + ' *** ERROR: '+ str(e))
+        del fmri_list
+        return 0;
     
-        new_im = ni.Nifti1Image(data[:,:,:,el_vols:], 
-                                affine = im.get_affine(), 
-                                header = im.get_header())
-        del data, im
-        imgList.append(new_im)
+    # Update Dataset attributes
+    #
+    # TODO: Evaluate if it is useful to build a dedicated function
+    ev_list = []
+    events = find_events(targets = ds.sa.targets, chunks = ds.sa.chunks)
+    for i in range(len(events)):
+        duration = events[i]['duration']
+        for j in range(duration):
+            ev_list.append(i+1)
+               
+    ds.a['events'] = events  # Update event field
+    ds.sa['events_number'] = ev_list # Update event number
     
-    return imgList
+    # Name added to do leave one subject out analysis
+    ds.sa['name'] = [subj for i in range(len(ds.sa.chunks))] 
+    
+    try:
+        ds.sa['frame'] = attr.frame
+        ds.sa['trial'] = attr.trial
+    except BaseException, e:
+        logging.error('Frame and Trial attributes not found.')
+         
+    f_list = []
+    for i, img_ in enumerate(fmri_list):
+        f_list += [i+1 for _ in range(img_.shape[-1])]
+        
+    # For each volume indicates to which file it belongs
+    # It is used for detrending!
+    ds.sa['file'] = f_list
+    
+    del fmri_list
+    
+    return ds 
 
 #@profile    
 def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
-    """
-    returns imgList
+    ''' Load file given filename, the 
+
+    Parameters
+    ----------
+    path : string
+       specification of filepath to load
+    name : string
+        subject name (in general it specifies a subfolder under path)
+    task : string
+        subfolder under subject folder (in general is the experiment name)
+    \*\*kwargs : keyword arguments
+        Keyword arguments to format-specific load
+
+    Returns
+    -------
+    file_list : string list
+       list of strings indicating the file pathname
+    '''
     
-    @param path: 
-    @param name:
-    @param task:
-    @param el_vols: 
-    """
+    # TODO: 
     
-    #What does it means analysis=single???
+    # What does it means analysis=single???
     analysis = 'single'
     img_pattern=''
     
@@ -106,14 +212,18 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
    
     logging.info('Loading...')
     
+    # TODO: Evaluate if it is useful to include searching code in a function
+    
     file_list = []
-    #Verifying which type of task I've to classify (task or rest) and loads filename in different dirs
+    # Verifying which type of task I've to classify (task or rest) 
+    # and loads filename in different dirs
     for path in path_file_dirs:
         file_list = file_list + os.listdir(path)
 
     logging.debug(' '.join(file_list))
 
-    #Verifying which kind of analysis I've to perform (single or group) and filter list elements   
+    # Verifying which kind of analysis I've to perform (single or group) 
+    # and filter list elements   
     if cmp(analysis, 'single') == 0:
         file_list = [elem for elem in file_list 
                      if (elem.find(img_pattern) != -1) and (elem.find(task) != -1) ]#and (elem.find('mni') == -1)]
@@ -123,7 +233,7 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
 
     logging.debug(' '.join(file_list))
     
-    #if no file are found I perform previous analysis!        
+    # if no file are found I perform previous analysis!        
     if (len(file_list) <= runs and len(file_list) == 0):
         raise OSError('Files not found, please check if data exists in '+str(path_file_dirs))
     else:
@@ -145,277 +255,39 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
             
     return image_list
 
+
 def load_fmri(fname_list, skip_vols=0):
-    
+    """This function loads fmri data from a list of .conc files
+       
+    Returns
+       -------
+    str : Datetime in format yymmdd_hhmmss
+    """   
     image_list = []
         
     for file_ in fname_list:
         
         logging.info('Now loading '+file_)     
         
-        im = ni.load(file_)
-        data = im.get_data()
+        img = ni.load(file_)
     
-        logging.debug(data.shape)
-    
-        new_im = im.__class__(data[:,:,:,skip_vols:], 
-                                affine = im.get_affine(), 
-                                header = im.get_header())
-        del data, im
-        image_list.append(new_im)
+        logging.debug(img.shape)
+        if skip_vols != 0:
+            
+            data = img.get_data()
+            img = img.__class__(data[:,:,:,skip_vols:], 
+                                  affine = img.get_affine(), 
+                                  header = img.get_header())
+            del data
+            
+        image_list.append(img)
     
     logging.debug('The image list is of ' + str(len(image_list)) + ' images.')
     return image_list
-    
-    
-    
-
-def load_beta_dataset(path, subj, type, **kwargs):
-    
-    for arg in kwargs:
-        if arg == 'runs':
-            runs = np.int(kwargs[arg])
-
-    dataset = []
-    targets = []
-    for r in range(runs):
-        filename = 'avg_stats_for_regions_'+subj+'_'+str(runs)+'run_'+subj+'_run'+str(r+1)+'_vox.txt'
-        f = open(os.path.join(path, subj, filename), 'r')
-        run_data = read_beta_file(f, r, **kwargs)
-        dataset.append(run_data[0])
-        targets.append(run_data[1])
-        
-    dataset = np.vstack(dataset)
-    targets = np.vstack(targets)
-    
-    ds = dataset_wizard(dataset, targets=targets[:,0], chunks=targets[:,1])
-    
-    return ds
-
-def read_beta_file(f, run, time_begin=1, time_end=14, **kwargs):
-    #print kwargs
-    for arg in kwargs:
-        #print arg
-        if arg == 'mask_area':
-            mask = kwargs[arg].split(',')
-        if arg == 'time_begin':
-            time_begin = np.int(kwargs[arg])
-        if arg == 'time_end':
-            time_end = np.int(kwargs[arg])
-            
-    if 'time_begin' not in locals():
-        time_begin = 0
-    if 'time_end' not in locals():
-        time_end = 600   
-        
-    file_lines = f.readlines()
-        
-    data_flag = False
-    data = []
-    condition = []
-    runs = []
-    line_ctr = 0
-    for line in file_lines:
-        
-        s_line = line.split()
-        
-        if len(s_line) == 0:
-            data_flag = False
-            line_ctr = 0
-            continue
-          
-        #if line.find('TIMECOURSE : ') != -1:
-        if s_line[0] == 'TIMECOURSE':
-            cond, time_points = decode_line(line, 'timecourse')
-            voxel_per_condition = 0
-            
-            interval = time_end - time_begin
-            if interval >= time_points:
-                interval = time_points
-            if time_end > time_points:
-                time_end = time_points
-            if time_begin > time_points:
-                time_begin = 0
-            if time_begin >= time_end:
-                interval = time_points
-                
-            for i in range(int(interval)):
-                condition.append(cond)
-                runs.append(run)
-            
-        #if line.find('REGION : ') !=-1:
-        if s_line[0] == 'REGION':
-            voxel_num, roi_name = decode_line(line, 'region')
-            for area in mask:
-                if roi_name.find(area) != -1:
-                    voxel_per_condition += int(voxel_num)
-                    data_flag = True
-                    line_ctr = 0
-           
-        #print line
-        if data_flag == True:
-            #print line
-            try:
-                int(s_line[0])
-            except ValueError, err:
-                continue
-            
-            line_ctr += 1
-            
-            data_begin = 3 + time_begin
-            data_end = data_begin +interval
-            #print 'voxel_num='+str(voxel_num)
-            #print 'line_ctr='+str(line_ctr)
-            if line_ctr <= voxel_num:
-                #print line.split()[data_begin:data_end]
-                data.append(np.float_(np.array(line.split()[data_begin:data_end])))
-    
-    data_div = []
-    ndata = np.array(data)
-    for block in range(len(np.unique(condition))):
-        data_div.append(ndata[block * voxel_per_condition:(block+1) * voxel_per_condition])
-    
-    ndata = np.hstack(data_div).T
-    targets = np.vstack((condition, runs)).T
-    
-    return ndata, targets
-
-def decode_line(line, keyword):
-    
-    if keyword == 'timecourse':
-        
-        condition = line.split()[2]
-        time_points = line.split()[-1]
-        return condition, time_points
-    
-    elif keyword == 'data':
-        
-        data = np.array(line)
-        return data
-    
-    elif keyword == 'region':
-        
-        vox_num = line.split()[-1]
-        roi_name = line.split()[-2]
-        return vox_num, roi_name
 
 
-def read_beta_data(line, voxel_num, time_points):
-    
 
-    return NotImplementedError()
-    
-    
-#@profile
-def load_dataset(path, subj, type_, **kwargs):
-    '''
-    @param mask: mask is a string indicating the area to be analyzed
-            - total: the entire brain voxels;
-            - visual: the visual cortex;
-            - ll : Lower Left Visual Quadrant
-            - lr : Lower Right Visual Quadrant
-            - ul : Upper Left Visual Quadrant
-            - ur : Upper Right Visual Quadrant
-    '''
-    
-    use_conc = 'False'
-    skip_vols = 0
-    ext=''
-    #print kwargs
-    
-    for arg in kwargs:
-        if arg == 'skip_vols':
-            skip_vols = np.int(kwargs[arg])
-        if arg == 'use_conc':
-            use_conc = kwargs[arg]
-        if arg == 'conc_file':
-            conc_file = kwargs[arg]
-        if arg == 'sub_dir':
-            sub_dir = kwargs[arg].split(',')
-        if arg == 'img_extension':
-            ext = kwargs[arg]
-            
-    if use_conc == 'False':
-        file_list = load_wu_file_list(path, name=subj, task=type_, **kwargs)   
-    else:
-        file_list = read_conc(path, subj, conc_file, sub_dir=sub_dir)
-        file_list = modify_conc_list(path, subj, file_list, extension=ext)
-
-        kwargs = update_subdirs(file_list, subj, **kwargs)
-        #print kwargs
-    
-    try:
-        fmri_list = load_fmri(file_list, skip_vols=skip_vols)
-    except IOError, err:
-        logging.error(err)
-        return 0
-    
-    ### Code to substitute   
-    [code, attr] = load_attributes(path, type_, subj, **kwargs)        
-    if code == 0:
-        del fmri_list
-        raise IOError('Attributes file not found')
-        
-    files = len(fmri_list)  
-    
-    #Loading mask 
-    mask = load_mask(path, subj, **kwargs)        
-       
-    volSum = 0;
-        
-    for i in range(len(fmri_list)):
-            
-        volSum += fmri_list[i].shape[3]
-    
-    #Check attributes/dataset sample mismatches
-    if volSum != len(attr.targets):
-        logging.debug('volume number: '+str(volSum)+' targets: '+str(len(attr.targets)))
-        del fmri_list
-        logging.error(subj + ' *** ERROR: Attributes Length mismatches with fMRI volumes! ***')
-        raise ValueError('Attributes Length mismatches with fMRI volumes!')       
-    
-    #Load the dataset.
-    try:
-        logging.info('Loading dataset...')
-        ds = fmri_dataset(fmri_list, targets=attr.targets, chunks=attr.chunks, mask=mask) 
-        logging.info('Dataset loaded...')
-    except ValueError, e:
-        logging.error(subj + ' *** ERROR: '+ str(e))
-        del fmri_list
-        return 0;
-    
-    #Update dataset attributes
-    ev_list = []
-    events = find_events(targets = ds.sa.targets, chunks = ds.sa.chunks)
-    for i in range(len(events)):
-        duration = events[i]['duration']
-        for j in range(duration):
-            ev_list.append(i+1)
-               
-    ds.a['events'] = events
-    ds.sa['events_number'] = ev_list
-    ds.sa['name'] = [subj for i in range(len(ds.sa.chunks))]
-    
-    try:
-        ds.sa['frame'] = attr.frame
-        ds.sa['trial'] = attr.trial
-    except BaseException, e:
-        logging.error('Frame and Trial attributes not found.')
-    
-    
-    #Inserted for searchlight proof!
-    #ds.sa['block'] = np.int_(np.array([(i/14.) for i in range(len(ds.sa.chunks))])-5*ds.sa.chunks)
-    
-    f_list = []
-    for i in range(files):
-        for _ in range(fmri_list[i].shape[-1:][0]):
-            f_list.append(i+1)
-
-    ds.sa['file'] = f_list
-    
-    del fmri_list
-    
-    return ds    
+      
 
 def load_spatiotemporal_dataset(ds, **kwargs):
     

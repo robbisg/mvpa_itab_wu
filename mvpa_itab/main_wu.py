@@ -9,7 +9,7 @@ from sklearn.svm import SVC
 from sklearn.manifold import MDS
 from sklearn.cluster import KMeans
 from scipy.spatial.distance import squareform, pdist
-from lib_io import *
+from mvpa_itab.io.lib_io import *
 from utils import *
 from similarity import *
 from mvpa2.suite import eventrelated_dataset, find_events, debug
@@ -376,43 +376,6 @@ def searchlight(ds, **kwargs):
                      'radius': radius})
     
     return d_result
-
-
-''' Fold average searchlight maps
-for name in nameL:
-    l = os.listdir(path+'/'+ name)
-    lf = [s for s in l if s.find('searchlight') != -1 and s.find('mni') == -1]
-    for sl in lf:
-        o = ni.load(os.path.join(path, name, sl))
-        nimg = np.mean(o.get_data(), axis=3)
-        ni.save(ni.Nifti1Image(nimg, o.get_affine()), os.path.join(path, name, sl[:sl.rfind('_')]+'_avg.nii.gz'))
-----------------------------------------------------------
-i = 0
-for list in lf_sl_total:
-    if (i % 2) == 0:
-        sum = np.zeros((48, 64, 48))
-    else:
-        sum = np.zeros((91,109, 91))
-    i = i + 1
-    for file in list:
-        name = file.split('_')[0]
-        img = ni.load(os.path.join(path, name, file))
-        sum = sum + img.get_data()
-    sum = sum / len(list)
-    ni.save(ni.Nifti1Image(sum, img.get_affine()), os.path.join(path, 'group_avg'+file[file.find('_'):]))
- ----------------------------------------------------------   
-    
-    for m in lista_mask:
-    refIn = os.path.join(path, 'andant','task', ref[:-4]+'.nii.gz')
-    command = 'flirt '+ \
-                      ' -in '+imgIn+ \
-                      ' -ref '+refIn+ \
-                      ' -init '+os.path.join(path,'iolpan','task',refL[6]) + \
-                      ' -applyxfm -interp nearestneighbour' + \
-                      ' -out '+ os.path.join(path,'1_single_ROIs','MNI',m[:-7]) +'_mni.nii.gz' 
-    print command
-    os.system(command)
-'''
 
 def spatiotemporal(ds, **kwargs):
       
