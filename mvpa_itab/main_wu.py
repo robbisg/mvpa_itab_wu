@@ -11,7 +11,7 @@ from sklearn.cluster import KMeans
 from scipy.spatial.distance import squareform, pdist
 from mvpa_itab.io.lib_io import *
 from utils import *
-from similarity import *
+from mvpa_itab.sl_similarity import *
 from mvpa2.suite import eventrelated_dataset, find_events, debug
 from mvpa2.suite import poly_detrend, zscore, mean_group_sample, mean_sample
 from mvpa2.suite import LinearCSVMC, GNB, QDA, LDA, SMLR, GPR, SKLLearnerAdapter

@@ -9,7 +9,7 @@ from io import *
 from mvpa2.clfs.transerror import ConfusionMatrix
 import os
 import copy
-from similarity import *
+from mvpa_itab.sl_similarity import *
 from mvpa2.suite import vstack, Sphere, Searchlight, IndexQueryEngine, Splitter
     
     

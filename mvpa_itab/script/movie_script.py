@@ -26,6 +26,10 @@ from nitime.analysis.correlation import SeedCorrelationAnalyzer
 from scipy.stats.stats import ttest_ind
 
 import matplotlib.pyplot as pl
+from mvpa_itab.similarity import SeedCorrelationAnalyzerWrapper,\
+    SeedSimilarityAnalysis, SeedAnalyzer
+from scipy.spatial.distance import euclidean
+from mvpa_itab.measure import mutual_information
 datapath = '/media/DATA/fmri/movie_viviana/corr_raw/RAW_mat_corr/'
 
 filelist = os.listdir(datapath)
@@ -344,40 +348,78 @@ data = dict()
 mask_mat = np.ones((50,50))
 mask_mat[np.tril_indices(50)] = 0
 mat_list.sort()
-
+roi_path = '/media/robbis/DATA/fmri/movie_viviana/corr_raw/RAW_mat_corr'
 roi_mat = np.zeros((50,50))
 roi_labels = np.loadtxt(os.path.join(roi_path, 'roi_labels.txt'),
                     dtype=np.str_,
                     delimiter='\t')
 
+# re-ordering roi_labels vector thus np.unique alphabetically order the vector
+unique_labels, indexes = np.unique(roi_labels.T[-1], return_index=True)
+ord_ind = np.argsort(np.argsort(unique_labels))
 
-un_vec, ind = np.unique(roi_labels.T[-1], return_index=True)
-o_ind = np.argsort(np.argsort(ind))
-
+# Building a matrix mask, with a number identifying each ROI
 for i, n in enumerate(np.unique(roi_labels.T[-1])):
-    mask = roi_labels.T[-1] == n
-    mask_roi = np.meshgrid(mask, mask)[1] * np.meshgrid(mask, mask)[0]
-    roi_mat = mask_roi*(o_ind[i]+1) + roi_mat
+    mask = roi_labels.T[-1] == n # Vector mask
+    mask_roi = np.meshgrid(mask, mask)[1] * np.meshgrid(mask, mask)[0] # Matrix mask
+    roi_mat = mask_roi*(ord_ind[i]+1) + roi_mat # The ROI index is put in the matrix mask
 
-index = 3
+index = 0
 
 for f in mat_list[:3]:
-    
-    key = f[:f.find('1')]
+    # Load matrix
     mat_file = loadmat(os.path.join(path, f))
+    # String stuff to find dictionary label
+    key = f[:f.find('1')]
     klist = key.split('_')
     condition = klist[-1]
     klist.pop()
     klist.pop()
     klist.append(condition)
     key = '_'.join(klist)
+    
     ts_matrix = mat_file[key][:,:,np.bool_(mask_mat)]
     #ts_matrix = sc_zscore(ts_matrix, axis=0)
-    roi_mask_mat = mask_mat * (roi_mat == index)
+    if index != 0:
+        roi_mask_mat = mask_mat * (roi_mat == index)
+    else:
+        roi_mask_mat = mask_mat
+    print mat_file[key].shape
     data[str.lower(condition)] = mat_file[key][:,:,np.bool_(roi_mask_mat)]
+    
+data_movie = data['movie']
+data_rest = data['rest']
 
-roi_path = '/media/robbis/DATA/fmri/movie_viviana/corr_raw/RAW_mat_corr'
 
+seed_analyzer = SeedAnalyzer
+kwargs = {'measure': euclidean}
+
+#kwargs = {'measure': mutual_information}
+
+
+seed_analyzer = SeedCorrelationAnalyzerWrapper
+
+for i in range(data_movie.shape[1]):
+    seed_ds = data_rest[:,i,:]
+    #target_ds = data_movie[i]
+    seed_similarity = SeedSimilarityAnalysis(seed_ds=seed_ds,
+                                             seed_analyzer=seed_analyzer,
+                                             **kwargs)
+    
+    value = seed_similarity.run(target_ds)
+    perm = seed_similarity.permutation_test(target_ds, 
+                                            permutation=1000,
+                                            axis=1)
+    p = seed_similarity.p_values(value)
+    f = pl.figure()
+    pl
+    
+    
+    
+
+
+
+"""
 ts = dict()
 correlation = []
 for i in range(11):
@@ -393,6 +435,9 @@ for c in correlation:
     c[0] = c[0][:c[1].shape[0], :c[1].shape[1]]
 
 corr = np.array(correlation)
+"""
+
+
 
 #Plots
 mat_movie_time = loadmat('/home/robbis/Share/Vivi/time_corr_movie1.mat')
