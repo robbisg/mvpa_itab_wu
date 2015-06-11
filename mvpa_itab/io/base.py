@@ -98,11 +98,7 @@ def load_dataset(path, subj, folder, **kwargs):
         return 0
     
     ### Code to substitute   
-    [code, attr] = load_attributes(path, folder, subj, **kwargs)        
-    if code == 0:
-        del fmri_list
-        raise IOError('Attributes file not found')
-        
+    attr = load_attributes(path, folder, subj, **kwargs)              
      
     
     # Loading mask 
@@ -144,10 +140,10 @@ def load_dataset(path, subj, folder, **kwargs):
     ds.sa['name'] = [subj for i in range(len(ds.sa.chunks))] 
     
     try:
-        ds.sa['frame'] = attr.frame
-        ds.sa['trial'] = attr.trial
+        for k in attr.keys():
+            ds.sa[k] = attr[k]
     except BaseException, e:
-        logging.error('Frame and Trial attributes not found.')
+        logging.error('attributes not found.')
          
     f_list = []
     for i, img_ in enumerate(fmri_list):
@@ -511,6 +507,9 @@ def load_attributes (path, task, subj, **kwargs):
             fidl_type = int(kwargs[arg])
         if (arg == 'event_header'):
             header = kwargs[arg].split(',')
+
+            if len(header) == 1:
+                header = np.bool(header[0])
             
     completeDirs = []
     for dir in sub_dirs:
@@ -537,7 +536,7 @@ def load_attributes (path, task, subj, **kwargs):
     if len(attrFiles) == 0:
         logging.error(' *******       ERROR: No attribute file found!        *********')
         logging.error( ' ***** Check in '+str(completeDirs)+' ********')
-        return [0, None]
+        return None
     
     
     #txtAttr = [f for f in attrFiles if f.find('.txt') != -1]
@@ -559,7 +558,7 @@ def load_attributes (path, task, subj, **kwargs):
 
     logging.debug(header)
     attr = SampleAttributes(attrFilename, header=header)
-    return [1, attr]
+    return attr
 
 
 def modify_conc_list(path, subj, conc_filelist, extension=''):

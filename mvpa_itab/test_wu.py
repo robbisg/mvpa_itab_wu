@@ -6,6 +6,7 @@
 
 from main_wu import *
 from io import *
+from io.base import *
 from mvpa2.clfs.transerror import ConfusionMatrix
 import os
 import copy

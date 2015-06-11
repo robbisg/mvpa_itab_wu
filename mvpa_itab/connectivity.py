@@ -6,12 +6,12 @@ from nipy.modalities.fmri.glm import GeneralLinearModel
 from nitime.timeseries import TimeSeries
 from nitime.analysis.correlation import CorrelationAnalyzer,\
     SeedCorrelationAnalyzer
-from mvpa_itab.io.lib_io import get_time
+from mvpa_itab.io.base import get_time
 from scipy.signal.windows import boxcar
 from scipy.signal.signaltools import convolve
 from scipy.stats.mstats import zscore
 
-from mvpa_itab.io.lib_io import load_wu_file_list, read_configuration
+from mvpa_itab.io.base import load_wu_file_list, read_configuration
 
 import matplotlib.pyplot as pl
 

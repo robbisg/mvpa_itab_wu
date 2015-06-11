@@ -9,7 +9,7 @@ from sklearn.svm import SVC
 from sklearn.manifold import MDS
 from sklearn.cluster import KMeans
 from scipy.spatial.distance import squareform, pdist
-from mvpa_itab.io.lib_io import *
+from mvpa_itab.io.base import *
 from utils import *
 from mvpa_itab.sl_similarity import *
 from mvpa2.suite import eventrelated_dataset, find_events, debug

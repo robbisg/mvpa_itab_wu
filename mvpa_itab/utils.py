@@ -282,12 +282,14 @@ def extract_events_xls(filename, sheet_name):
     
     duration = sh.col_values(2)
     duration = np.array(duration[1:])
+    
     logging.debug(duration)
     
     duration = [onset[i+1] - onset[i] for i in range(len(onset)-1)]
     
     event_labels = sh.col_values(5)
     event_labels = np.array([e for e in event_labels if e != ''])
+    
     logging.debug(event_labels)
     
     return onset, duration, event_labels, events_num
@@ -340,14 +342,66 @@ def build_attributes(out_path,
     return
     
 
+def enhance_attributes(filename, current_header=['targets', 'chunks', 'trial', 'frame']):
+    
+    """Only for Carlo's memory experiment"""
+    import re
+    attr = np.loadtxt(filename, dtype=np.str_)
+    
+    assert attr.shape[1] == len(current_header)
+    
+    pattern_old = ['O_._1', 'N_._0']
+    pattern_new = ['O_._0', 'N_._1']
+    
+    def is_in(pattern_list, string_):
+        
+        return np.array([re.search(pt, string_)!=None for pt in pattern_list]).any()
+    
+    mask_old = np.array([is_in(pattern_old, a) for a in attr.T[0]])
+    mask_new = np.array([is_in(pattern_new, a) for a in attr.T[0]])
+    
+    decision = attr.T[0].copy()
+    decision[mask_new] = 'NEW'
+    decision[mask_old] = 'OLD'
+    
+    
+    pattern_old = ['O_._1', 'N_._0']
+    pattern_new = ['O_._0', 'N_._1']
+    
+    
+    mask_old = np.array([a[0]=='O' for a in attr.T[0]])
+    mask_new = np.array([a[0]=='N' for a in attr.T[0]])
+    
+    memory_status = attr.T[0].copy()
+    memory_status[mask_new] = 'NEW'
+    memory_status[mask_old] = 'OLD'    
+    
+    stim = []
+    for a_ in attr.T[0]:
+        if a_ != 'FIX':
+            stim.append(a_.split('_'))
+        else:
+            stim.append(['F', '0', '0'])
+    
+    stim = np.array(stim)
+    
+    attr_ = np.hstack((attr, stim, memory_status[:,np.newaxis], decision[:,np.newaxis]))
+    current_header = current_header+['stim', 'evidence', 'accuracy', 'memory_status', 'decision']
+    
+    assert len(current_header) == attr_.shape[1]
+    
+    attr_ = np.vstack((current_header, attr_))
+    
+    filename_pts = filename.split('/')
+    filename_ = filename_pts.pop()
+    filename_new = filename_.split('.')[0]+'_plus.txt'
+    filename_pts.append(filename_new)
+    
+    fname = '/'.join(filename_pts)
 
-def watch_results (path, task):
-    resFolder = '0_results'
+    np.savetxt(fname, attr_, fmt='%s')
     
-    fileList = os.listdir(os.path.join(path, resFolder))
-    fileList = [f for f in fileList if f.find(task) != -1]
     
-    return fileList
 
 def load_results(path, name, task):
 
