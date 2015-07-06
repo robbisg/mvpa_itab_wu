@@ -124,10 +124,36 @@ def flatten_correlation_matrix(matrix):
     return matrix[~np.isnan(out_matrix)]
     
 
+def load_correlation_matrix(path, pattern_):
+    
+    """
+    Gets a pathname in which is supposed to be a list of txt files
+    with the connectivity matrices, filenames are composed by a common
+    pattern to filter the file list in the folder.
+    
+    The output is the array shaped subj x node x node
+    """ 
+    
+    flist_conn = os.listdir(path)
+    flist_conn = [f for f in flist_conn if f.find(pattern_) != -1]
+        
+    conn_data = []
+    for f in flist_conn:
+        data_ = np.genfromtxt(os.path.join(path, f))
+        conn_data.append(data_)
+    
+    conn_data = np.array(conn_data)
+    
+    return conn_data
 
-def load_correlation():
+def load_correlation(path, filepattern, format, dictionary):
+    """
+    path: where to find the file?
+    filepattern: is a single file or a serie of?
+    format: which routine use to open the file?
+    dictonary: what is the meaning of each matrix dimension?
+    """
     # To be implemented
     
     return
 
-        
