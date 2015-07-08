@@ -229,12 +229,17 @@ class Correlation(object):
         self._dataset = ds
         
     def run(self, ds, seed):
+        """
         
-        ds = self._dataset.T
+        """
+        
+        #ds = self._dataset.T
+        ds = ds.T
         y = seed
         
         corr = []
         for x in ds:
+
             r_, _ = pearsonr(x, y)
             
             corr.append(r_)

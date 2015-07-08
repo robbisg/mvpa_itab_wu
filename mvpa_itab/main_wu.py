@@ -357,13 +357,13 @@ def searchlight(ds, **kwargs):
     [fclf, cvte] = setup_classifier(**kwargs)
     """ 
     clf = LinearCSVMC(C=1, probability=1, enable_ca=['probabilities'])
-    cv = CrossValidation(clf, HalfPartitioner(attr='band'))
+    cv = CrossValidation(clf, HalfPartitioner(attr='chunks'))
     
     
-    #sl = sphere_searchlight(cv, radius, space = 'voxel_indices')
+    sl = sphere_searchlight(cv, radius, space = 'voxel_indices')
     
     #sl = Searchlight(MahalanobisMeasure, queryengine, add_center_fa, results_postproc_fx, results_backend, results_fx, tmp_prefix, nblocks)
-    sl = sphere_searchlight(MahalanobisMeasure(), 3, space= 'voxel_indices')
+    #sl = sphere_searchlight(MahalanobisMeasure(), 3, space= 'voxel_indices')
     sl_map = sl(ds)
     
     sl_map.samples *= -1

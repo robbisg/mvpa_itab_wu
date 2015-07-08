@@ -10,6 +10,7 @@ from mvpa2.misc.errorfx import mean_mismatch_error
 
 import numpy as np
 from mvpa2.clfs.base import Classifier
+from mvpa2.generators.resampling import Balancer
 path = '/media/robbis/DATA/fmri/memory/'#110929anngio/'
 """
 fold = ['RESIDUALS_MVPA', 'RESIDUALS_MVPA/SINGLE_TRIALS']
@@ -195,26 +196,42 @@ class ErrorPerTrial(BinaryFxNode):
         
         return Dataset(np.array(err).flatten())
     
-subj = '110929angque'
-task = 'RESIDUALS_MVPA'
+subjects = ['110929angque', '110929anngio']
+tasks = ['RESIDUALS_MVPA', 'BETA_MVPA']
+res = []
+for subj in subjects:
+    for task in tasks:
+        conf = read_configuration(path, 'remote_memory.conf', task)
+        ds = load_dataset(path, subj, task, **conf)
 
-conf = read_configuration(path, 'memory.conf', task)
-ds = load_dataset(path, subj, task, **conf)
+        ds = preprocess_dataset(ds, task, **conf)
+        
+        ds.targets = ds.sa.decision
+        
+        balanc = Balancer(count=3, apply_selection=True)
+        gen = balanc.generate(ds)
+        #clf = AverageLinearCSVM(C=1)
+        
+        clf = LinearCSVMC(C=1)
+        #avg = TrialAverager(clf)
+        #cv_storage = StoreResults()
 
-ds = preprocess_dataset(ds, task, **conf)
-ds.targets = ds.sa.memory_status
+        cvte = CrossValidation(clf,
+                               HalfPartitioner(),
+                               #errorfx=ErrorPerTrial(), 
+                               #callback=cv_storage,
+                               enable_ca=['stats', 'probabilities'])
 
-#clf = AverageLinearCSVM(C=1)
-clf = LinearCSVMC(C=1)
-avg = TrialAverager(clf)
-cv_storage = StoreResults()
-
-cvte = CrossValidation(avg,
-                       HalfPartitioner(),
-                       errorfx=ErrorPerTrial(), 
-                       #callback=cv_storage,
-                       enable_ca=['stats', 'probabilities'])
-
-sl = sphere_searchlight(cvte, radius=3, space = 'voxel_indices')
-sl_map = sl(ds)
-err = cvte(ds)
+        sl = sphere_searchlight(cvte, radius=3, space = 'voxel_indices')
+        maps = []
+        for ds_ in gen:
+            print 'Here we are!'
+            sl_map = sl(ds_)
+            sl_map.samples *= -1
+            sl_map.samples +=  1
+            sl_map.samples = sl_map.mean(axis=len(sl_map.shape)-1)
+            map = map2nifti(sl_map, imghdr=ds.a.imghdr)
+            maps.append(map)
+        
+        res.append(maps)
+            #err = cvte(ds_)

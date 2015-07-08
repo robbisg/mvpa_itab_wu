@@ -6,7 +6,7 @@ from numpy.random.mtrand import permutation
 from sklearn.cross_validation import *
 from sklearn.linear_model import Lasso, ElasticNet
 from sklearn.metrics.metrics import mean_squared_error
-from sklearn.linear_model.coordinate_descent import LassoCV
+from sklearn.linear_model.coordinate_descent import LassoCV, ElasticNetCV
 
 path = '/home/robbis/Share/dati_insulaDrive/'
 gm_vbm = np.genfromtxt('/home/robbis/Share/dati_insulaDrive/GM_INSULA_vbm_Y_E_M_sbj.txt')
@@ -89,7 +89,20 @@ for i in range(10):
     pl.figure()
     pl.scatter(X_[:,i], y,c=groups, cmap=pl.cm.rainbow)
     
-    
+
+color = 'bgr'
+labels = ['elderly', 'mci', 'insula']
+
+for x in X.T:
+    f = pl.figure()
+    for i in range(3):
+        a = f.add_subplot(1,3,i+1)
+        pl.scatter(x[groups==i], y[groups==i], c=color[i], s=30, label=labels[i])
+    pl.legend()
+        
+
+
+  
 def nested_cross_validation(X, y, test_size=0.15):
     """
         Basically it is used to evaluate testing error for small datasets
