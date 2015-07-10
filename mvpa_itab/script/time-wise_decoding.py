@@ -229,7 +229,7 @@ for subj in subjects:
             sl_map = sl(ds_)
             sl_map.samples *= -1
             sl_map.samples +=  1
-            sl_map.samples = sl_map.mean(axis=len(sl_map.shape)-1)
+            #sl_map.samples = sl_map.samples.mean(axis=len(sl_map.shape)-1)
             map = map2nifti(sl_map, imghdr=ds.a.imghdr)
             maps.append(map)
         

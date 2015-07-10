@@ -7,6 +7,8 @@ from sklearn.cross_validation import *
 from sklearn.linear_model import Lasso, ElasticNet
 from sklearn.metrics.metrics import mean_squared_error
 from sklearn.linear_model.coordinate_descent import LassoCV, ElasticNetCV
+from mvpa.clfs.enet import ENET
+from mvpa_itab.stats import Correlation
 
 path = '/home/robbis/Share/dati_insulaDrive/'
 gm_vbm = np.genfromtxt('/home/robbis/Share/dati_insulaDrive/GM_INSULA_vbm_Y_E_M_sbj.txt')
@@ -47,9 +49,6 @@ skf = StratifiedShuffleSplit(groups[group_mask], n_iter=35, test_size=0.25)
 #svr_lin = SVR(kernel='linear', C=1e3)
 #svr_poly = SVR(kernel='poly', C=1e3, degree=2)
 
-lasso = Lasso(alpha=0.01, normalize=True)
-
-
 y_ = y
 dist_r2 = []
 dist_mse = []
@@ -62,8 +61,7 @@ for alpha in np.arange(0, 0.5, 0.01):
     lasso = ElasticNet(alpha=alpha, fit_intercept=True)
     
     for train_index, test_index in skf:
-        
-        
+             
         #pl.figure()
         X_train = X_[train_index]
         y_train = y_[train_index]
@@ -74,35 +72,113 @@ for alpha in np.arange(0, 0.5, 0.01):
         #y_reg = svr_lin.fit(X_train, y_train).predict(X_test)
         #y_reg = svr_poly.fit(X_train, y_train).predict(X_test)
         y_reg = lasso.fit(X_train, y_train).predict(X_test)
+        
         #pl.scatter(y[test_index], y_rbf)
         #print np.count_nonzero(lasso.coef_)
+        
         y_pred[test_index] += y_reg
         count_[test_index] += 1
     
     dist_mse.append(mean_squared_error(y_, y_pred/count_))
     dist_r2.append(r2_score(y_, y_pred/count_))
 
-#pl.plot(np.arange(0, 0.5, 0.01), np.array(dist_r2))
 pl.plot(np.arange(0, 0.5, 0.01), np.array(dist_mse))
 
 for i in range(10):
     pl.figure()
     pl.scatter(X_[:,i], y,c=groups, cmap=pl.cm.rainbow)
-    
 
+################################################
+n_rows = 3   
+indexes = np.array(zip(*np.triu_indices(13, 1)))
 color = 'bgr'
-labels = ['elderly', 'mci', 'insula']
+labels = ['elderly', 'mci', 'young']
+j = 0
+for _, x in enumerate(X.T):
+    if (j%n_rows) == 0:
+        f = pl.figure()
+    
+    for i in range(n_rows):
+        a = f.add_subplot(n_rows, n_rows,(n_rows)*(j%n_rows)+(i+1))
+        title = node_names[indexes[j][0]]+' -- '+node_names[indexes[j][1]]
+        pl.scatter(x[groups==i], y[groups==i], c=color[i], s=40, label=labels[i])
+        a.set_title(title)
+        pl.legend()
+    
+    j+=1
+######################################################
+enetcv = ElasticNetCV(alphas=np.linspace(1, 0.05, 50), 
+                          cv=ShuffleSplit(len(y), n_iter=50, test_size=0.25))
 
-for x in X.T:
+lassocv = LassoCV(alphas=np.linspace(1, 0.05, 50), 
+                          cv=ShuffleSplit(len(y), n_iter=50, test_size=0.25))
+for i in range(n_rows):
+    
+    X_ = conn_data[groups==i,:]
+    y_ = y[groups==i]
+    
+    enetcv = ElasticNetCV(alphas=np.linspace(1, 0.05, 50), 
+                          cv=ShuffleSplit(len(y_), n_iter=50, test_size=0.25))
+
+    lassocv = LassoCV(alphas=np.linspace(1, 0.05, 50), 
+                          cv=ShuffleSplit(len(y_), n_iter=50, test_size=0.25))
+    
+    
+    lassocv.fit(X_, y_)
+    enetcv.fit(X_, y_)
     f = pl.figure()
-    for i in range(3):
-        a = f.add_subplot(1,3,i+1)
-        pl.scatter(x[groups==i], y[groups==i], c=color[i], s=30, label=labels[i])
-    pl.legend()
-        
+    a = f.add_subplot(211)
+    pl.plot(lassocv.coef_, c=color[i], label=labels[i])
+    a = f.add_subplot(212)
+    pl.plot(enetcv.coef_, c=color[i], label=labels[i])
+    
+##################################################
+
+permut_ = []
+for i in np.arange(1000):
+    
+    y_permuted = permutation(y)
+    cv=ShuffleSplit(len(y), n_iter=50, test_size=0.25)
+    
+    mse_ = []
+    
+    svr_rbf = SVR(kernel='rbf', C=1)
+    svr_lin = SVR(kernel='linear', C=1)
+    svr_poly = SVR(kernel='poly', C=1, degree=2)
+    
+    for train_index, test_index in cv:
+                 
+            #pl.figure()
+            X_train = X[train_index]
+            y_train = y_permuted[train_index]
+            
+            X_test = X[test_index]
+            
+            y_rbf = svr_rbf.fit(X_train, y_train).predict(X_test)
+            y_lin = svr_lin.fit(X_train, y_train).predict(X_test)
+            y_poly = svr_poly.fit(X_train, y_train).predict(X_test)
+            
+            mse_rbf = mean_squared_error(y_permuted[test_index], y_rbf)
+            mse_lin = mean_squared_error(y_permuted[test_index], y_lin)
+            mse_poly = mean_squared_error(y_permuted[test_index], y_poly)
+            
+            mse_.append([mse_rbf, mse_lin, mse_poly])
+            
+    permut_.append(mse_)
+     
+permut_ = np.array(permut_)
+
+c = Correlation(X)
+for i in range(3):
+    corr = c.run(X[groups==i],y[groups==i])[0]
+    pl.plot(corr, marker='o', c=color[i])
+
+pl.xticks(np.arange(78), label_list, rotation=45)
 
 
-  
+
+
+
 def nested_cross_validation(X, y, test_size=0.15):
     """
         Basically it is used to evaluate testing error for small datasets
