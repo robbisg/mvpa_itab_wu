@@ -7,7 +7,7 @@ from mvpa2.clfs.svm import LinearCSVMC
 from mvpa2.suite import mean_group_sample
 from mvpa2.mappers.fx import BinaryFxNode
 from mvpa2.misc.errorfx import mean_mismatch_error
-
+import nibabel as ni
 import numpy as np
 from mvpa2.clfs.base import Classifier
 from mvpa2.generators.resampling import Balancer
@@ -196,15 +196,17 @@ class ErrorPerTrial(BinaryFxNode):
         
         return Dataset(np.array(err).flatten())
     
-subjects = ['110929angque', '110929anngio']
+subjects = ['110929angque']#, '110929anngio']
 tasks = ['RESIDUALS_MVPA', 'BETA_MVPA']
 res = []
-for subj in subjects:
-    for task in tasks:
-        conf = read_configuration(path, 'remote_memory.conf', task)
-        ds = load_dataset(path, subj, task, **conf)
 
-        ds = preprocess_dataset(ds, task, **conf)
+for subj in subjects:
+    for task_ in tasks:
+        
+        conf = read_configuration(path, 'memory.conf', task_)
+        ds = load_dataset(path, subj, task_, **conf)
+        
+        ds = preprocess_dataset(ds, task_, **conf)
         
         ds.targets = ds.sa.decision
         
@@ -235,3 +237,38 @@ for subj in subjects:
         
         res.append(maps)
             #err = cvte(ds_)
+
+path_results = os.path.join(path,'0_results','220715_decision_searchlight')
+os.system('mkdir '+path_results)
+
+for i, subj in enumerate(subjects):
+    path_subj = os.path.join(path_results, subj)
+    os.system('mkdir '+path_subj)
+    for j, task_ in enumerate(tasks):
+        
+        task_ = str.lower(task_)
+        index_ = len(subjects)*i + j
+        
+        r = res[index_]
+        
+        mean_map = []
+        
+        for k, map_ in enumerate(r):
+            
+            name_ = task_+'_map_no_'+str(k)+'.nii.gz'
+            
+            # Print each balance map
+            ni.save(map_, os.path.join(path_subj, name_))
+            
+            # Average across-fold
+            map_data = map_.get_data().mean(axis=3)
+            mean_map.append(map_data)
+        
+        # Mean map across balance
+        mean_map = np.array(mean_map).mean(axis=3)
+        fname_ = os.path.join(path_subj, task_+'_balance_avg.nii.gz')
+        ni.save(ni.Nifti1Image(mean_map, map_.get_affine()), fname_)
+        
+        
+        
+    

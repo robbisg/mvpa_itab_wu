@@ -50,7 +50,9 @@ class SeedAnalyzer(BaseAnalyzer):
         # In the case where there is only one channel in the seed time-series:
         else:
             #To correct!!!
-            Cxy = np.array(self._measure(self.seed.data, self.target.data))
+            len_target = self.target.shape[0]
+            rr = [self._measure(self.seed.data, self.target.data[i]) for i in range(len_target)]
+            Cxy = np.array(rr)
             
             
         return Cxy.squeeze()
@@ -192,3 +194,34 @@ def progress(count, total, suffix=''):
 
     sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', suffix))
     sys.stdout.flush()
+
+
+class SimilarityAnalyzer(BaseAnalyzer):
+    
+    def __init__(self, 
+                 time_serie=None, 
+                 measure=euclidean, 
+                 **kwargs):
+        
+        """measure is a function which takes two arrays
+        and gives a number as output"""
+        
+        self._measure = measure
+        self.time_serie = time_serie
+        BaseAnalyzer.__init__(self, time_serie)
+        
+    @desc.setattr_on_read
+    def measure(self):
+        
+        vars_ = self.time_serie.data.shape[0]
+        result = np.zeros((vars_, vars_))
+        
+        for i in range(vars_):
+            ts_seed = TimeSeries(self.time_serie.data[i], sampling_interval=1.)
+            ts_target = TimeSeries(self.time_serie.data[i+1:], sampling_interval=1.)
+            S = SeedAnalyzer(ts_seed, ts_target, self._measure)
+            result[i,i+1:] = S.measure
+            
+        return result
+        
+        

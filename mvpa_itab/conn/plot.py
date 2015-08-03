@@ -109,3 +109,7 @@ def plot_cross_correlation(xcorr, t_start, t_end, labels):
                                   blit=True)
     plt.show()
     #ani.save('/home/robbis/xcorrelation_.mp4')
+    
+def plot_dendrogram(dendrogram, dissimilarity_matrix):
+    
+    return

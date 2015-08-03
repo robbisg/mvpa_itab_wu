@@ -122,7 +122,18 @@ def flatten_correlation_matrix(matrix):
     out_matrix[np.isnan(out_matrix)] == 0
     '''
     return matrix[~np.isnan(out_matrix)]
-    
+
+def copy_matrix(matrix):
+
+    iu = np.triu_indices(matrix.shape[0])
+    il = np.tril_indices(matrix.shape[0])
+
+    matrix[il] = 1
+
+    for i, j in zip(iu[0], iu[1]):
+        matrix[j, i] = matrix[i, j]
+
+    return matrix    
 
 def load_correlation_matrix(path, pattern_):
     
@@ -157,3 +168,85 @@ def load_correlation(path, filepattern, format, dictionary):
     
     return
 
+class CorrelationLoader(object):
+        
+    def load(self, path, filepattern, conditions=None):
+        
+        # Check what we have in the path (subjdirs, subjfiles, singlefile)
+        
+        
+        subjects = os.listdir(path)
+            
+        subjects = [s for s in subjects if s.find('configuration') == -1 \
+            and s.find('.') == -1]
+    
+    
+        result = []
+    
+        for c in conditions:
+
+            s_list = []
+    
+            for s in subjects:
+
+                sub_path = os.path.join(path, s)
+
+                filel = os.listdir(sub_path)
+                filel = [f for f in filel if f.find(c) != -1]
+                c_list = []
+                
+                for f in filel:
+
+                    matrix = np.loadtxt(os.path.join(sub_path, f))
+            
+                c_list.append(matrix)
+    
+            s_list.append(np.array(c_list))
+
+            result.append(np.array(s_list))
+    
+        return np.array(result)   
+        
+
+class RegressionDataset(object):
+    
+    
+    def __init__(self, X, y, group=None, conditions=None):
+        
+        self.X = X
+        self.y = y
+        
+        if group != None:
+            if len(self.group) != len(y):
+                raise ValueError("Data mismatch: Check if \
+                data and group have the same numerosity!")
+            
+        self.group = np.array(group)
+        
+        if conditions != None:
+            if len(self.group) != len(y):
+                raise ValueError("Data mismatch: Check if \
+                data and conditions have the same numerosity!")
+        
+        self.conditions = conditions
+    
+    
+    def get_group(self, group_name):
+        
+        if group_name not in np.unique(self.group):
+            raise ValueError("%s not included in loaded groups!", 
+                             group_name)
+        
+        group_mask = self.group == group_name
+        
+        rds = RegressionDataset(self.X[group_mask],
+                                self.y[group_mask],
+                                group=self.group[group_mask])
+        return rds
+    
+    
+       
+        
+            
+               
+    

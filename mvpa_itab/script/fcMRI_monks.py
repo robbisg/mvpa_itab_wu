@@ -14,6 +14,8 @@ from mvpa_itab.stats import TTest, permutation_test
 from scipy.optimize.minpack import curve_fit
 from scipy.stats.stats import zscore
 from sklearn.metrics.metrics import mean_squared_error
+from mvpa_itab.similarity import SimilarityAnalyzer
+from mvpa_itab.conn.io import copy_matrix
 
 path = '/media/robbis/DATA/fmri/monks/0_results/'
 
@@ -34,9 +36,11 @@ subjects = np.loadtxt('/media/robbis/DATA/fmri/monks/attributes_struct.txt',
 p_value = np.float(0.05)
 for r in results_dir:
     results = load_matrices(os.path.join(path,r), ['Samatha', 'Vipassana', 'Rest'])
+    
+    
     nan_mask = np.isnan(results)
-     
     for i in range(len(results.shape) - 2):
+        # For each condition/subject/run check if we have nan
         nan_mask = nan_mask.sum(axis=0)
         
     results = results[:,:,:,~np.bool_(nan_mask)]
@@ -49,6 +53,7 @@ for r in results_dir:
     zresults = z_fisher(results)
     zresults[np.isinf(zresults)] = 1
     
+    # Select mask to delete labels
     roi_mask = ~np.bool_(np.diagonal(nan_mask))
     
     fields = dict()
@@ -264,3 +269,132 @@ for i in range(100):
     
     mse_.append(mse__)
     pl.legend()
+    
+#########################################################
+
+label_list = []
+indexes = np.array(zip(*np.triu_indices(samatha.shape[-1], 1)))
+for i in range(X.shape[1]):
+    conn_ = roi_list[indexes[i][0], 0]+' -- '+roi_list[indexes[i][1], 0]
+    label_list.append(conn_)
+
+########### Hierachical Clustering + Dendogram ##############
+
+import scipy.cluster.hierarchy as sch
+
+# Build a distance matrix between objects
+ts = TimeSeries(X.T, sampling_interval=1.)
+S = SimilarityAnalyzer(ts)
+
+matrix = copy_matrix(S.measure) # We fill the lower part of the matrix
+
+methods = ['centroid', 'complete', 'average', 'ward']
+
+cluster_labels = []
+fig_ncl = pl.figure()
+for m in methods:
+
+    # Hierarchical Clustering
+    Y = sch.linkage(matrix, method=m)
+    
+    # Cut-off
+    n_ = []
+    
+    # Number of clusters we want to obtain
+    cluster_size = 10
+    # We try different thresholds
+    cutoff_range = np.linspace(Y[:,2].max()/2., Y[:,2].min(), 50)
+    is_csize_reached = False
+    
+    for t in cutoff_range:
+        # We cutoff the dendrogram using threshold t, obtaining labels
+        cl = sch.fcluster(Y, t, 'distance') 
+        # No. of clusters
+        n_cl = np.unique(cl)[-1]
+        
+        # If our cluster number is reached we save the labels
+        if (n_cl >= cluster_size) and (is_csize_reached == False):
+            is_csize_reached = True
+            t_color = t
+            cluster_labels.append(cl)
+        
+        # n_ mantains the no. of clusters for each threshold
+        n_.append(n_cl)
+    
+    # if cluster_size is not reached we save last clustering
+    if is_csize_reached == False:
+        t_color = t
+        cluster_labels.append(cl)
+    
+    # Plotting stuff
+    
+    a_cl = fig_ncl.add_subplot(111)
+    a_cl.plot(cutoff_range, np.array(n_), marker='o', label=m)
+    
+    # Dendrograms
+    fig = pl.figure()
+    axdendro = fig.add_axes([0.09,0.1,0.2,0.8])
+    
+    Z = sch.dendrogram(Y, 
+                       orientation='right', 
+                       color_threshold=t_color, 
+                       labels=label_list)
+    axdendro.set_xticks([])
+    axdendro.set_yticks([])
+    
+    # Plot distance matrix.
+    axmatrix = fig.add_axes([0.3,0.1,0.6,0.8])
+    index = Z['leaves']
+    D = matrix[index,:]
+    D = D[:,index]
+    im = axmatrix.matshow(D, aspect='auto', origin='lower')
+    axmatrix.set_xticks([])
+    axmatrix.set_yticks([])
+    
+    # Plot colorbar.
+    axcolor = fig.add_axes([0.91,0.1,0.02,0.8])
+    pl.colorbar(im, cax=axcolor)
+    
+    # Cophenetic
+    coph = sch.cophenet(Y)
+    cophenetic = np.zeros_like(matrix)
+    cophenetic[np.triu_indices(matrix.shape[0], 1)] = coph
+    cophenetic = copy_matrix(cophenetic)
+    C = cophenetic[index,:]
+    C = C[:,index]
+    
+    pl.figure()
+    pl.imshow(C, aspect='auto', origin='lower')
+    
+    a_cl.legend()
+
+########### Evaluate clusters of nodes ##########
+
+cluster_labels = np.array(cluster_labels)
+
+for i, clust_ in enumerate(cluster_labels):
+    
+    for l in np.unique(clust_):
+        
+        mask_cluster = clust_ == l
+        X_clust = X[:,mask_cluster]
+        
+        pl.figure()
+        #pl.scatter(y, X_clust.mean(1))
+        pl.errorbar(y, X_clust.mean(1), yerr=X_clust.std(1)*0.5, fmt='o')
+        
+        
+        pl.title(methods[i]+' -  cluster: '+str(l)+ \
+                  ' \n no. of nodes included: '+str(X_clust.shape[1]))
+        
+        pl.ylabel('Correlation coefficient')
+        pl.xlabel('Years of experience')
+        for j, s in enumerate(subjects[:12]):
+            name = s[0][6:]
+            pl.text(y[j], X_clust.mean(1)[j], name)
+    
+        fname = methods[i]+'_cluster_'+str(l)+'_nodes_'+str(X_clust.shape[1])+'.png'
+        fname = os.path.join(path, fname)
+        pl.savefig(fname)
+    
+    

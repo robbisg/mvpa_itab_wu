@@ -5,6 +5,7 @@ import numpy as np
 from collections import Counter
 from scipy.stats.stats import ttest_1samp, ttest_ind, pearsonr
 from numpy.random.mtrand import permutation
+from sklearn.metrics import mean_squared_error
 
 
 def cross_validate(ds, clf, partitioner, permuted_labels):
@@ -248,9 +249,208 @@ class Correlation(object):
         
         return corr, _
             
+class SKLRegressionWrapper(object):
+    
+    def __init__(self, algorithm, error_fx=mean_squared_error):
+        self.is_trained = False
+        self.algorithm = algorithm
+        self.error_fx = error_fx
+        self._y_pred = None
+        
+    def train(self, X, y):
+        
+        self.algorithm.fit(X, y)
+        self.is_trained = True
+        return
+        
+    def predict(self, X):
+        
+        if self.is_trained == False:
+            raise ValueError()
+        
+        self._y_pred = self.algorithm.predict(X)
+        
+        return self._y_pred
+        
+    def evaluate(self, y_true, y_pred=None):
+        
+        if y_pred != None:
+            y_pred = self.y_pred
+        
+        return self.error_fx(y_true, y_pred)
+        
+        
+    def run(self, X, y, error_function=mean_squared_error, **kwargs):
+        
+        
+        return
+        
+class CrossValidation(object):
+    
+    def __init__(self, method, algorithm, error_fx=mean_squared_error):
+        
+        self.method = method
+        self.algorithm = algorithm
+        self.errorfx = error_fx
+        
+        
+    def run(self, X, y):
+        """
+        The output is a vector r x 1 where r is the number
+        of repetitions of the splitting method
+        """
+        
+        cv = self.method
+        
+        # Check if all elements could be selected
+        if cv.n != len(y):
+            cv.n = len(y)
+        
+        mse_ = []
+        for train_index, test_index in cv:           
+                
+            X_train = X[train_index]
+            y_train = y[train_index]
+                
+            X_test = X[test_index]
             
+            # We suppose only scikit-learn fit algorithms are passed!
+            y_predict = self.algorithm.fit(X_train, y_train).predict(X_test)
+                
+            mse = mean_squared_error(y[test_index], y_predict)
+        
+            mse_.append(mse)
     
+        self.result = np.array(mse_)
+        
+        return self.result
+
+
+class RegressionPermutation(object):
     
+    def __init__(self, 
+                 analysis, 
+                 permutation_axis=0, 
+                 n_permutation=1000):
+        
+        """permutation dimension indicates the axis to permute on ds"""
+        
+        self.analysis = analysis   # check to be done
+        self.n_permutation = n_permutation
+        self._axis = permutation_axis
+    
+    def shuffle(self, ds, labels):
+        # Temporary function
+        fp = np.memmap('/media/robbis/DATA/perm.dat',
+                       dtype='float32', 
+                       mode='w+',
+                       shape=(self.n_permutation, 
+                              ds.shape[1],
+                              ds.shape[2])
+                       )
+        #print fp.shape
+        for i in range(self.n_permutation):
+            p_labels = permutation(labels)
+            #print p_labels
+            fp[i,:] = self.analysis.run(p_labels)
+            #fp[i,:] = self.analysis.run(ds_p)
+        
+            #null_dist.append(value_)
+        
+        #fp = np.array(null_dist)
+        self.null_dist = fp
+    
+        return fp
+    
+    def run(self, ds, labels):
+        # What the fuck is labels???
+        #null_dist = []
+        
+        fp = np.memmap('/media/robbis/DATA/perm.dat',
+                       dtype='float32', 
+                       mode='w+',
+                       shape=(self.n_permutation, 
+                              len(labels),
+                              len(labels))
+                       )
+        
+        for i in range(self.n_permutation):
+            ds_p = self.ds_simple_permutation(ds)
+            #fp[i,:] = self.analysis.run(p_labels)
+            fp[i,:] = self.analysis.run(ds_p)
+        
+            #null_dist.append(value_)
+        
+        #fp = np.array(null_dist)
+        self.null_dist = fp
+    
+        return fp
+    
+    def p_values(self, true_values, null_dist=None, tails=0):
+        """tails = [0, two-tailed; 1, upper; -1, lower]"""
+        
+        #check stuff
+                    
+        if null_dist == None:
+            null_dist = self._null_dist
+        
+        
+        if tails == 0:
+            count_ = np.abs(null_dist) > np.abs(true_values)
+        else:
+            count_ = (tails * null_dist) > (tails * true_values)
+
+            
+        p_values = np.sum(count_, axis=0) / np.float(self.n_permutation)
+        
+        self._p_values = p_values
+        
+        return p_values    
+    
+    def ds_permutation(self, ds):
+        
+        from datetime import datetime
+        start = datetime.now()
+
+        dim = self._axis
+        
+        #check if dimension is coherent with ds shape
+        new_indexing = []
+        for i in range(len(ds.shape)):
+            ind = range(ds.shape[i])
+            if i == dim:
+                ind = list(permutation(ind))
+            
+            new_indexing.append(ind)
+        
+        ds_ = ds[np.ix_(*new_indexing)]
+        
+        finish = datetime.now()
+        print (finish - start)
+        
+        return ds_
+    
+    def ds_simple_permutation(self, ds):
+        
+        from datetime import datetime
+        start = datetime.now()
+        
+        dim = self._axis
+        ind = range(ds.shape[dim])
+        
+        if dim == 0:
+            ds_ = ds[ind]
+        elif dim == 1:
+            ds_ = ds[:,ind]
+        elif dim == 2:
+            ds_ = ds[:,:,ind]
+             
+        finish = datetime.now()
+        print (finish - start)
+        
+        return ds_
+        
+                
 def permutation_test(ds, labels, analysis, n_permutation=1000):
     
     null_dist = []
