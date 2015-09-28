@@ -173,7 +173,6 @@ class SeedSimilarityAnalysis(object):
         pl.colorbar()
         pl.savefig(fname)
         
-        
         fname = file_path_pattern+'values.txt'
         np.savetxt(fname, self._measure)
         

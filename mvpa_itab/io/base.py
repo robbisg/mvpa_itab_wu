@@ -17,6 +17,8 @@ import logging
 import time
 #from memory_profiler import profile
 
+logger = logging.getLogger(__name__)
+
 def get_time():
     
     """Get the current time and returns a string (fmt: yymmdd_hhmmss)
@@ -67,7 +69,7 @@ def load_dataset(path, subj, folder, **kwargs):
     skip_vols = 0
     ext=''
     
-    logging.debug(str(kwargs))
+    logger.debug(str(kwargs))
     
     for arg in kwargs:
         if arg == 'skip_vols':              # no. of canceled volumes
@@ -94,7 +96,7 @@ def load_dataset(path, subj, folder, **kwargs):
     try:
         fmri_list = load_fmri(file_list, skip_vols=skip_vols)
     except IOError, err:
-        logging.error(err)
+        logger.error(err)
         return 0
     
     ### Code to substitute   
@@ -108,18 +110,18 @@ def load_dataset(path, subj, folder, **kwargs):
     vol_sum = np.sum([img.shape[3] for img in fmri_list])
 
     if vol_sum != len(attr.targets):
-        logging.debug('Volumes no.: '+str(vol_sum)+' Targets no.: '+str(len(attr.targets)))
+        logger.debug('Volumes no.: '+str(vol_sum)+' Targets no.: '+str(len(attr.targets)))
         del fmri_list
-        logging.error(subj + ' *** ERROR: Attributes Length mismatches with fMRI volumes! ***')
+        logger.error(subj + ' *** ERROR: Attributes Length mismatches with fMRI volumes! ***')
         raise ValueError('Attributes Length mismatches with fMRI volumes!')       
     
     # Load the dataset.
     try:
-        logging.info('Loading dataset...')
+        logger.info('Loading dataset...')
         ds = fmri_dataset(fmri_list, targets=attr.targets, chunks=attr.chunks, mask=mask) 
-        logging.info('Dataset loaded...')
+        logger.info('Dataset loaded...')
     except ValueError, e:
-        logging.error(subj + ' *** ERROR: '+ str(e))
+        logger.error(subj + ' *** ERROR: '+ str(e))
         del fmri_list
         return 0;
     
@@ -143,7 +145,7 @@ def load_dataset(path, subj, folder, **kwargs):
         for k in attr.keys():
             ds.sa[k] = attr[k]
     except BaseException, e:
-        logging.error('attributes not found.')
+        logger.error('attributes not found.')
          
     f_list = []
     for i, img_ in enumerate(fmri_list):
@@ -206,7 +208,7 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
             path_file_dirs.append(os.path.join(path,name,dir_))
 
    
-    logging.info('Loading...')
+    logger.info('Loading...')
     
     # TODO: Evaluate if it is useful to include searching code in a function
     
@@ -216,7 +218,7 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
     for path in path_file_dirs:
         file_list = file_list + os.listdir(path)
 
-    logging.debug(' '.join(file_list))
+    logger.debug(' '.join(file_list))
 
     # Verifying which kind of analysis I've to perform (single or group) 
     # and filter list elements   
@@ -227,13 +229,13 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
         file_list = [elem for elem in file_list 
                      if elem.find(img_pattern) != -1 and elem.find(task) != -1 and elem.find('mni') != -1]
 
-    logging.debug(' '.join(file_list))
+    logger.debug(' '.join(file_list))
     
     # if no file are found I perform previous analysis!        
     if (len(file_list) <= runs and len(file_list) == 0):
         raise OSError('Files not found, please check if data exists in '+str(path_file_dirs))
     else:
-        logging.debug('File corrected found ....')  
+        logger.debug('File corrected found ....')  
 
     ### Data loading ###
     file_list.sort()
@@ -263,11 +265,11 @@ def load_fmri(fname_list, skip_vols=0):
         
     for file_ in fname_list:
         
-        logging.info('Now loading '+file_)     
+        logger.info('Now loading '+file_)     
         
         img = ni.load(file_)
     
-        logging.debug(img.shape)
+        logger.debug(img.shape)
         if skip_vols != 0:
             
             data = img.get_data()
@@ -278,7 +280,7 @@ def load_fmri(fname_list, skip_vols=0):
             
         image_list.append(img)
     
-    logging.debug('The image list is of ' + str(len(image_list)) + ' images.')
+    logger.debug('The image list is of ' + str(len(image_list)) + ' images.')
     return image_list
 
 
@@ -397,7 +399,7 @@ def load_mask_wu(path, subj, **kwargs):
     
     scaled = ''
     
-    logging.debug(mask_area)
+    logger.debug(mask_area)
     
     if isScaled == 'True':
         scaled = 'scaled'
@@ -429,8 +431,8 @@ def load_mask_wu(path, subj, **kwargs):
                       ((m[:].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('nii.gz') != -1) or
                       ((m[:].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('hdr') != -1)]
       
-    logging.debug(' '.join(mask_list))
-    logging.info('Mask searched in '+mask_path+' Mask(s) found: '+str(len(mask_list)))
+    logger.debug(' '.join(mask_list))
+    logger.info('Mask searched in '+mask_path+' Mask(s) found: '+str(len(mask_list)))
     
     files = []
     if len(mask_list) == 0:
@@ -452,7 +454,7 @@ def load_mask_wu(path, subj, **kwargs):
     for m in mask_list:
         img = ni.load(os.path.join(mask_path,m))
         data = data + img.get_data() 
-        logging.info('Mask used: '+img.get_filename())
+        logger.info('Mask used: '+img.get_filename())
 
     mask = ni.Nifti1Image(data.squeeze(), img.get_affine())
         
@@ -485,7 +487,7 @@ def load_mask_juelich(**kwargs):
     for m in mask_list:
         img = ni.load(os.path.join(mask_path,m))
         data = data + img.get_data() 
-        logging.info('Mask used: '+img.get_filename())
+        logger.info('Mask used: '+img.get_filename())
 
     mask = ni.Nifti1Image(data, img.get_affine())
 
@@ -534,8 +536,8 @@ def load_attributes (path, task, subj, **kwargs):
         
     
     if len(attrFiles) == 0:
-        logging.error(' *******       ERROR: No attribute file found!        *********')
-        logging.error( ' ***** Check in '+str(completeDirs)+' ********')
+        logger.error(' *******       ERROR: No attribute file found!        *********')
+        logger.error( ' ***** Check in '+str(completeDirs)+' ********')
         return None
     
     
@@ -556,7 +558,7 @@ def load_attributes (path, task, subj, **kwargs):
                 fidl_convert(os.path.join(dir, attrFiles[0]), os.path.join(dir, attrFiles[0][:-5]+'.txt'), type=fidl_type)
                 attrFilename = os.path.join(dir, attrFiles[0][:-5]+'.txt')
 
-    logging.debug(header)
+    logger.debug(header)
     attr = SampleAttributes(attrFilename, header=header)
     return attr
 
@@ -573,7 +575,7 @@ def modify_conc_list(path, subj, conc_filelist, extension=''):
         
         #Leave the first path part
         fl = fl[fl.find(subj):]
-        logging.debug(fl)
+        logger.debug(fl)
         
         #Leave file extension
         fname, ext1, ext2 = fl.split('.')
@@ -581,10 +583,10 @@ def modify_conc_list(path, subj, conc_filelist, extension=''):
 
         new_list += glob.glob(new_filename+'.*'+extension)
 
-        logging.debug(fname)
-        logging.debug(new_filename)
+        logger.debug(fname)
+        logger.debug(new_filename)
     
-    logging.debug(new_list)
+    logger.debug(new_list)
     
     del conc_filelist
     return new_list
@@ -598,52 +600,52 @@ def read_file(filename):
         for name in fileholder:
             filename_list.append(name[name.find('/'):-1])
     
-    logging.debug(' '.join(filename_list))
+    logger.debug(' '.join(filename_list))
         
     return filename_list
 
 
 def read_conc(path, subj, conc_file_patt, sub_dir=['']):
     
-    logging.debug(path)
+    logger.debug(path)
     
     #First we look for the conc file in the task folder
     conc_file_list = []
     for dir_ in sub_dir:
         conc_path = os.path.join(path, subj, dir_)
-        logging.debug(conc_path)
+        logger.debug(conc_path)
         if os.path.exists(conc_path):
             file_list = os.listdir(conc_path)
-            logging.debug(conc_file_list)
+            logger.debug(conc_file_list)
             conc_file_list += [f for f in file_list if f.find('.conc') != -1 and f.find(conc_file_patt) != -1]
     
-    logging.debug('.conc files in sub dirs: '+str(len(conc_file_list)))
+    logger.debug('.conc files in sub dirs: '+str(len(conc_file_list)))
     #Then we look in the subject directory
     if len(conc_file_list) == 0:
         conc_path = os.path.join(path, subj)
         file_list = os.listdir(conc_path)
         conc_file_list += [f for f in file_list \
                           if f.find('.conc') != -1 and f.find(conc_file_patt) != -1]
-        logging.debug(' '.join(conc_file_list))
-        logging.debug('.conc files in sub dirs: '+str(len(conc_file_list)))
+        logger.debug(' '.join(conc_file_list))
+        logger.debug('.conc files in sub dirs: '+str(len(conc_file_list)))
     
     c_file = conc_file_list[0]
     
-    #Logging
-    logging.debug(' '.join(conc_file_list))
+    #logger
+    logger.debug(' '.join(conc_file_list))
     
     #Open and check conc file
     conc_file = open(os.path.join(conc_path, c_file), 'r')
     s = conc_file.readline()
-    logging.debug(s)
+    logger.debug(s)
     try:
         #conc file used to have first row with file number
         n_files = np.int(s.split(':')[1])
     except IndexError, err:
-        logging.error('The conc file is not recognized.')
+        logger.error('The conc file is not recognized.')
         return read_file(os.path.join(conc_path, c_file))
         
-    logging.debug('Number of files in conc file is '+str(n_files))
+    logger.debug('Number of files in conc file is '+str(n_files))
     
     
     #Read conc file
@@ -656,7 +658,7 @@ def read_conc(path, subj, conc_file_patt, sub_dir=['']):
         i = i + 1
     
     conc_file.close()
-    logging.debug('\n'.join(filename_list))
+    logger.debug('\n'.join(filename_list))
     return filename_list
 
 
@@ -672,11 +674,11 @@ def read_remote_configuration(path):
         
         for item in config.items(sec):
             configuration.append(item)
-            logging.debug(item)
+            logger.debug(item)
     
     return dict(configuration) 
 
-    logging.info('Reading remote config file '+os.path.join(path,'remote.conf'))
+    logger.info('Reading remote config file '+os.path.join(path,'remote.conf'))
 
 
 #@profile
@@ -689,7 +691,7 @@ def read_configuration (path, experiment, section):
     config.read(os.path.join(path,experiment))
     
     
-    logging.info('Reading config file '+os.path.join(path,experiment))
+    logger.info('Reading config file '+os.path.join(path,experiment))
     
     types = config.get('path', 'types').split(',')
     
@@ -705,13 +707,19 @@ def read_configuration (path, experiment, section):
         
         for item in config.items(sec):
             configuration.append(item)
-            logging.debug(item)
+            logger.debug(item)
     
     return dict(configuration)   
 
 
 def save_results(path, results, configuration):
-
+    """
+    path: is the results path dir
+    results: is the structure used to store data
+    configuration: is the configuration file to store analysis info
+    """
+    
+    # Get information to make the results dir
     datetime = get_time()
     analysis = configuration['analysis_type']
     mask = configuration['mask_area']
@@ -721,8 +729,11 @@ def save_results(path, results, configuration):
     command = 'mkdir '+os.path.join(path, '0_results', new_dir)
     os.system(command)
     
+    # New directory to store files
     parent_dir = os.path.join(path, '0_results', new_dir)
     
+    # Check which analysis has been done
+    ## TODO: Use a class to save results
     if analysis == 'searchlight':
         save_results_searchlight(parent_dir, results)
     elif analysis == 'transfer_learning':
@@ -743,7 +754,7 @@ def save_results(path, results, configuration):
     #######################################################################
     
     if analysis == 'searchlight':
-        logging.info('Result saved in '+parent_dir)
+        logger.info('Result saved in '+parent_dir)
         return 'OK' #WTF?
     else:
         file_summary = open(os.path.join(parent_dir, 'analysis_summary_'+mask+'_'+task+'.txt'), "w")
@@ -779,7 +790,7 @@ def save_results(path, results, configuration):
         
         file_summary.close()
     
-    logging.info('Result saved in '+parent_dir)
+    logger.info('Result saved in '+parent_dir)
     
     return 'OK' 
 
@@ -789,38 +800,40 @@ def save_results_searchlight (path, results):
     
     total_map = []
     
-    for key in results:
+    # For each subject save map and average across fold
+    for name in results:
         
-        name = key
         command = 'mkdir '+os.path.join(parent_dir, name)
         os.system(command)
         
         results_dir = os.path.join(parent_dir, name)
         
-        map = results[name]['map']
+        map_ = results[name]['map']
         
         radius = np.int(results[name]['radius'])
         
         
-        if len(map.get_data().shape) > 3:
-            mean_map = map.get_data().mean(axis=3)
-            mean_img = ni.Nifti1Image(mean_map, affine=map.get_affine())
+        if len(map_.get_data().shape) > 3:
+            mean_map = map_.get_data().mean(axis=3)
+            mean_img = ni.Nifti1Image(mean_map, affine=map_.get_affine())
             fname = name+'_radius_'+str(radius)+'_searchlight_mean_map.nii.gz'
             ni.save(mean_img, os.path.join(results_dir,fname))
         else:
-            mean_map = map.get_data()
-            
+            mean_map = map_.get_data()
+        
+        
         fname = name+'_radius_'+str(radius)+'_searchlight_map.nii.gz'
-        ni.save(map, os.path.join(results_dir,fname))
+        ni.save(map_, os.path.join(results_dir,fname))
         
         total_map.append(mean_map)
     
+    # Save the total average map
     total_map = np.array(total_map).mean(axis=0)
-    total_img = ni.Nifti1Image(total_map, affine=map.get_affine())
+    total_img = ni.Nifti1Image(total_map, affine=map_.get_affine())
     fname = 'accuracy_map_radius_'+str(radius)+'_searchlight_all_subj.nii.gz'
     ni.save(total_img, os.path.join(path,fname))
                    
-    logging.info('Results writed in '+path)
+    logger.info('Results writed in '+path)
     return path
 
 def save_results_basic(path, results):
@@ -843,8 +856,11 @@ def save_results_basic(path, results):
                 m_mean_data = m_mean.get_data()
                 fname = name+'_mean_map.nii.gz'
                 m_mean_data = (m_mean_data - np.mean(m_mean_data))/np.std(m_mean_data)
+                
                 m_mean_zscore = ni.Nifti1Image(m_mean_data, m_mean.get_affine())
                 ni.save(m_mean_zscore, os.path.join(results_dir,fname))
+                
+                #save_map(os.path.join(results_dir, fname), m_mean_data, m_mean.get_affine())
                 
                 for map, t in zip(results[name][key], results[name]['sensitivities'].sa.targets):
                     cl = '_'.join(t)
@@ -872,16 +888,20 @@ def save_results_basic(path, results):
     ###################################################################          
     
     
-    logging.info('Result saved in '+parent_dir)
+    logger.info('Result saved in '+parent_dir)
     
     return 'OK' 
 
 
 def save_results_transfer_learning(path, results):
     
+    # Cross-decoding predictions and labels
+    # p = classifier prediction on target ds
+    # r = targets of target ds
     p = results[results.keys()[0]]['mahalanobis_similarity'][0].T[1]
     r = results[results.keys()[0]]['mahalanobis_similarity'][0].T[0]
     
+    # Stuff for total histograms 
     hist_sum = dict()
     
     means_s = dict()
@@ -895,24 +915,29 @@ def save_results_transfer_learning(path, results):
     
     
     for name in results:
+        # Make subject dir
         command = 'mkdir '+os.path.join(path, name)
         os.system(command)
         
         results_dir = os.path.join(path, name)                        
         
+        # Statistics of decoding
         stats = results[name]['stats']
         fname = name+'_stats.txt'
         file_ = open(os.path.join(results_dir,fname), 'w')
+        
         file_.write(str(stats))
-        p_value = results[name]['p-value']
+        
+        p_value = results[name]['pvalue']
         file_.write('\n\n p-values for each fold \n')
         for v in p_value:
             file_.write(str(v)+'\n')
+        
         file_.write('\n\n Mean each fold p-value: '+str(p_value.mean()))
         file_.write('\n\n Mean null dist total accuracy value: '+str(results[name]['p']))
         file_.write('\nd-prime coefficient: '+str(results[name]['d_prime']))
         file_.write('\nbeta coefficient: '+str(results[name]['beta']))
-        file_.write('\nc coefficient: '+str(results[name]['c']))
+        file_.write('\nc coefficient: '+str(results[name]['lab']))
         #file.write('\n\nd-prime mahalanobis coeff: '+str(results[name]['d_prime_maha']))
         file_.close()
         
@@ -923,137 +948,147 @@ def save_results_transfer_learning(path, results):
                 file_.write(str(m.stats['ACC']))
                 file_.write('\n')
             file_.close()
+        
+        
+        for k in results[name].keys():
+            if k in ['classifier', 'targets', 'predictions']:
+                if k == 'classifier':
+                    obj = results[name][k].ca
+                else:
+                    obj = results[name][k]
+                    
+                fname = name+'_'+k+'.pyobj'
+        
+                file_ = open(os.path.join(results_dir,fname), 'w')
+                pickle.dump(obj, file_)
+                file_.close()
+        
+            if k in ['confusion_target', 'confusion_total']:
+                c_m = results[name][k]
+                fname = name+'_'+k+'.txt'
+                file_ = open(os.path.join(results_dir,fname), 'w')
+                file_.write(str(c_m))
+                file_.close()
                 
-        obj = results[name]['classifier'].ca
-        fname = name+'_'+'classifier'+'.pyobj'          
-        file_ = open(os.path.join(results_dir,fname), 'w')
-        pickle.dump(obj, file_)
-        file_.close()
+                
+        #plot_transfer_graph(results_dir, name, results[name])      
         
-        obj = results[name]['targets']
-        fname = name+'_'+'targets'+'.pyobj'          
-        file_ = open(os.path.join(results_dir,fname), 'w')
-        pickle.dump(obj, file_)
-        file_.close()
-        
-        obj = results[name]['predictions']
-        fname = name+'_'+'predictions'+'.pyobj'          
-        file_ = open(os.path.join(results_dir,fname), 'w')
-        pickle.dump(obj, file_)
-        file_.close()
-        #plot_transfer_graph(results_dir, name, results[name])
-        
-        c_m = results[name]['confusion_target']
-        fname = name+'_confusion_target.txt'
-        file_ = open(os.path.join(results_dir,fname), 'w')
-        file_.write(str(c_m))
-        file_.close()
-        
-        c_m = results[name]['confusion_total']
-        fname = name+'_confusion_total.txt'
-        file_ = open(os.path.join(results_dir,fname), 'w')
-        file_.write(str(c_m))
-        file_.close()        
-        
+        ####################### Similarity results #####################################
+        # TODO: Keep in mind! They should be saved when similarity has been performed!!!
         full_data = results[name]['mahalanobis_similarity'][0]
-        true_pred = results[name]['mahalanobis_similarity'][1]
+        similarity_mask = results[name]['mahalanobis_similarity'][1]
         threshold = results[name]['mahalanobis_similarity'][2]
         distances = results[name]['mahalanobis_similarity'][4]
         
-        t_mahala = full_data[true_pred]
+        # Renaming variables to better read
+        ds_targets = full_data.T[0]
+        class_prediction_tar = full_data.T[1]
+        
+        t_mahala = full_data[similarity_mask]
         fname = name+'_mahalanobis_data.txt'
         file_ = open(os.path.join(results_dir,fname), 'w')
         
-        n_src_label = len(np.unique(full_data.T[1]))
-        n_tar_label = len(np.unique(full_data.T[0]))
+        n_src_label = len(np.unique(class_prediction_tar))
+        n_tar_label = len(np.unique(ds_targets))
         
         plot_list = dict()
         
-        
-        for t in np.unique(full_data.T[1]):
+        # For each label in predictions
+        for t in np.unique(class_prediction_tar):
             f, ax = plt.subplots(2, 1)
             plot_list[t] = [f, ax]
         
-        #for each label of the target dataset (target classes)
-        for tar in np.unique(full_data.T[0]): 
+
+        
+        
+        # For each label of the target dataset (target classes)
+        for tar in np.unique(ds_targets): 
             
-            #Rest mask
-            t_pred_mask = full_data.T[0] == tar
-            t_m_data = full_data[t_pred_mask * true_pred]
-            
-            #for each predicted label
-            for lab in np.unique(full_data.T[1]):
+            # Select data belonging to target loop class
+            target_mask = ds_targets == tar
+            similarity_target = similarity_mask[target_mask]
+            target_data = full_data[target_mask] 
+
+
+            for lab in np.unique(class_prediction_tar):
+ 
+                # Select target data classified as loop label
+                prediction_mask = target_data.T[1] == lab 
+                crossd_data = target_data[prediction_mask] 
+                similarity_crossd = similarity_target[prediction_mask]
+
+                distance_ = crossd_data.T[2]
+                p_values_ = crossd_data.T[3]                
                 
-                histo_fname = name+'_histo_'+lab+'_'+tar+'_dist.txt'
-                histo_p_fname = name+'_histo_'+lab+'_'+tar+'_p.txt'
+                # Filter data that meets similarity criterion
+                similarity_data = crossd_data[similarity_crossd]
+                num = len(similarity_data)
                 
                 
-                
-                all_vec = full_data[(full_data.T[1] == lab) * t_pred_mask]
-                
-                if len(t_m_data) != 0:
-                    m_maha = t_m_data.T[1] == lab
-                    true_vec = t_m_data[m_maha]
-                    num = len(true_vec)
-                    mean_maha = np.mean(np.float_(true_vec.T[2]))
-                    mean_p = np.mean(np.float_(true_vec.T[3]))
+                if len(target_data) != 0:
+                    distance_data = similarity_data.T[2]# Mean distance
+                    p_data = similarity_data.T[3] # Mean p-value
                 else:
-                    num = 0
-                    mean_maha = np.mean(np.float_(all_vec.T[2]))
-                    mean_p = np.mean(np.float_(all_vec.T[3]))
+                    distance_data = np.mean(np.float_(distance_)) 
+                    p_data = np.mean(np.float_(p_values_)) # 
                 
-                tot_mean = np.mean(np.float_(all_vec.T[2]))
-                tot_p = np.mean(np.float_(all_vec.T[3]))
-                               
-                file_.write(tar+' '+lab+' '+str(num)+' '+str(mean_maha)+' '+str(mean_p)+' '+str(tot_mean)+' '+str(tot_p)+'\n')
+                mean_maha_d = np.mean(np.float_(distance_data))
+                mean_maha_p = np.mean(np.float_(p_data))
                 
-                np.savetxt(os.path.join(results_dir,histo_fname), np.float_(all_vec.T[2]))
-                np.savetxt(os.path.join(results_dir,histo_p_fname), np.float_(all_vec.T[3]))
+                tot_d = np.mean(np.float_(distance_))
+                tot_p = np.mean(np.float_(p_values_))
                 
-                #bin_d = np.linspace(mn_d, mx_d, 25)
-                #bin_p = np.linspace(0, 1, 25)
+                occurence_ = ','.join([tar, lab, str(num), str(mean_maha_d),str(mean_maha_p),str(tot_d),str(tot_p)])
                 
-                plot_list[lab][1][0].hist(np.float_(all_vec.T[2]), bins=35, label=tar, alpha=0.5)
-                plot_list[lab][1][1].hist(np.float_(all_vec.T[3]), bins=35, label=tar, alpha=0.5)          
+                file_.write(occurence_+'\n')
                 
-                hist_sum[tar][lab]['dist'].append(np.float_(all_vec.T[2]))
-                hist_sum[tar][lab]['p'].append(np.float_(all_vec.T[3]))
+                # TODO: Maybe is possible to collapse both file in a single one!
+                histo_d_fname = "%s_hist_%s_%s_dist.txt" % (name, lab, tar)
+                histo_p_fname = "%s_hist_%s_%s_p.txt" % (name, lab, tar)
                 
-            
-            histo_full_fname = name+'_'+tar+'_histo_.txt'
-            histo_full_p_fname = name+'_'+tar+'_histo_p.txt'
-            
-            l = 0
-            pred_array = np.zeros(full_data.T[1].shape)
-            for lab in np.unique(full_data[t_pred_mask].T[1]):
+                np.savetxt(os.path.join(results_dir,histo_d_fname), np.float_(distance_))
+                np.savetxt(os.path.join(results_dir,histo_p_fname), np.float_(p_values_))
                 
-                pred_array[full_data.T[1] == lab] = l
+                # Histogram plots
+                # TODO: Maybe it's better to do something else!
+                # TODO: Unique values of bins!
+                plot_list[lab][1][0].hist(np.float_(distance_), bins=35, label=tar, alpha=0.5)
+                plot_list[lab][1][1].hist(np.float_(p_values_), bins=35, label=tar, alpha=0.5)          
                 
-                l = l + 1
+                # We store information for the total histogram
+                hist_sum[tar][lab]['dist'].append(np.float_(distance_))
+                hist_sum[tar][lab]['p'].append(np.float_(p_values_))
                 
-            #np.savetxt(os.path.join(results_dir,histo_full_fname), np.vstack((full_data[t_pred_mask].T[2:], pred_array)))
-
-
-        for c in distances.keys():
-            for tar in np.unique(full_data.T[0]):
-                data = distances[c][full_data.T[0] == tar]
+                
+                
+                ## TODO: Insert plot in a function and let the user decide if he wants it!
+                ## plot_distances(distances, runs)
+                ## distance_ = data[prediction_mask] # Equivalent form!
+                data = distances[lab][target_mask]
                 f_d = plt.figure()
                 a_d = f_d.add_subplot(111)
                 a_d.plot(data)
-                a_d.set_ylim(0, 75)
+                a_d.set_ylim(data.mean()-3*data.std(), data.mean()+3*data.std())
                 step = data.__len__() / 6.
                 for j in np.arange(6)+1:#n_runs
                     a_d.axvline(x = step * j, ymax=a_d.get_ylim()[1], color='y', linestyle='-', linewidth=1)
                 a_d.axhline(y = threshold, color='r', linestyle='--', linewidth=2)
                 
-                means_s[c+'_'+tar].append(np.mean(data))
+                
                 a_d.axhline(y = np.mean(data), color='black', linestyle=':', linewidth=2)
-                f_d.savefig(os.path.join(results_dir,name+'_distance_plot_'+c+'_'+tar+'_.png'))
-            
-                np.savetxt(os.path.join(results_dir,name+'_distance_txt_'+c+'_'+tar+'_.txt'), 
-                           distances[c][full_data.T[0] == tar], fmt='%.4f')               
+                
+                pname = "%s_distance_plot_%s_%s.png" % (name, lab, tar)
+                
+                f_d.savefig(os.path.join(results_dir, pname))
+                
+                ## Save file ##
+                fname = "%s_distance_txt_%s_%s.txt" % (name, lab, tar)
+                np.savetxt(os.path.join(results_dir, fname), 
+                           data, fmt='%.4f')               
 
-        
+                means_s[lab+'_'+tar].append(np.mean(data))
+                
+        ## TODO: Insert in a function        
         for k in plot_list.keys():
             ax1 = plot_list[k][1][0]
             ax2 = plot_list[k][1][1]
@@ -1068,27 +1103,17 @@ def save_results_transfer_learning(path, results):
         file_.close()
         
         cmatrix_mahala = results[name]['confusion_mahala']
-        fname = name+'_confusion_mahala.txt'
+        fname = "%s_confusion_mahala.txt" % name
         file_ = open(os.path.join(results_dir,fname), 'w')
         try:
             file_.write(str(cmatrix_mahala))
         except ValueError,err:
             file_.write('None')
             print err
-        '''
-        cmatrix_mahala = results[name]['confusion_tot_maha']
-        fname = name+'_confusion_total_mahala.txt'
-        file = open(os.path.join(results_dir,fname), 'w')
-        try:
-            file.write(str(cmatrix_mahala))
-        except ValueError,err:
-            file.write('None')
-            print err  
-        '''
         
         file_.close()
         
-    
+        # Is this snippert a part of other code???
         if results[name]['map'] != None:
             
             m_mean = results[name]['map'].pop()
@@ -1163,6 +1188,12 @@ def save_results_clustering(path, results):
             if key == 'clusters':
                 plot_clusters_graph(results_dir, name, results[name])
   
+    return
+
+def save_map(filename, map_np_array, affine=np.eye(4)):
+        
+    map_zscore = ni.Nifti1Image(map_np_array, affine)
+    ni.save(map_zscore, filename)
     return
 
 def write_all_subjects_map(path, dir_):
@@ -1244,7 +1275,7 @@ def update_subdirs(conc_file_list, subj, **kwargs):
         
     i = 0
     
-    logging.debug('Old subdir '+kwargs['sub_dir'])
+    logger.debug('Old subdir '+kwargs['sub_dir'])
     
     for directory in conc_file_list:
         
@@ -1261,7 +1292,7 @@ def update_subdirs(conc_file_list, subj, **kwargs):
         i = i + 1
         
     kwargs['sub_dir'] = ','.join(sub_dirs)
-    logging.debug('New subdir '+kwargs['sub_dir'])
+    logger.debug('New subdir '+kwargs['sub_dir'])
     return kwargs
             
 def _find_file(path, subj, pattern):

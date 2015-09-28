@@ -15,6 +15,7 @@ from mvpa_itab.stats import Correlation, CrossValidation
 path = '/home/robbis/Share/dati_insulaDrive/'
 lista_file_conn = os.listdir('/home/robbis/Share/dati_insulaDrive/')
 lista_file_conn = [f for f in lista_file_conn if f.find('Corr') != -1]
+lista_file_conn.sort()
 conn_data = []
 for f in lista_file_conn:
     data_ = np.genfromtxt(os.path.join(path, f))
@@ -217,37 +218,51 @@ labels_alg = ['SVR(kernel=\'rbf\', C=1)',
                ]
 
 
-repetitions = 50
+repetitions = 500
 #n_permutation = 1000
-n_permutation = 2000
+n_trial = 1
 arg_ = np.argsort(np.abs(corr))[::-1]
-mse_t = np.zeros((arg_.shape[0], len(algorithms_), repetitions))
+mse_t = np.zeros((n_trial, arg_.shape[0], len(algorithms_), repetitions))
 
 index_ = np.arange(len(y1))
-for i in range(arg_.shape[0]):
+for n in range(n_trial):
     
-    X_fit = X1[:,arg_[:i+1]] # Sequential slicing
-    
-    for j, alg_ in enumerate(algorithms_):
-        cv=ShuffleSplit(len(y1), n_iter=repetitions, test_size=0.25)
-
-        k = 0
-        for train_index, test_index in cv:
-            
-            train_index_perm = train_index
-            
-            X_train = X_fit[train_index]
-            y_train = y1[train_index_perm]
-            
-            
-            X_test = X_fit[test_index]
-            y_predict = alg_.fit(X_train, y_train).predict(X_test)
-            
-            mse = mean_squared_error(y1[test_index], y_predict)
-            
-            mse_t[i,j,k] = mse
+    for i in range(arg_.shape[0]):
         
-            k+=1
+        X_fit = X1[:,arg_[:i+1]] # Sequential slicing
+        
+        for j, alg_ in enumerate(algorithms_):
+            cv=ShuffleSplit(len(y1), n_iter=repetitions, test_size=0.25)
+    
+            k = 0
+            for train_index, test_index in cv:
+                
+                train_index_perm = train_index
+                
+                X_train = X_fit[train_index]
+                y_train = y1[train_index_perm]
+                
+                
+                X_test = X_fit[test_index]
+                y_predict = alg_.fit(X_train, y_train).predict(X_test)
+                
+                mse = mean_squared_error(y1[test_index], y_predict)
+                
+                mse_t[n,i,j,k] = mse
+            
+                k+=1
+                
+    p1_ = []
+    #mse_avg = mse_.mean(1)
+    
+    mse_t1_avg = mse_t[n].squeeze().mean(1)
+    for v, dist in zip(mse_t1_avg, mse_avg):
+        m_ = np.count_nonzero(v >= dist)
+        p1_.append(m_)
+    
+    p1_ = np.array(p1_)/2000.
+    pl.scatter(np.arange(1,79), mse_t1_avg, c='b')
+    pl.scatter(np.arange(1,79)[p1_<=0.05], mse_t1_avg[p1_<=0.05], c='b', s=45)
 
 ############## Plots #############################       
 color = 'bgrykcm'    
@@ -309,7 +324,7 @@ for i in range(arg_.shape[0]):
         
 ########### Permute feature set #########################
      
-repetitions = 50
+repetitions = 200
 n_combination = 2000
 n_permutation = 1
 arg_ = np.argsort(np.abs(corr))[::-1]
@@ -382,7 +397,7 @@ labels_alg = ['SVR(kernel=\'rbf\', C=1)',
                #'ElasticNet',
                #'Lasso',
                ]
-repetitions = 50
+repetitions = 200
 n_permutation = 2000
 arg_ = np.argsort(np.abs(corr))[::-1]
 mse_ = np.zeros((arg_.shape[0], len(algorithms_), repetitions, n_permutation))
@@ -445,12 +460,14 @@ labels_alg = ['SVR(kernel=\'rbf\', C=1)',
                ]
 
 
-repetitions = 50
-n_permutation = 2000
+repetitions = 200
+n_permutation = 5000
 arg_ = np.argsort(np.abs(corr))[::-1]
 mse_ = np.zeros((arg_.shape[0], len(algorithms_), repetitions, n_permutation))
-
+corr_ = np.zeros((arg_.shape[0], len(algorithms_), repetitions, n_permutation))
 index_ = np.arange(len(y1))
+total_ = mse_.size
+count_ = 0
 for i in range(arg_.shape[0]):
     
     X_fit = X1[:,arg_[:i+1]] # Sequential slicing
@@ -476,11 +493,14 @@ for i in range(arg_.shape[0]):
                 y_predict = alg_.fit(X_train, y_train).predict(X_test)
                 
                 mse = mean_squared_error(y1[test_index], y_predict)
+                cor = np.corrcoef(y1[test_index], y_predict)
                 
                 mse_[i,j,k,p] = mse
-            
+                corr_[i,j,k,p] = cor[0,1]
+                count_ += 1
                 k+=1
-
+                
+                progress(count_, total_)
 
 
 p1_ = []
@@ -490,7 +510,7 @@ for v, dist in zip(mse_t1_avg, mse_avg):
     m_ = np.count_nonzero(v >= dist)
     p1_.append(m_)
     
-p1_ = np.array(p_)/2000.
+p1_ = np.array(p1_)/2000.
 
 p2_ = []
 mse_avg = mse_.mean(1)
@@ -499,7 +519,7 @@ for v, dist in zip(mse_t2_avg, mse_avg):
     m_ = np.count_nonzero(v >= dist)
     p2_.append(m_)
     
-p2_ = np.array(p_)/2000.
+p2_ = np.array(p2_)/2000.
 
 p3_ = []
 mse_avg = mse_.mean(1)
@@ -508,12 +528,66 @@ for v, dist in zip(mse_t3_avg, mse_avg):
     m_ = np.count_nonzero(v >= dist)
     p3_.append(m_)
     
-p3_ = np.array(p_)/2000.
+p3_ = np.array(p3_)/2000.
 
 pl.boxplot(mse_avg.T, showmeans=True, showfliers=False)
 pl.scatter(np.arange(1,79), mse_t1_avg, c='b')
-pl.scatter(np.arange(1,79)[p1_<=0.05], mse_t1_avg[p1_<=0.05], c='b', s=30, marker='s')
+pl.scatter(np.arange(1,79)[p1_<=0.05], mse_t1_avg[p1_<=0.05], c='b', s=45)
 pl.scatter(np.arange(1,79), mse_t2_avg, c='g')
-pl.scatter(np.arange(1,79)[p2_<=0.05], mse_t2_avg[p2_<=0.05], c='g', s=30, marker='s')
+pl.scatter(np.arange(1,79)[p2_<=0.05], mse_t2_avg[p2_<=0.05], c='g', s=45)
 pl.scatter(np.arange(1,79), mse_t3_avg, c='r')
-pl.scatter(np.arange(1,79)[p3_<=0.05], mse_t3_avg[p3_<=0.05], c='r', s=30, marker='s')
+pl.scatter(np.arange(1,79)[p3_<=0.05], mse_t3_avg[p3_<=0.05], c='r', s=45)
+
+
+############### Controls ###################
+gm_can = np.genfromtxt('/home/robbis/Share/CAN_NET_GMperc.csv', skip_header=1, delimiter=',')
+can_labels = ['MCC','R_aINS','L_pINS','L_AMY']
+repetitions = 200
+n_permutation = 2000
+arg_ = np.argsort(np.abs(corr))[::-1]
+mse_can = np.zeros((arg_.shape[0], len(algorithms_), repetitions, gm_can.shape[1]))
+
+index_ = np.arange(len(y1))
+for ii, y1 in enumerate(gm_can.T):
+    
+    for i in range(arg_.shape[0]):
+    
+        X_fit = X1[:,arg_[:i+1]] # Sequential slicing
+        
+        for j, alg_ in enumerate(algorithms_):
+            
+            cv=ShuffleSplit(len(y1), n_iter=repetitions, test_size=0.25)
+    
+            k = 0
+            for train_index, test_index in cv:
+                
+                train_index_perm = train_index
+                
+                X_train = X_fit[train_index]
+                
+                y_train = y1[train_index_perm]
+
+                X_test = X_fit[test_index]
+                y_predict = alg_.fit(X_train, y_train).predict(X_test)
+                
+                mse = mean_squared_error(y1[test_index], y_predict)
+                
+                mse_can[i,j, k, ii] = mse
+            
+                k+=1
+
+t_control = np.zeros((78, 4))
+p_control = np.zeros((78, 4))
+for j, x in enumerate(mse_control):
+    for i in range(4):
+        t_c, p_c = ttest_ind(x[:,i], x[:,4])
+        t_control[j,i] = t_c
+        p_control[j,i] = p_c
+
+colors_ = 'bgrc'
+x_ = np.arange(78)
+for i in range(4):
+    y_ = mse_control.mean(1)[:,i]
+    j_ = p_control[:,i] <= 0.01
+    for xx, yy in zip(x_[j_], y_[j_]):
+        pl.text(xx, yy, '*', fontsize=20)

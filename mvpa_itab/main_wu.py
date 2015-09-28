@@ -32,6 +32,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import logging
 
+logger = logging.getLogger(__name__)
+
 class StoreResults(object):
     def __init__(self):
         self.storage = []
@@ -149,7 +151,7 @@ def build_events_ds(ds, new_duration, **kwargs):
             new_event_list.append(new_event)
     
     
-    logging.info('Building new event related dataset...')
+    logger.info('Building new event related dataset...')
     evds = eventrelated_dataset(ds, events = new_event_list)
     
     return evds
@@ -191,14 +193,14 @@ def preprocess_dataset(ds, type_, **kwargs):
             img_dim = int(kwargs[arg])
                 
     
-    logging.info('Dataset preprocessing: Detrending...')
+    logger.info('Dataset preprocessing: Detrending...')
     if len(np.unique(ds.sa['file'])) != 1:
         poly_detrend(ds, polyord = 1, chunks_attr = 'file')
     poly_detrend(ds, polyord = 1, chunks_attr = 'chunks')
     
     
     if  label_dropped != 'none':
-        logging.info('Removing labels...')
+        logger.info('Removing labels...')
         ds = ds[ds.sa.targets != label_dropped]
     if  label_included != ['all']:
         ds = ds[np.array([l in label_included for l in ds.sa.targets],
@@ -206,24 +208,24 @@ def preprocess_dataset(ds, type_, **kwargs):
         
                
     if str(mean) == 'True':
-        logging.info('Dataset preprocessing: Averaging samples...')
+        logger.info('Dataset preprocessing: Averaging samples...')
         avg_mapper = mean_group_sample(['event_num']) 
         ds = ds.get_mapped(avg_mapper)     
     
-    
-    logging.info('Dataset preprocessing: Normalization feature-wise...')
+    '''
+    logger.info('Dataset preprocessing: Normalization feature-wise...')
     if img_dim == 4:
         zscore(ds, chunks_attr='file')
     zscore(ds)#, param_est=('targets', ['fixation']))
     
     '''
     #Normalizing image-wise
-    print 'Dataset preprocessing: Normalization sample-wise...'
+    logger.info('Dataset preprocessing: Normalization sample-wise...')
     ds.samples -= np.mean(ds, axis=1)[:, None]
     ds.samples /= np.std(ds, axis=1)[:, None]
     
     ds.samples[np.isnan(ds.samples)] = 0
-    '''
+    
     
     ds.a.events = find_events(#event= ds.sa.event_num, 
                               chunks = ds.sa.chunks, 
@@ -249,7 +251,7 @@ def spatial(ds, **kwargs):
     [fclf, cvte] = setup_classifier(**kwargs)
     
     
-    logging.info('Cross validation is performing ...')
+    logger.info('Cross validation is performing ...')
     error_ = cvte(ds)
     
     
@@ -282,7 +284,7 @@ def spatial(ds, **kwargs):
     except Exception, err:
         allowed_keys = ['map', 'sensitivities', 'stats', 
                         'mapper', 'classifier', 'ds', 
-                        'p-value', 'p']
+                        'pvalue', 'p']
         
         allowed_results = [None, None, cvte.ca.stats, 
                            ds.a.mapper, fclf, ds, 
@@ -321,7 +323,7 @@ def spatial(ds, **kwargs):
     
     allowed_keys = ['map', 'sensitivities', 'stats', 
                     'mapper', 'classifier', 'ds', 
-                    'p-value' , 'p']
+                    'pvalue' , 'p']
     allowed_results = [l_maps, res_sens, cvte.ca.stats, 
                        ds.a.mapper, classifier, ds, 
                        p_value, total_p_value]
@@ -336,7 +338,7 @@ def spatial(ds, **kwargs):
         if elem in allowed_keys:
             results[elem] = results_dict[elem]
         else:
-            logging.error('******** '+elem+' result is not allowed! *********')
+            logger.error('******** '+elem+' result is not allowed! *********')
 
     
     return results
@@ -368,8 +370,9 @@ def searchlight(ds, **kwargs):
     
     sl_map.samples *= -1
     sl_map.samples +=  1
-    
-    nif = map2nifti(sl_map, imghdr=ds.a.imghdr)    
+
+    nif = map2nifti(sl_map, imghdr=ds.a.imghdr)
+    nif.set_qform(ds.a.imgaffine)  
     
     #Results packing
     d_result = dict({'map': nif,
@@ -406,7 +409,7 @@ def spatiotemporal(ds, **kwargs):
     
     [fclf, cvte] = setup_classifier(**kwargs)
     
-    logging.info('Cross validation is performing ...')
+    logger.info('Cross validation is performing ...')
     res = cvte(evds)
     
     print cvte.ca.stats 
@@ -432,7 +435,7 @@ def spatiotemporal(ds, **kwargs):
     except Exception, err:
         allowed_keys = ['map', 'sensitivities', 'stats', 
                         'mapper', 'classifier', 'ds', 
-                        'p-value', 'p']
+                        'pvalue', 'p']
         
         allowed_results = [None, None, cvte.ca.stats, 
                            evds.a.mapper, fclf, evds, 
@@ -463,11 +466,11 @@ def spatiotemporal(ds, **kwargs):
     if not 'enable_results' in locals():
         enable_results = ['map', 'sensitivities', 'stats', 
                           'mapper', 'classifier', 'ds', 
-                          'p-value', 'p']
+                          'pvalue', 'p']
 
     allowed_keys = ['map', 'sensitivities', 'stats',
                     'mapper', 'classifier', 'ds',
-                    'p-value', 'p']
+                    'pvalue', 'p']
 
     allowed_results = [l_maps, res_sens, cvte.ca.stats, 
                        evds.a.mapper, fclf, evds, 
@@ -513,27 +516,39 @@ def transfer_learning(ds_src, ds_tar, analysis, **kwargs):
     #   Pack_results
     results = dict()
     #del enable_results
+    
     if 'enable_results' not in locals():
-        enable_results = ['targets', 'classifier', 'map',
-                          'stats', 'sensitivities', 'mapper',
-                          'predictions','fclf', 'ds_src', 'ds_tar', 'p-value', 'p']
+        
+        enable_results = ['decoding_result', 'targets', 'classifier', 'predictions',
+                    'fclf', 'ds_tar', 'ds_src']
 
+    '''
     allowed_keys = ['targets', 'classifier', 'map',
                     'stats', 'sensitivities', 'mapper',
-                    'predictions','fclf', 'ds_src', 'ds_tar', 'p-value', 'p']
-
+                    'predictions','fclf', 'ds_src', 'ds_tar', 'pvalue', 'p']
+    '''
+      
 
     if isinstance(classifier, FeatureSelectionClassifier):
         classifier_s = classifier.clf
     else:
         classifier_s = classifier
-
+    
+    '''
     allowed_results = [ds_tar.targets, classifier_s, src_result['map'], 
                        src_result['stats'], src_result['sensitivities'], 
                        src_result['mapper'], predictions, 
-                       classifier, src_result['ds'], ds_tar, src_result['p-value'],
+                       classifier, src_result['ds'], ds_tar, src_result['pvalue'],
                        src_result['p'] ]
-
+    '''
+    
+    allowed_keys = ['decoding_result', 'targets', 'classifier', 'predictions',
+                    'fclf', 'ds_tar', 'ds_src']
+    
+    allowed_results = [src_result, ds_tar.targets, classifier_s, predictions, 
+                       classifier, ds_tar, src_result['ds']]
+    
+    
     results_dict = dict(zip(allowed_keys, allowed_results))
 
     for elem in enable_results:
@@ -541,7 +556,7 @@ def transfer_learning(ds_src, ds_tar, analysis, **kwargs):
         if elem in allowed_keys:
             results[elem] = results_dict[elem]
         else:
-            logging.error('******** '+elem+' result is not allowed  ! *********')
+            logger.error('******** '+elem+' result is not allowed  ! *********')
 
     return results
 
@@ -591,7 +606,7 @@ def setup_classifier(**kwargs):
     
     ############## Feature Selection #########################
     if f_sel == 'True':
-        logging.info('Feature Selection selected.')
+        logger.info('Feature Selection selected.')
         fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  
                                                 FractionTailSelector(0.05,
                                                                      mode='select',
@@ -599,7 +614,7 @@ def setup_classifier(**kwargs):
         fclf = FeatureSelectionClassifier(clf, fsel)
 
     elif f_sel == 'Fixed':
-        logging.info('Fixed Feature Selection selected.')
+        logger.info('Fixed Feature Selection selected.')
         fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  
                                                 FixedNElementTailSelector(100,
                                                                      mode='select',
@@ -609,7 +624,7 @@ def setup_classifier(**kwargs):
     elif f_sel == 'PCA':
         from mvpa2.mappers.skl_adaptor import SKLTransformer
         from sklearn.decomposition import PCA
-        logging.info('Fixed Feature Selection selected.')
+        logger.info('Fixed Feature Selection selected.')
         fsel = SKLTransformer(PCA(n_components=45))
         
         fclf = FeatureSelectionClassifier(clf, fsel)
@@ -668,7 +683,7 @@ def setup_classifier(**kwargs):
                                null_dist=distr_est,
                                enable_ca=['stats', 'repetition_results'])
 
-    logging.info('Classifier set...')
+    logger.info('Classifier set...')
 
     return [fclf, cvte]
 
@@ -684,7 +699,7 @@ def clustering(ds, n_clusters=6):
 
     kmeans = KMeans(init='k-means++', n_clusters=n_clusters, n_init=10)
 
-    logging.info('Clustering with ' + str(n_clusters) + ' clusters...')
+    logger.info('Clustering with ' + str(n_clusters) + ' clusters...')
     cluster_label = kmeans.fit_predict(data)
     dist = squareform(pdist(data, 'euclidean'))
 
@@ -705,7 +720,7 @@ def clustering(ds, n_clusters=6):
         if elem in allowed_keys:
             results[elem] = results_dict[elem]
         else:
-            logging.error('******** ' + elem + ' result is not allowed! *********')
+            logger.error('******** ' + elem + ' result is not allowed! *********')
 
     return results
 
@@ -738,7 +753,7 @@ def clustering_analysis(ds_src, ds_tar, analysis, **kwargs):
             mds = MDS(n_components=2, max_iter=2000,
                    eps=1e-9, random_state=seed,
                    n_jobs=1)
-            logging.info('Multidimensional scaling is performing...')
+            logger.info('Multidimensional scaling is performing...')
             pos = mds.fit_transform(r_clustering[label]['dist'])
             r_clustering[label]['pos'] = pos
 

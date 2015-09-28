@@ -12,11 +12,14 @@ import os
 import copy
 from mvpa_itab.sl_similarity import *
 from mvpa2.suite import vstack, Sphere, Searchlight, IndexQueryEngine, Splitter
+import mvpa_itab.results as rs
+from wx import PreDatePickerCtrl
+
+logger = logging.getLogger(__name__)
     
+def test_spatiotemporal(path, subjects, conf_file, type_, **kwargs):
     
-def test_spatiotemporal(path, subjects, conf_file, type, **kwargs):
-    
-    conf = read_configuration(path, conf_file, type)
+    conf = read_configuration(path, conf_file, type_)
     
     for arg in kwargs:
         conf[arg] = kwargs[arg]
@@ -24,14 +27,18 @@ def test_spatiotemporal(path, subjects, conf_file, type, **kwargs):
             balance = kwargs[arg]
     
     total_results = dict()
+    
     data_path = conf['data_path']
+    conf['analysis_type'] = 'spatiotemporal'
+    conf['analysis_task'] = type_
+    
     for subj in subjects:
         try:
-            ds = load_dataset(data_path, subj, type, **conf)
+            ds = load_dataset(data_path, subj, type_, **conf)
         except Exception, err:
             print err
             continue
-        ds = preprocess_dataset(ds, type, **conf)
+        ds = preprocess_dataset(ds, type_, **conf)
         
         if 'balance' in locals() and balance == True:
             if conf['label_included'] == 'all' and \
@@ -42,18 +49,17 @@ def test_spatiotemporal(path, subjects, conf_file, type, **kwargs):
         
         total_results[subj] = r
     
-    conf['analysis_type'] = 'spatiotemporal'
-    conf['analysis_task'] = type
+
     conf['classes'] = np.unique(ds.targets)
     
     save_results(path, total_results, conf)
     
     return total_results
 
-def test_spatial(path, subjects, conf_file, type, **kwargs):
+def test_spatial(path, subjects, conf_file, type_, **kwargs):
     
     
-    conf = read_configuration(path, conf_file, type)
+    conf = read_configuration(path, conf_file, type_)
     
     for arg in kwargs:
         conf[arg] = kwargs[arg]
@@ -61,31 +67,37 @@ def test_spatial(path, subjects, conf_file, type, **kwargs):
     total_results = dict()
     
     data_path = conf['data_path']
+        
+    conf['analysis_type'] = 'spatial'
+    conf['analysis_task'] = type_
+    
+    result = rs.DecodingResults(path, conf)
     
     for subj in subjects:
         print '------'
         try:
-            ds = load_dataset(data_path, subj, type, **conf)
+            ds = load_dataset(data_path, subj, type_, **conf)
         except Exception, err:
             print err
             continue
         
-        ds = preprocess_dataset(ds, type, **conf)
+        ds = preprocess_dataset(ds, type_, **conf)
         
         r = spatial(ds, **conf)
-        
         total_results[subj] = r
         
-        #del ds
+        subj_result = rs.DecodingSubjectResult(subj, r)
         
-    
-    conf['analysis_type'] = 'spatial'
-    conf['analysis_task'] = type
+        result.add(subj_result)
+        
+    #result.save()
+    result.summarize()
+
     conf['classes'] = np.unique(ds.targets)  
     #save_results()
-    save_results(path, total_results, conf)
+    #save_results(path, total_results, conf)
     
-    return total_results
+    return total_results, subj_result
 
 
 def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs):    
@@ -201,8 +213,12 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     
     total_results = dict()
     
+    
+    collection = rs.ResultsCollection()
+    
+    
     for subj in subjects:
-        print '-----------'
+        print '-------------------'
         
         if (len(subjects) > 1) or (subj != 'group'):
             try:
@@ -212,63 +228,69 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
                 print err
                 continue
          
-            #Evaluate if is correct to do further normalization after merging two ds. 
+        # Evaluate if is correct to do further normalization after merging two ds. 
         ds_src = preprocess_dataset(ds_src, source, **conf_src)
         ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
-
+        
         if conf_src['label_included'] == 'all' and \
            conf_src['label_dropped'] != 'fixation':
                 print 'Balancing dataset...'
                 ds_src = balance_dataset(ds_src, 'fixation')        
         
+        # Make cross-decoding
         r = transfer_learning(ds_src, ds_tar, analysis, **conf_src)
         
         
         
+        
+        # Now we have cross-decoding results we could process it
         pred = np.array(r['classifier'].ca.predictions)
+
         targets = r['targets']
         
         c_m = ConfusionMatrix(predictions=pred, targets=targets)
         c_m.compute()
         r['confusion_target'] = c_m
-        print c_m
         
+        c_new = cross_decoding_confusion(pred, targets, map_list)
+        r['confusion_total'] = c_new
         
+        print c_new
+        
+        # Similarity Analysis
         if calculateSimilarity == 'True':
             if 'p' not in locals():
                 print 'Ciao!'
-            
-            
-            print r['ds_tar'].shape
-            print r['ds_src'].shape
+
             
             mahala_data = similarity_measure(r['ds_tar'], r['ds_src'], 
                                              r, p_value=p, method='mahalanobis')
+            
             r['mahalanobis_similarity'] = mahala_data
-            #print tr_pred
-        
-            c_mat_mahala = ConfusionMatrix(predictions=mahala_data[0][mahala_data[1]].T[1], 
-                                           targets=mahala_data[0][mahala_data[1]].T[0])
-            c_mat_mahala.compute()
-            r['confusion_mahala'] = c_mat_mahala
+            r['confusion_mahala'] = mahala_data['confusion_mahalanobis']
         
         else:
             r['mahalanobis_similarity'] = []
             r['confusion_mahala'] = 'Null'
-            
-        d_prime, beta, c, c_new = signal_detection_measures(pred, targets, map_list)
-        r['d_prime'] = d_prime
-        r['beta'] = beta
-        r['c'] = c
-        r['confusion_total'] = c_new
         
-        '''
-        d_prime_maha, c_new_maha = d_prime_statistics(tr_pred.T[1], tr_pred.T[0], map_list)
-        r['d_prime_maha'] = d_prime_maha
-        r['confusion_tot_maha'] = c_new_maha
-        '''
+        # Signal Detection Theory Analysis
+        sdt_res = signal_detection_measures(c_new)
+        
+        for k_,v_ in sdt_res.items():
+            r[k_] = v_
+            
+            '''
+            Same code of:
+        
+            r['d_prime'] = d_prime
+            r['beta'] = beta
+            r['c'] = c
+            '''
         
         total_results[subj] = r
+        
+        # Save each subject
+        
         
     conf_src['analysis_type'] = 'transfer_learning'
     conf_src['analysis_task'] = source
@@ -278,37 +300,50 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     if (analysis_type=='group'):
         path = path[0]
     
-    save_results(path, total_results, conf_src)
+    #save_results(path, total_results, conf_src)
     
-    return [total_results, r['ds_src'], r['ds_tar']]
+    return [total_results, r['ds_src'], r['ds_tar'], mahala_data]
 
 
-def test_searchlight(path, subjects, conf_file, type, **kwargs):
+def test_searchlight(path, subjects, conf_file, type_, **kwargs):
     
     
-    conf = read_configuration(path, conf_file, type)
+    conf = read_configuration(path, conf_file, type_)
     
     for arg in kwargs:
         conf[arg] = kwargs[arg]
     
-    total_results = dict()
-    data_path = conf['data_path']
-    for subj in subjects:
-        
-        ds = load_dataset(data_path, subj, type, **conf)
-        ds = preprocess_dataset(ds, type, **conf)
-        
-        r = searchlight(ds, **kwargs)
-        
-        total_results[subj] = r
     
     conf['analysis_type'] = 'searchlight'
-    conf['analysis_task'] = type
+    conf['analysis_task'] = type_
+    
+    total_results = dict()
+    data_path = conf['data_path']
+    
+    #
+    result = rs.SearchlightResults(path, conf)
+    #
+    
+    for subj in subjects:
+        
+        ds = load_dataset(data_path, subj, type_, **conf)
+        ds = preprocess_dataset(ds, type_, **conf)
+        
+        r = searchlight(ds, **kwargs)
+        subj_result = rs.SearchlightSubjectResult(subj, r)
+        total_results[subj] = r
+        
+        result.add(subj_result)
+    
+    result.save()
+    result.summarize()
+    
+
     conf['classes'] = np.unique(ds.targets)  
     #save_results()
-    save_results(path, total_results, conf)
+    #save_results(path, total_results, conf)
     
-    return total_results
+    return result, r, subj_result
 
 def test_searchlight_similarity(path,
                                 subjects, 
@@ -443,8 +478,6 @@ def test_searchlight_cross_decoding(path, subjects, conf_file, type, **kwargs):
         
         
 
-
-
 def test_group_mvpa(path, subjects, analysis,  conf_file, type='task', **kwargs):
     
        
@@ -453,10 +486,9 @@ def test_group_mvpa(path, subjects, analysis,  conf_file, type='task', **kwargs)
 
 #####################################################################
 
-def signal_detection_measures(predictions, targets, map_list):
-    
+def cross_decoding_confusion(predictions, targets, map_list):
     '''
-    map_list =  two-element list, is what we expect the classifier did first element
+    map_list =  two-element list, is what we expect the classifier did when it cross-decodes
                 first element is the prediction
                 second element is the label of second ds to be predicted
     '''
@@ -477,14 +509,19 @@ def signal_detection_measures(predictions, targets, map_list):
     new_predictions[~mask_predictions] = new_label_2
     new_targets[~mask_targets] = new_label_2
     
-    
     c_matrix = ConfusionMatrix(predictions=new_predictions, targets=new_targets)
     c_matrix.compute()
     
+    return c_matrix
+
+def signal_detection_measures(confusion_):
+    
+    result = dict()
+
     from scipy.stats import norm
     
-    hit_rate = c_matrix.stats['TP']/np.float_(c_matrix.stats['P'])
-    false_rate = c_matrix.stats['FP']/np.float_(c_matrix.stats['N'])
+    hit_rate = confusion_.stats['TP']/np.float_(confusion_.stats['P'])
+    false_rate = confusion_.stats['FP']/np.float_(confusion_.stats['N'])
     
     d_prime = norm.ppf(hit_rate) - norm.ppf(false_rate)
     
@@ -492,8 +529,11 @@ def signal_detection_measures(predictions, targets, map_list):
     
     c = - 0.5 * (norm.ppf(hit_rate) + norm.ppf(false_rate))
     
-       
-    return d_prime[0], beta[0], c[0], c_matrix
+    result['beta'] = beta[0]
+    result['d_prime'] = d_prime[0]
+    result['c'] = c[0]
+    
+    return result
     
 def subjects_merged_ds(path, subjects, conf_file, task, **kwargs):
     
