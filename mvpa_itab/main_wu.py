@@ -11,7 +11,7 @@ from sklearn.cluster import KMeans
 from scipy.spatial.distance import squareform, pdist
 from mvpa_itab.io.base import *
 from utils import *
-from mvpa_itab.sl_similarity import *
+from mvpa_itab.similarity.searchlight import *
 from mvpa2.suite import eventrelated_dataset, find_events, debug
 from mvpa2.suite import poly_detrend, zscore, mean_group_sample, mean_sample
 from mvpa2.suite import LinearCSVMC, GNB, QDA, LDA, SMLR, GPR, SKLLearnerAdapter
@@ -212,7 +212,7 @@ def preprocess_dataset(ds, type_, **kwargs):
         avg_mapper = mean_group_sample(['event_num']) 
         ds = ds.get_mapped(avg_mapper)     
     
-    '''
+    
     logger.info('Dataset preprocessing: Normalization feature-wise...')
     if img_dim == 4:
         zscore(ds, chunks_attr='file')
@@ -225,7 +225,7 @@ def preprocess_dataset(ds, type_, **kwargs):
     ds.samples /= np.std(ds, axis=1)[:, None]
     
     ds.samples[np.isnan(ds.samples)] = 0
-    
+    '''
     
     ds.a.events = find_events(#event= ds.sa.event_num, 
                               chunks = ds.sa.chunks, 
@@ -283,8 +283,8 @@ def spatial(ds, **kwargs):
         sensana = fclf.get_sensitivity_analyzer()
     except Exception, err:
         allowed_keys = ['map', 'sensitivities', 'stats', 
-                        'mapper', 'classifier', 'ds', 
-                        'pvalue', 'p']
+                        'mapper', 'classifier', 'ds_src', 
+                        'perm_pvalue', 'p']
         
         allowed_results = [None, None, cvte.ca.stats, 
                            ds.a.mapper, fclf, ds, 
@@ -435,7 +435,7 @@ def spatiotemporal(ds, **kwargs):
     except Exception, err:
         allowed_keys = ['map', 'sensitivities', 'stats', 
                         'mapper', 'classifier', 'ds', 
-                        'pvalue', 'p']
+                        'perm_pvalue', 'p']
         
         allowed_results = [None, None, cvte.ca.stats, 
                            evds.a.mapper, fclf, evds, 
@@ -516,17 +516,11 @@ def transfer_learning(ds_src, ds_tar, analysis, **kwargs):
     #   Pack_results
     results = dict()
     #del enable_results
-    
-    if 'enable_results' not in locals():
         
-        enable_results = ['decoding_result', 'targets', 'classifier', 'predictions',
-                    'fclf', 'ds_tar', 'ds_src']
-
-    '''
     allowed_keys = ['targets', 'classifier', 'map',
                     'stats', 'sensitivities', 'mapper',
-                    'predictions','fclf', 'ds_src', 'ds_tar', 'pvalue', 'p']
-    '''
+                    'predictions','fclf', 'ds_src', 'ds_tar', 'perm_pvalue', 'p']
+    
       
 
     if isinstance(classifier, FeatureSelectionClassifier):
@@ -534,7 +528,7 @@ def transfer_learning(ds_src, ds_tar, analysis, **kwargs):
     else:
         classifier_s = classifier
     
-    '''
+   
     allowed_results = [ds_tar.targets, classifier_s, src_result['map'], 
                        src_result['stats'], src_result['sensitivities'], 
                        src_result['mapper'], predictions, 
@@ -547,16 +541,12 @@ def transfer_learning(ds_src, ds_tar, analysis, **kwargs):
     
     allowed_results = [src_result, ds_tar.targets, classifier_s, predictions, 
                        classifier, ds_tar, src_result['ds']]
-    
+    '''
     
     results_dict = dict(zip(allowed_keys, allowed_results))
 
-    for elem in enable_results:
-
-        if elem in allowed_keys:
-            results[elem] = results_dict[elem]
-        else:
-            logger.error('******** '+elem+' result is not allowed  ! *********')
+    for elem in allowed_keys:
+        results[elem] = results_dict[elem]
 
     return results
 

@@ -10,10 +10,9 @@ from io.base import *
 from mvpa2.clfs.transerror import ConfusionMatrix
 import os
 import copy
-from mvpa_itab.sl_similarity import *
+from mvpa_itab.similarity.cross_decoding import *
 from mvpa2.suite import vstack, Sphere, Searchlight, IndexQueryEngine, Splitter
 import mvpa_itab.results as rs
-from wx import PreDatePickerCtrl
 
 logger = logging.getLogger(__name__)
     
@@ -88,7 +87,7 @@ def test_spatial(path, subjects, conf_file, type_, **kwargs):
         
         subj_result = rs.DecodingSubjectResult(subj, r)
         
-        result.add(subj_result)
+        result.aggregate(subj_result)
         
     #result.save()
     result.summarize()
@@ -203,6 +202,11 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         data_path = conf_src['data_path']
     
     
+    conf_src['analysis_type'] = 'transfer_learning'
+    conf_src['analysis_task'] = source
+    conf_src['analysis_func'] = analysis.func_name
+    
+    
     for arg in conf_src:
         if arg == 'map_list':
             map_list = conf_src[arg].split(',')
@@ -214,7 +218,21 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     total_results = dict()
     
     
-    collection = rs.ResultsCollection()
+    
+    
+    summarizers = [rs.CrossDecodingSummarizer(),
+                   rs.SimilaritySummarizer(),
+                   rs.DecodingSummarizer(),
+                   rs.SignalDetectionSummarizer(),
+                   ]
+    
+    savers = [rs.CrossDecodingSaver(),
+                   rs.SimilaritySaver(),
+                   rs.DecodingSaver(),
+                   rs.SignalDetectionSaver(),
+                   ]
+    
+    collection = rs.ResultsCollection(conf_src, path, summarizers)
     
     
     for subj in subjects:
@@ -266,11 +284,13 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
             mahala_data = similarity_measure(r['ds_tar'], r['ds_src'], 
                                              r, p_value=p, method='mahalanobis')
             
-            r['mahalanobis_similarity'] = mahala_data
+            #r['mahalanobis_similarity'] = mahala_data
+            for k_,v_ in mahala_data.items():
+                r[k_] = v_
             r['confusion_mahala'] = mahala_data['confusion_mahalanobis']
         
         else:
-            r['mahalanobis_similarity'] = []
+            #r['mahalanobis_similarity'] = []
             r['confusion_mahala'] = 'Null'
         
         # Signal Detection Theory Analysis
@@ -288,14 +308,14 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
             '''
         
         total_results[subj] = r
+        subj_result = rs.SubjectResult(subj, r, savers=savers)
         
+        collection.add(subj_result)
         # Save each subject
-        
-        
-    conf_src['analysis_type'] = 'transfer_learning'
-    conf_src['analysis_task'] = source
-    conf_src['analysis_func'] = analysis.func_name
-    conf_src['classes'] = np.unique(ds_src.targets)
+    collection.summarize()   
+    
+    conf_src['classes'] = np.unique(ds_src.targets)    
+
     
     if (analysis_type=='group'):
         path = path[0]
@@ -321,7 +341,9 @@ def test_searchlight(path, subjects, conf_file, type_, **kwargs):
     data_path = conf['data_path']
     
     #
-    result = rs.SearchlightResults(path, conf)
+    summarizers = [rs.SearchlightSummarizer()]
+    savers = [rs.SearchlightSaver()]
+    result = rs.ResultsCollection(conf, path, summarizers)
     #
     
     for subj in subjects:
@@ -330,12 +352,12 @@ def test_searchlight(path, subjects, conf_file, type_, **kwargs):
         ds = preprocess_dataset(ds, type_, **conf)
         
         r = searchlight(ds, **kwargs)
-        subj_result = rs.SearchlightSubjectResult(subj, r)
+        
+        subj_result = rs.SubjectResult(subj, r, savers)
         total_results[subj] = r
         
         result.add(subj_result)
     
-    result.save()
     result.summarize()
     
 

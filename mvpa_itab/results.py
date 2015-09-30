@@ -5,21 +5,35 @@ import time
 import logging
 from scipy.stats import ttest_1samp
 import pickle
-
-
-
-
-class Results(object):
-    
-    
-    ## TODO: Could be useful do a summary header?
-    
-    def __init__(self, path, conf):
         
-        self._result_array = []
+
+
+class SubjectResult(object):
+    
+    def __init__(self, name, result_dict, savers=None):
+        self.name = name
+        for k, v in result_dict.items():
+            setattr(self, '_'+str(k), v)
+        if savers != None:
+            self.savers = savers
+    
+    def add_result(self, res_name, value):
+        setattr(self, res_name, value)
+        
+    def set_savers(self, savers):
+        "List of objects implementing a save function"
+        self.savers = savers
+
+
+   
+class ResultsCollection(object):
+    
+    
+    def __init__(self, conf, path, summarizers=None):
+        
+        self.collection = []
         self.index = 0
         self.count = 0
-        self.analysis_path = path
         self.summary = dict()
         
         # Get information to make the results dir
@@ -28,28 +42,71 @@ class Results(object):
         self._task = conf['analysis_task']
         self._analysis = conf['analysis_type']
         
+        self.analysis_path = path
         dir_ = '_'.join([datetime, self._analysis, self._mask, self._task])
         self.path = os.path.join(self.analysis_path, '0_results', dir_)
-        
+    
         make_dir(self.path)
-        
+    
+        if summarizers != None:
+            self.summarizers = summarizers
+            
+            
+    def set_summarizers(self, summarizers):
+        self.summarizers = summarizers
+    
     
     def add(self, result):
-        # For each subject result added we make a new dir to store results
+
         if isinstance(result, SubjectResult):
-            self._result_array.append(result)
-            self.count+=1
-            self._current_path = os.path.join(self.path, result.name)
-            make_dir(self._current_path)
-            self.summary[result.name] = []
+            self.count += 1
+            self.collection.append(result)
+            subj_path = os.path.join(self.path, result.name)
+            print subj_path
+            make_dir(subj_path)
+            for saver in result.savers:
+                saver.save(subj_path, result)
+        else:
+            print result.__class__
+            print type(result)
+            print SubjectResult
             
-            result.save(self._current_path)
-    
+                
+            
+   
+            
     def summarize(self):
+        #super(ResultsCollection, self).summarize()
+        for summarizer in self.summarizers:
+            for item in self.collection:
+                summarizer.aggregate(item)
+            summarizer.summarize(self.path)   
+
+
+
+class Summarizer(object):
+    
+    ## TODO: Could be useful do a summary header?
+    
+    def __init__(self):
         
-        fname = "analysis_summary_%s_%s.txt" %(self._mask, self._task)
-        file_summary = open(os.path.join(self.path, fname), "w")
-            
+        self.summary = dict()
+
+        
+        
+    def aggregate(self, result):
+        self.summary[result.name] = []
+        return
+    
+    def summarize(self, path):
+        # TODO: Use a template
+        self.path = path
+        
+        fname = "analysis_summary.txt"
+        file_summary = open(os.path.join(self.path, fname), "a")
+        
+        file_summary.write(','.join(self.header))
+        file_summary.write('\n')
         for name, value in self.summary.items():
         
             file_summary.write(name+',')
@@ -59,56 +116,47 @@ class Results(object):
                 
             file_summary.write('\n')
         
-        file_summary.close() 
-        
-
-    
-class ResultsCollection(Results):
-    
-    def __init__(self):
-        self.collection = []        
-    
-    def summarize(self):
-        super(ResultsCollection, self).summarize()
-        for item in self.collection:
-            item.summarize()   
+        file_summary.close()
 
 
-        
-class SearchlightResults(Results):
+               
+class SearchlightSummarizer(Summarizer):
     
     expected_fields = ['name', 'map', 'radius']
     
-    def __init__(self, path, conf):
-
-        super(SearchlightResults, self).__init__(path, conf)
+    def __init__(self, p=0.05):
+        Summarizer.__init__(self)
         self._total_map = []        
+        self._p_value = p
 
-
-    def add(self, result):
-        """
-        When we add a result, we store new single subject results
-        """
-        super(SearchlightResults, self).add(result)
+    def aggregate(self, result):
         
-        if not isinstance(result, SearchlightSubjectResult):
+        """
+        When we aggregate a result, we store new single subject results
+        """
+        super(SearchlightSummarizer, self).aggregate(result)
+        if not isinstance(result, SubjectResult):
             raise ValueError("Bad class added!")
         
+        if not hasattr(self, '_affine'):
+            self._affine = result._map.get_affine()
+        if not hasattr(self, '_radius'):
+            self._radius = result._radius
 
         self._total_map.append(result._mean_map)
 
     
-    def save(self):
+    def summarize(self, path):
+        self.path = path
         """
         Function who saves the union of subject's map to easily see it
         and the mean map across subjects
-        """
-        if self.count == 0:
-            raise ValueError()        
+        """     
         
+        threshold_value = self._p_value
         total_map = self._total_map
-        affine = self._result_array[0]._map.get_affine()
-        radius = self._result_array[0]._radius
+        affine = self._affine
+        radius = self._radius
             
         total_map = np.rollaxis(np.array(total_map), 0, 4)
         total_img = ni.Nifti1Image(total_map, affine=affine)
@@ -121,27 +169,8 @@ class SearchlightResults(Results):
         fname = "accuracy_map_radius_%s_searchlight_mean_subj.nii.gz" % radius
         ni.save(mean_img, os.path.join(self.path,fname))         
         
-        logging.info('Results writed in '+self.path)
-        
-        self._total_map = total_map
-        
-        return self.path
-
-        
-    def summarize(self, threshold_value=0.5):
-        """
-        This is used to do basic tests
-        """
-        if self._total_map == []:
-            raise ValueError("Try to do save() before summarize()!") 
-        
-        if self.count == 0:
-            raise ValueError("Result object is empty!")
-        
-        affine = self._result_array[0]._map.get_affine()
-        
-        total_map = self._total_map
-        
+        logging.info('Summarizer writed in '+self.path)
+                
         t, p = ttest_1samp(total_map, threshold_value, axis=3)
         
         fname = "t_map_vs_threshold_%s_uncorrected.nii.gz" % threshold_value 
@@ -154,15 +183,15 @@ class SearchlightResults(Results):
 
 
 
-class DecodingResults(Results):
+class DecodingSummarizer(Summarizer):
     
-    def __init__(self, path, conf):
-        super(DecodingResults, self).__init__(path,conf)
+    def __init__(self):
+        super(DecodingSummarizer, self).__init__()
     
     
-    def add(self, result):
-        super(DecodingResults, self).add(result)
-    
+    def aggregate(self, result):
+        super(DecodingSummarizer, self).aggregate(result)
+        self.header = ['name','accuracy', 'pvalue']
         self.summary[result.name].append(result._stats.stats['ACC'])
         self.summary[result.name].append(result._p)
     
@@ -173,22 +202,23 @@ class DecodingResults(Results):
 
 
 
-class SimilarityResults(Results):
+class SimilaritySummarizer(Summarizer):
         
-    def __init__(self, path, conf):
-        super(SimilarityResults, self).__init__(path,conf)
+    def __init__(self):
+        super(SimilaritySummarizer, self).__init__()
         self._histogram_data = []
         
         
-    def add(self, result):
-        super(SimilarityResults, self).add(result)
+    def aggregate(self, result):
+        super(SimilaritySummarizer, self).aggregate(result)
         
         self._histogram_data.append(result._data)
         self._unique_predictions = result._unique_predictions
         self._unique_targets = result._unique_targets
-        self._items = result._values
+        self._items = SimilaritySaver._values
         
-    def summarize(self):
+    def summarize(self, path):
+        self.path = path
         
         import matplotlib.pyplot as pl
         
@@ -196,8 +226,8 @@ class SimilarityResults(Results):
             fig = pl.figure()
             
             for i, k_ in enumerate(self._items):
-                
-                ax = fig.add_subplot(i, 1, len(self._items))
+                print i, len(self._items)
+                ax = fig.add_subplot(len(self._items),1,(i+1))
                 
                 for p in self._unique_predictions:
                     
@@ -206,7 +236,7 @@ class SimilarityResults(Results):
                     for data_ in self._histogram_data:
                         hist_data.append(data_[p][t][k_])
                     
-                    hist_data = np.array(hist_data)
+                    hist_data = np.hstack(hist_data)
                 
                     ax.hist(hist_data, bins=35, label=p, alpha=0.5)
         
@@ -218,86 +248,66 @@ class SimilarityResults(Results):
     
     
 
-class SignalDetectionResults(Results):
+class SignalDetectionSummarizer(Summarizer):
     
-    def __init__(self, path, conf):
-        Results.__init__(self, path, conf)
+    def __init__(self):
+        super(SignalDetectionSummarizer, self).__init__()
         
-    def add(self, result):
-        Results.add(self, result)
-        
+    def aggregate(self, result):
+        super(SignalDetectionSummarizer, self).aggregate(result)
+        self.header = ['name', 'beta', 'd_prime', 'c']
         self.summary[result.name].append(result._beta)
         self.summary[result.name].append(result._d_prime)
         self.summary[result.name].append(result._c)
 
 
-class CrossDecodingResults(Results):
+class CrossDecodingSummarizer(Summarizer):
     
-    def __init__(self, path, conf):
-        Results.__init__(self, path, conf)
-        
-    def add(self, result):
-        Results.add(self, result)
-        
+    def __init__(self):
+        super(CrossDecodingSummarizer, self).__init__()
+                
+    def aggregate(self, result):
+        super(CrossDecodingSummarizer, self).aggregate(result)
+        self.header = ['name','cross_accuracy']
         self.summary[result.name].append(result._confusion_total.stats['ACC'])
 
   
-        
-class SubjectResult(object):
-    
-    def __init__(self, name, result_dict):
-        self.name = name
-        for k, v in result_dict.items():
-            setattr(self, '_'+str(k), v)
-    
-    def add_result(self, res_name, value):
-        setattr(self, res_name, value)
-
-
-class SubjectResultCollection(SubjectResult):
+class Saver(object):
     
     def __init__(self):
-        self.collection = []
-        
-    def add(self, subj_result):
-        self.collection.append(subj_result)
-        
-    def save(self, path):
-        for result_ in self.collection:
-            result_.save(path)
+        return
+    
+    def save(self, path, result):
+        return
 
         
 
-class CrossDecodingSubjectResult(SubjectResult):
+class CrossDecodingSaver(Saver):
     
     _fields = ['confusion_target', 'confusion_total']
-    
-    def __init__(self, name, result_dict):
-        SubjectResult.__init__(self, name, result_dict)
-        
-    def save(self, path):
+            
+                
+    def save(self, path, result):
         
         for k in self._fields:
-            matrix = getattr(self, '_'+k)
-            fname = "%s_%s.txt" % (self.name, k)
+            matrix = getattr(result, '_'+k)
+            fname = "%s_%s.txt" % (result.name, k)
             file_ = open(os.path.join(path, fname), 'w')
             file_.write(str(matrix))
             file_.close()
 
 
-       
-
-class SearchlightSubjectResult(SubjectResult):
+class SearchlightSaver(Saver):
             
     
-    def save(self, path):
+    def save(self, path, result):
         """
-        When we add a result we store new single subject results
+        When we aggregate a result we store new single subject results
         """
         
-        name_ = self.name
-        radius_ = np.int(self._radius)
-        map_ = self._map
+        name_ = result.name
+        radius_ = np.int(result._radius)
+        map_ = result._map
         
         print map_.get_affine()
         
@@ -314,35 +324,35 @@ class SearchlightSubjectResult(SubjectResult):
         fname = "%s_radius_%s_searchlight_total_map.nii.gz" % (name_, str(radius_))
         ni.save(map_, os.path.join(path,fname))
         
-        self._mean_map = return_map
+        result._mean_map = return_map
 
 
-class DecodingSubjectResult(SubjectResult):
+class DecodingSaver(Saver):
     
-    _object_attributes = ['classifier', 'mapper', 'ds', 'stats'] 
+    _object_attributes = ['classifier', 'mapper', 'ds_src', 'stats'] 
     
-    def save(self, path):
+    def save(self, path, result):
         
-        map_mean = self._map.pop()
+        map_mean = result._map.pop()
         map_mean_data = map_mean.get_data()
         map_mean_data = (map_mean_data - np.mean(map_mean_data)) / np.std(map_mean_data)
-        fname = "%s_mean_map.nii.gz" % self.name
+        fname = "%s_mean_map.nii.gz" % result.name
         img_zscore = ni.Nifti1Image(map_mean_data, map_mean.get_affine())
         ni.save(img_zscore, os.path.join(path, fname))
  
-        for map_, tar in zip(self._map, self._sensitivities.sa.targets):
+        for map_, tar in zip(result._map, result._sensitivities.sa.targets):
             classes_ = '_'.join(tar)
-            fname = "%s_%s_map.nii.gz" % (self.name, classes_)
+            fname = "%s_%s_map.nii.gz" % (result.name, classes_)
             map_data = map_.get_data()
             map_data_zscore = (map_data - np.mean(map_data)) / np.std(map_data)
             map_zscore = ni.Nifti1Image(map_data_zscore, map_.get_affine())
             ni.save(map_zscore, os.path.join(path,fname))
                 
         # Save statistics
-        stats = self._stats
-        fname = "%s_stats.txt" % self.name
+        stats = result._stats
+        fname = "%s_stats.txt" % result.name
         file_ = open(os.path.join(path,fname), 'w')
-        p_value = self._pvalue
+        p_value = result._perm_pvalue
         file_.write(str(stats))
         file_.write('\n\np-values for each fold \n')
         for v in p_value:
@@ -353,57 +363,47 @@ class DecodingSubjectResult(SubjectResult):
         file_.close()
         
         for obj_name in self._object_attributes:
-            obj = getattr(self, '_'+obj_name)
+            obj = getattr(result, '_'+obj_name)
             if obj_name == 'classifier':
                 obj = obj.ca
-            fname = "%s_%s.pyobj" % (self.name, obj_name)          
+            fname = "%s_%s.pyobj" % (result.name, obj_name)          
             file_ = open(os.path.join(path,fname), 'w')
             pickle.dump(obj, file_)
             file_.close()
 
 
-class SimilaritySubjectResult(SubjectResult):
+class SimilaritySaver(Saver):
     
     _values = ['distances', 'pvalues']
-    
-    def __init__(self, name, dict_):
-        super(SimilaritySubjectResult, self).__init__(name, dict_)
+      
+            
+    def save(self, path, result):
         
-        self._unique_targets = np.unique(self._similarity_data['labels'])
-        self._unique_predictions = np.unique(self._similarity_data['predictions'])
-        
-        self._data = {}
-        for p in self._unique_predictions:
-            self._data[p] = {}
-            for t in self._unique_targets:
-                self._data[p][t] = {}
-        
-  
-    def save(self, path):
+        self._get_structures(result)
         
         import matplotlib.pyplot as pl
         # TODO: Keep in mind! They should be saved when similarity has been performed!!!
-        similarity_data = self._similarity_data
-        similarity_mask = self._similarity_mask
-        threshold = self._threshold_value
+        similarity_data = result._similarity_data
+        similarity_mask = result._similarity_mask
+        threshold = result._threshold_value
         
         # Renaming variables to better read
         ds_targets = similarity_data['labels']
-        class_prediction_tar = similarity_data['predictions']
+        #class_prediction_tar = similarity_data['predictions']
         
-        fname = '%s_mahalanobis_data.txt' % self.name
+        fname = '%s_mahalanobis_data.txt' % result.name
         file_ = open(os.path.join(path, fname), 'w')
         
         
         plot_list = dict()
               
                 
-        for lab in self._unique_predictions:
+        for lab in result._unique_predictions:
             
             f, ax = pl.subplots(2, 1)
             plot_list[lab] = [f, ax]
             
-            for tar in self._unique_targets: 
+            for tar in result._unique_targets: 
             
                 # Select data belonging to target loop class
                 target_mask = ds_targets == tar
@@ -437,21 +437,21 @@ class SimilaritySubjectResult(SubjectResult):
                     occurrence_.append(str(key_total_data))
                     
                     # TODO: Maybe is possible to collapse both file in a single one!
-                    histo_d_fname = "%s_hist_%s_%s_%s.txt" % (self.name, lab, tar, key_)
+                    histo_d_fname = "%s_hist_%s_%s_%s.txt" % (result.name, lab, tar, key_)
                     np.savetxt(os.path.join(path, histo_d_fname), np.float_(key_data))
                     
                     # Histogram plots
                     # TODO: Maybe it's better to do something else!
                     # TODO: Unique values of bins!
                     plot_list[lab][1][i].hist(np.float_(key_data), bins=35, label=tar, alpha=0.5)
-                    self._data[lab][tar][key_] = np.float_(key_data)
+                    result._data[lab][tar][key_] = np.float_(key_data)
                     
                     if key_ == 'pvalues':
                         continue
                     
                     
                     ## TODO: Insert plot in a function and let the user decide if he wants it!
-                    total_data = getattr(self, '_'+key_)
+                    total_data = getattr(result, '_'+key_)
                     data = total_data[lab][target_mask]
                     
                     f_d = pl.figure()
@@ -466,10 +466,10 @@ class SimilaritySubjectResult(SubjectResult):
                     
                     a_d.axhline(y = np.mean(data), color='black', linestyle=':', linewidth=2)
                     
-                    pname = "%s_%s_plot_%s_%s.png" % (self.name, key_, lab, tar)
+                    pname = "%s_%s_plot_%s_%s.png" % (result.name, key_, lab, tar)
                     f_d.savefig(os.path.join(path, pname))
                     
-                    fname = "%s_%s_txt_%s_%s.txt" % (self.name, key_, lab, tar)
+                    fname = "%s_%s_txt_%s_%s.txt" % (result.name, key_, lab, tar)
                     np.savetxt(os.path.join(path, fname), 
                                data, fmt='%.4f')               
 
@@ -486,14 +486,14 @@ class SimilaritySubjectResult(SubjectResult):
             ax2.legend()
             ax1.axvline(x=threshold, ymax=ax1.get_ylim()[1], color='r', linestyle='--', linewidth=3)
             ax2.axvline(x=0.99, ymax=ax2.get_ylim()[1], color='r', linestyle='--', linewidth=3)
-            fig_name = os.path.join(path, self.name+'_histogram_'+lab+'.png')
+            fig_name = os.path.join(path, result.name+'_histogram_'+lab+'.png')
             plot_list[lab][0].savefig(fig_name)
 
         file_.write('\nthreshold '+str(threshold))       
         file_.close()
         
-        cmatrix_mahala = self._confusion_mahalanobis
-        fname = "%s_confusion_mahala.txt" % self.name
+        cmatrix_mahala = result._confusion_mahalanobis
+        fname = "%s_confusion_mahala.txt" % result.name
         file_ = open(os.path.join(path ,fname), 'w')
         try:
             file_.write(str(cmatrix_mahala))
@@ -502,27 +502,34 @@ class SimilaritySubjectResult(SubjectResult):
             print err
         
         file_.close()
+        
+    
+    def _get_structures(self, result):
+        result._unique_targets = np.unique(result._similarity_data['labels'])
+        result._unique_predictions = np.unique(result._similarity_data['predictions'])
+        
+        result._data = {}
+        for p in result._unique_predictions:
+            result._data[p] = {}
+            for t in result._unique_targets:
+                result._data[p][t] = {}
 
 
 
-class SignalDetectionSubjectResult(SubjectResult):
+class SignalDetectionSaver(Saver):
     
     _indexes = ['beta', 'c', 'd_prime']
-    
-    def __init__(self, name, dict_):
-        super(SignalDetectionSubjectResult, self).__init__(name, dict_)
+       
+    def save(self, path, result):
         
-    def save(self, path):
-        
-        fname = '%s_signal_detection_indexes.txt' % (self.name)
+        fname = '%s_signal_detection_indexes.txt' % (result.name)
         file_ = open(os.path.join(path, fname), 'w')
         
         for key_ in self._indexes:
-            file_.write(key+','+str(getattr(self, '_'+key_)))
+            file_.write(key_+','+str(getattr(result, '_'+key_)))
             file_.write("\n")
         
         file_.close()
-
 
 
 

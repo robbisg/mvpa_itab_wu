@@ -45,15 +45,15 @@ def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
         data_or[c] = []
     for i in range(12):
         if i < 6:
-            add = 1
+            aggregate = 1
             l = '_pre'
         else:
-            add = 2
+            aggregate = 2
             l = '_post'
         avg = []
         for c in np.unique(pred):
-            a = f.add_subplot(3,2,(c*2)+add)
-            a2 = f2.add_subplot(3,2,(c*2)+add)
+            a = f.add_subplot(3,2,(c*2)+aggregate)
+            a2 = f2.add_subplot(3,2,(c*2)+aggregate)
             a.set_title(lab[c]+l)
             #v = prob[i*run_length:(i+1)*run_length]
             v = prob[i*run_length:(i+1)*run_length] * (pred[i*run_length:(i+1)*run_length] == c)
