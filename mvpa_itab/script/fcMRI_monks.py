@@ -14,7 +14,7 @@ from mvpa_itab.stats import TTest, permutation_test
 from scipy.optimize.minpack import curve_fit
 from scipy.stats.stats import zscore
 from sklearn.metrics.metrics import mean_squared_error
-from mvpa_itab.similarity import SimilarityAnalyzer
+from mvpa_itab.similarity.analysis import SimilarityAnalyzer
 from mvpa_itab.conn.io import copy_matrix
 
 path = '/media/robbis/DATA/fmri/monks/0_results/'

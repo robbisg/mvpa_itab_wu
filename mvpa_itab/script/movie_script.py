@@ -230,7 +230,7 @@ def load_mat_dataset(datapath, bands, conditions, networks=None):
     for cond in conditions:
         for band in bands:
             filt_list = [f for f in filelist if f.find(cond) != -1 \
-                                       th and f.find(band) != -1]
+                                        and f.find(band) != -1]
             data = loadmat(os.path.join(datapath, filt_list[0]))
 
             mat_ = data[data.keys()[0]]

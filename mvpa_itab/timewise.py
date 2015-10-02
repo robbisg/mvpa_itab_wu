@@ -45,11 +45,12 @@ class AverageLinearCSVM(LinearCSVMC):
     and interface of a corresponding `Collection`.
     """
     
-    def __init__(self, C=1):
+    def __init__(self, C=1, attr='trial'):
         LinearCSVMC.__init__(self, C=1)
+        self._attribute = attr
         
     def _train(self, ds):
-        avg_mapper = mean_group_sample(['trial']) 
+        avg_mapper = mean_group_sample([self._attribute]) 
         ds = ds.get_mapped(avg_mapper)
         return LinearCSVMC._train(self, ds)
     

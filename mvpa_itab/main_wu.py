@@ -27,7 +27,7 @@ from mvpa2.suite import CrossValidation
 import os
 import cPickle as pickle
 import nibabel as ni
-import time
+from mvpa_itab import timewise
 import numpy as np
 import matplotlib.pyplot as plt
 import logging

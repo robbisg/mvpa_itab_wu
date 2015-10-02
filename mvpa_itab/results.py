@@ -1,7 +1,6 @@
 import os
 import nibabel as ni
 import numpy as np
-import time
 import logging
 from scipy.stats import ttest_1samp
 import pickle
@@ -62,7 +61,7 @@ class ResultsCollection(object):
             self.count += 1
             self.collection.append(result)
             subj_path = os.path.join(self.path, result.name)
-            print subj_path
+            logging.debug(subj_path)
             make_dir(subj_path)
             for saver in result.savers:
                 saver.save(subj_path, result)
@@ -72,9 +71,7 @@ class ResultsCollection(object):
             print SubjectResult
             
                 
-            
-   
-            
+    
     def summarize(self):
         #super(ResultsCollection, self).summarize()
         for summarizer in self.summarizers:
@@ -89,14 +86,13 @@ class Summarizer(object):
     ## TODO: Could be useful do a summary header?
     
     def __init__(self):
-        
         self.summary = dict()
-
-        
-        
+  
+  
     def aggregate(self, result):
         self.summary[result.name] = []
         return
+    
     
     def summarize(self, path):
         # TODO: Use a template
@@ -107,15 +103,12 @@ class Summarizer(object):
         
         file_summary.write(','.join(self.header))
         file_summary.write('\n')
+        
         for name, value in self.summary.items():
-        
             file_summary.write(name+',')
-
             for v in value:
-                file_summary.write(str(v)+',')
-                
+                file_summary.write(str(v)+',')    
             file_summary.write('\n')
-        
         file_summary.close()
 
 
@@ -499,7 +492,7 @@ class SimilaritySaver(Saver):
             file_.write(str(cmatrix_mahala))
         except ValueError,err:
             file_.write('None')
-            print err
+            logging.error(err)
         
         file_.close()
         
@@ -543,8 +536,9 @@ def save_image(filename, image):
     return  
 
 def get_time():
-    """Get the current time and returns a string (fmt: yymmdd_hhmmss)"""
+    """Get the current timewise and returns a string (fmt: yymmdd_hhmmss)"""
     
+    import time
     # Time acquisition
     tempo = time.localtime()
     

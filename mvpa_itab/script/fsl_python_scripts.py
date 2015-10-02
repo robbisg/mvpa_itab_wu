@@ -61,7 +61,7 @@ for d in dlist:
 
     struct_list = [m for m in s_list if m.find('mprage') != -1]
     
-    image = os.path.join(sub_dir, 'mprage', struct_list[0])	
+    image = os.path.join(sub_dir, 'mprage', struct_list[0])    
 
     command = 'fslswapdim '+ image + ' -z -x -y '+ os.path.join(sub_dir, 'mprage','mprage_orient')
     
@@ -149,31 +149,31 @@ for s in subjlist:
                     ' --iout='+ os.path.join(sub_dir, 'mprage','mprage_fnirt_3mm.nii.gz') + \
                     ' --config=/media/DATA/fmri/monks/fnirt_3mm.cnf'
 
-	print command
+    print command
 ###################################################################################
 for s in subjlist:
-	sub_dir = os.path.join(path, s)
-	
-	command = 'overlay 1 0 ' +os.path.join('/media/DATA/fmri/MNI152_T1_3mm.nii.gz') + ' 0.000000 8000 '+ \
-	             os.path.join(sub_dir, 'fmri', 'bold_mni_3mm.nii.gz')+' 100 1000 '+\
+    sub_dir = os.path.join(path, s)
+    
+    command = 'overlay 1 0 ' +os.path.join('/media/DATA/fmri/MNI152_T1_3mm.nii.gz') + ' 0.000000 8000 '+ \
+                 os.path.join(sub_dir, 'fmri', 'bold_mni_3mm.nii.gz')+' 100 1000 '+\
                   os.path.join(sub_dir, 'fmri', 'overlayed_mni.nii.gz')
 
-	print command
+    print command
 
 #' -init /media/DATA/fmri/monks/070222andzap/fmri/andzap_mprage_to_bold_no.mat' + \
 for s in subjlist:
-	sub_dir = os.path.join(path, s)	
-	
-	command = 'flirt -ref '+ os.path.join('/media/DATA/fmri/MNI152_T1_3mm_brain.nii.gz') + \
-		       ' -in ' + os.path.join(sub_dir, 'fmri', 'bold_orient.nii.gz') + \
-		       ' -omat ' + os.path.join(sub_dir, 'fmri', s[6:]+'_bold2mni.mat') + \
-		       ' -o ' + os.path.join(sub_dir, 'fmri', 'bold2mni_flirt.nii.gz') + \
-		       ' -cost normmi'
-	print command
+    sub_dir = os.path.join(path, s)    
+    
+    command = 'flirt -ref '+ os.path.join('/media/DATA/fmri/MNI152_T1_3mm_brain.nii.gz') + \
+               ' -in ' + os.path.join(sub_dir, 'fmri', 'bold_orient.nii.gz') + \
+               ' -omat ' + os.path.join(sub_dir, 'fmri', s[6:]+'_bold2mni.mat') + \
+               ' -o ' + os.path.join(sub_dir, 'fmri', 'bold2mni_flirt.nii.gz') + \
+               ' -cost normmi'
+    print command
 
 
 for s in subjlist_bad:
-	sub_dir = os.path.join(path, s)
+    sub_dir = os.path.join(path, s)
     s_list = os.listdir(os.path.join(sub_dir, 'mprage'))
     struct_list = [m for m in s_list if m.find('x') == -1 and m.find('hdr') != -1]
 
@@ -199,48 +199,48 @@ for s in subjlist:
 
     print command 
 
-	
+    
 for s in subjlist:                                                                     
-        sub_dir = os.path.join(path, s)
-        s_list = os.listdir(os.path.join(sub_dir, 'mprage'))
-        struct_list = [m for m in s_list if m.find('x') == -1 and m.find('hdr') != -1]	
-	
+    sub_dir = os.path.join(path, s)
+    s_list = os.listdir(os.path.join(sub_dir, 'mprage'))
+    struct_list = [m for m in s_list if m.find('x') == -1 and m.find('hdr') != -1]    
+    
 
-	struct_3mm = os.path.join(sub_dir, 'mprage',struct_list[0].strip('.hdr')+'_3mm')
-	
-	
-	command = 'flirt -nosearch -ref '+ struct_3mm + \
+    struct_3mm = os.path.join(sub_dir, 'mprage',struct_list[0].strip('.hdr')+'_3mm')
+    
+    
+    command = 'flirt -nosearch -ref '+ struct_3mm + \
                        ' -in '+ os.path.join(sub_dir, 'fmri','bold_orient.nii.gz') + \
                        ' -omat '+os.path.join(sub_dir, 'fmri', s[6:]+'_bold_to_mprage.mat') + \
                        ' -o '+ os.path.join(sub_dir, 'fmri','bold_flirt.nii.gz')
-	
-	
-	#print command
-	
-	bold = os.path.join(sub_dir, 'fmri','bold_orient.nii.gz')
-	
-	matrix = os.path.join(sub_dir, 'fmri', s[6:]+'_mprage_to_bold.mat')
-	
-	struct_list = [m for m in s_list if m.find('x') == -1 and m.find('warpcoef') != -1]
-	
-	command = 'fsl4.1-applywarp --ref=/media/DATA/fmri/templates_MNI_3mm/MNI152_T1_3mm'+ \
+    
+    
+    #print command
+    
+    bold = os.path.join(sub_dir, 'fmri','bold_orient.nii.gz')
+    
+    matrix = os.path.join(sub_dir, 'fmri', s[6:]+'_mprage_to_bold.mat')
+    
+    struct_list = [m for m in s_list if m.find('x') == -1 and m.find('warpcoef') != -1]
+    
+    command = 'fsl4.1-applywarp --ref=/media/DATA/fmri/templates_MNI_3mm/MNI152_T1_3mm'+ \
                                  '  --in='+ bold + \
                                  '  --premat='+ matrix + \
                                  '  --mask=/media/DATA/fmri/templates_MNI_3mm/MNI152_T1_3mm_brain_mask.nii.gz' + \
                                  '  --out='+ os.path.join(sub_dir, 'fmri', 'bold_mni_3mm_new') + \
                                  '  --warp='+os.path.join(sub_dir, 'mprage', 'mprage_orient_warpcoef.gz.nii.gz') 
                                  
-	#print '\n'
+    #print '\n'
     print command
 
 
 for s in subjlist:
-	sub_dir = os.path.join(path, s)
-	bold = os.path.join(sub_dir, 'fmri','bold_orient.nii.gz')
-	
-	
-	command = 'fslroi '+bold+' '+bold.strip('.nii.gz')+'_single 0 1'
-	print command
+    sub_dir = os.path.join(path, s)
+    bold = os.path.join(sub_dir, 'fmri','bold_orient.nii.gz')
+    
+    
+    command = 'fslroi '+bold+' '+bold.strip('.nii.gz')+'_single 0 1'
+    print command
 
 command = 'slicesdir -o '
 for s in subjlist:
@@ -257,11 +257,11 @@ list_files = []
 for s in subjlist:
     sub_dir = os.path.join(path, s)
     s_list = os.listdir(os.path.join(sub_dir, 'mprage'))
-	struct_list = [m for m in s_list if m.find('hdr') == -1 
+    struct_list = [m for m in s_list if m.find('hdr') == -1 
                    and m.find('mprage_orient') == -1 and m.find('.img') == -1]
-	list_files.append(os.path.join(sub_dir, 'fmri',struct_list[0]))
-	for f in struct_list:
-		print 'rm '+os.path.join(sub_dir, 'mprage', f)	
+    list_files.append(os.path.join(sub_dir, 'fmri',struct_list[0]))
+    for f in struct_list:
+        print 'rm '+os.path.join(sub_dir, 'mprage', f)    
 
 
 
@@ -274,36 +274,36 @@ network_list = [s for s in network_list if s.find('.') == -1]
 
 
 for f in network_list:
-	
-	sub_folder = os.listdir(os.path.join(net_path, f))
-	sub_folder = [g for g in sub_folder if g.find('.') == -1]
-	
-	main_net = ni.load(os.path.join(net_path, f, f+'.nii.gz'))
-	
-	data = np.zeros_like(main_net.get_data())
-	
-	for g in sub_folder:
-		filenet = os.listdir(os.path.join(net_path,  f, g))[0]
-		network_file = os.path.join(net_path, f, g, os.listdir(os.path.join(net_path, f, g))[0])
-		img = ni.load(network_file)
-		
-		data += 2*img.get_data()*np.float(filenet.strip('.nii.gz'))
-	
-	ni.save(ni.Nifti1Image(data, img.get_affine(), header=img.get_header()), 
+    
+    sub_folder = os.listdir(os.path.join(net_path, f))
+    sub_folder = [g for g in sub_folder if g.find('.') == -1]
+    
+    main_net = ni.load(os.path.join(net_path, f, f+'.nii.gz'))
+    
+    data = np.zeros_like(main_net.get_data())
+    
+    for g in sub_folder:
+        filenet = os.listdir(os.path.join(net_path,  f, g))[0]
+        network_file = os.path.join(net_path, f, g, os.listdir(os.path.join(net_path, f, g))[0])
+        img = ni.load(network_file)
+        
+        data += 2*img.get_data()*np.float(filenet.strip('.nii.gz'))
+    
+    ni.save(ni.Nifti1Image(data, img.get_affine(), header=img.get_header()), 
             os.path.join(net_path, f, f+'_separated.nii.gz'))
-	
-	file_new = os.path.join(net_path, f, f+'_separated.nii.gz')
-	file_old = os.path.join(net_path, f, f+'.nii.gz')
-	
-	command = 'flirt -in '+file_new+' -out '+file_new.strip('.nii.gz')+\
+    
+    file_new = os.path.join(net_path, f, f+'_separated.nii.gz')
+    file_old = os.path.join(net_path, f, f+'.nii.gz')
+    
+    command = 'flirt -in '+file_new+' -out '+file_new.strip('.nii.gz')+\
     '_3mm.nii.gz -ref /media/DATA/fmri/MNI152_T1_3mm -applyisoxfm 3 -interp nearestneighbour'
-	print command
-	
-	command = 'flirt -in '+file_old+' -out '+file_old.strip('.nii.gz')+\
+    print command
+    
+    command = 'flirt -in '+file_old+' -out '+file_old.strip('.nii.gz')+\
     '_3mm.nii.gz -ref /media/DATA/fmri/MNI152_T1_3mm -applyisoxfm 3 -interp nearestneighbour'
-	print command
-		
-		
+    print command
+        
+        
 ########### Atlas AAL conversion #################
 
 atlas_list = os.listdir('/media/robbis/DATA/fmri/templates_AAL/')
@@ -519,14 +519,3 @@ for d in dlist:
     real_img = os.path.join(path, d, 'mprage', 'mprage_orient_brain_g.nii.gz')
     command = 'mv '+real_img+' '+input_img
     print command
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
