@@ -4,6 +4,8 @@ from mvpa2.suite import Measure, TransferMeasure
 from scipy.spatial.distance import mahalanobis, euclidean
 from scipy.stats import pearsonr
 import sklearn.covariance
+import sklearn.metrics as sklm
+import sklearn.svm as svr
 from sklearn.covariance import EmpiricalCovariance, LedoitWolf, MinCovDet, \
                         GraphLasso, ShrunkCovariance
 from mvpa2.generators.partition import Partitioner
@@ -65,11 +67,11 @@ class MahalanobisMeasure(SimilarityMeasure):
     
 
 
-class CorrelationMeasure(SimilarityMeasure):
+class CorrelationMeasure(Measure):
 
     def __init__(self, p=0.05):
         
-        SimilarityMeasure.__init__(self)
+        Measure.__init__(self)
         #self.space = 'targets'
         self.p = p
 
@@ -97,7 +99,8 @@ class CorrelationMeasure(SimilarityMeasure):
         
         #space = self.get_space()
         return Dataset(np.array([value]))
-    
+
+   
     
 class TargetCombinationPartitioner(Partitioner):
     
@@ -127,4 +130,34 @@ class TargetCombinationPartitioner(Partitioner):
         
         return [('None', [item[0]], [item[1]])  for item in prod]
 
+
+
+class RegressionMeasure(Measure):
+
+    def __init__(self, trainer=svr.LinearSVR(), error_fx=sklm.r2_score):
         
+        #super(RegressionMeasure, self).__init__()
+        Measure.__init__(self)
+        self.trainer = trainer
+        self.fx = error_fx
+        self.mse = sklm.mean_squared_error
+        
+    def train(self, ds):
+        Measure.train(self, ds)
+        self.trainer.fit(ds.samples, ds.targets)
+
+    def _call(self, ds):
+          
+        y_pred = self.trainer.predict(ds.samples)
+        
+        err_ = self.fx(ds.targets, y_pred)
+        mse_ = self.mse(ds.targets, y_pred)
+        
+        #space = self.get_space()
+        return Dataset(np.array([err_, mse_]))
+    
+
+
+
+
+

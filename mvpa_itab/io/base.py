@@ -92,7 +92,7 @@ def load_dataset(path, subj, folder, **kwargs):
 
         kwargs = update_subdirs(file_list, subj, **kwargs) # updating args
 
-    
+    # Load data
     try:
         fmri_list = load_fmri(file_list, skip_vols=skip_vols)
     except IOError, err:
@@ -115,7 +115,7 @@ def load_dataset(path, subj, folder, **kwargs):
         logger.error(subj + ' *** ERROR: Attributes Length mismatches with fMRI volumes! ***')
         raise ValueError('Attributes Length mismatches with fMRI volumes!')       
     
-    # Load the dataset.
+    # Load the pymvpa dataset.
     try:
         logger.info('Loading dataset...')
         ds = fmri_dataset(fmri_list, targets=attr.targets, chunks=attr.chunks, mask=mask) 
@@ -205,6 +205,7 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
         if dir_ == 'none':
             dir_ = ''
         if dir_.find('/') == -1:
+            print dir_
             path_file_dirs.append(os.path.join(path,name,dir_))
 
    
@@ -215,10 +216,11 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
     file_list = []
     # Verifying which type of task I've to classify (task or rest) 
     # and loads filename in different dirs
-    for path in path_file_dirs:
-        file_list = file_list + os.listdir(path)
+    for path_ in path_file_dirs:
+        dir_list = [os.path.join(path_, f) for f in os.listdir(path_)]
+        file_list = file_list + dir_list
 
-    logger.debug(' '.join(file_list))
+    logger.debug('\n'.join(file_list))
 
     # Verifying which kind of analysis I've to perform (single or group) 
     # and filter list elements   
@@ -228,18 +230,21 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
     else:
         file_list = [elem for elem in file_list 
                      if elem.find(img_pattern) != -1 and elem.find(task) != -1 and elem.find('mni') != -1]
-
-    logger.debug(' '.join(file_list))
+    
+    logger.debug('----------------- After filtering ------------------')
+    logger.debug('\n'.join(file_list))
     
     # if no file are found I perform previous analysis!        
     if (len(file_list) <= runs and len(file_list) == 0):
-        raise OSError('Files not found, please check if data exists in '+str(path_file_dirs))
+        logger.error('Files not found, check the path of data!')
+        raise ValueError()
     else:
         logger.debug('File corrected found ....')  
 
     ### Data loading ###
     file_list.sort()
     
+    """
     image_list = []
     
     for img in file_list:
@@ -250,16 +255,12 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
             filepath = os.path.join(path_file_dirs[1], img)
     
         image_list.append(filepath)
-            
-    return image_list
+    """        
+    return file_list
 
 
 def load_fmri(fname_list, skip_vols=0):
-    """This function loads fmri data from a list of .conc files
-       
-    Returns
-       -------
-    str : Datetime in format yymmdd_hhmmss
+    """
     """   
     image_list = []
         
