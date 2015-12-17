@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 import minepy
 
 def mutual_information(signal1, signal2, bins=40):
@@ -43,4 +44,12 @@ def mic(signal1, signal2):
     
     return mine.mic()
     
-    
+def correlation(y_true, y_pred):
+    return sp.stats.stats.pearsonr(y_true, y_pred)[0]
+
+
+def ranking_correlation(corr):
+    """From a correlation array returns the index order of absolute correlation
+    magnitude.
+    """
+    return  np.argsort(np.abs(corr))[::-1]

@@ -107,6 +107,24 @@ def load_mat_dataset(datapath, bands, conditions, networks=None):
         
     return ds
 
+def array_to_matrix(array):
+    
+    # second degree resolution to get matrix dimensions #
+    c = -2*array.shape[0]
+    a = 1
+    b = -1
+    det =  b*b - 4*a*c
+    rows = (-b + np.sqrt(det))/(2*a)
+    
+    matrix = np.ones((rows, rows))
+    
+    il = np.tril_indices(matrix.shape[0])
+    matrix[il] = 0
+    
+    matrix[np.nonzero(matrix)] = array
+    
+    return matrix
+
 def flatten_correlation_matrix(matrix):
     
     il = np.tril_indices(matrix.shape[0])
@@ -123,12 +141,12 @@ def flatten_correlation_matrix(matrix):
     '''
     return matrix[~np.isnan(out_matrix)]
 
-def copy_matrix(matrix):
+def copy_matrix(matrix, diagonal_filler=1):
 
     iu = np.triu_indices(matrix.shape[0])
     il = np.tril_indices(matrix.shape[0])
 
-    matrix[il] = 1
+    matrix[il] = diagonal_filler
 
     for i, j in zip(iu[0], iu[1]):
         matrix[j, i] = matrix[i, j]

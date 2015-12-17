@@ -1,5 +1,5 @@
 
-def load_data(file_name):
+def setup_analysis(file_name):
     '''
     Load file given filename, guessing filetype.
 

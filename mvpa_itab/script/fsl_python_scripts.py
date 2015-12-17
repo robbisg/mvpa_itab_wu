@@ -1,7 +1,5 @@
 import os
-from bzrlib.commands import Command
 from mne.commands.mne_bti2fiff import out_fname
-from wx._windows_ import new_DirDialog
 subjlist = []
 
 ################################
@@ -325,13 +323,19 @@ for a in atlas_list:
 
 ###############  Preprocessing of fcMRI  ###########################
 
-ref_img = '/usr/share/data/fsl-mni152-templates/MNI152_T1_1mm.nii.gz'
+mm = '2mm'
+ref_img = '/usr/share/data/fsl-mni152-templates/MNI152_T1_%s.nii.gz' % (mm)
+
 ####### Registration to MNI ########
-for d in dlist[-4:]:
-    
+for d in dlist[:1]:
+
     mprage = os.path.join(path, d, 'mprage', 'mprage_orient.nii.gz')
-    omat = os.path.join(path, d, 'mprage', 'anat2mni.mat')
-    out_img =  os.path.join(path, d, 'mprage', 'mprage_orient_mni.nii.gz')
+    
+    omat_fname = 'anat2mni_%s.mat' % (mm)
+    omat = os.path.join(path, d, 'mprage', omat_fname)
+    
+    out_img_fname = 'mprage_orient_mni_%s.nii.gz' % (mm)
+    out_img =  os.path.join(path, d, 'mprage', out_img_fname)
     
     command = 'flirt -in '+mprage+' '+\
               '-ref '+ref_img+' '+\
@@ -342,19 +346,30 @@ for d in dlist[-4:]:
 
 
 ###### Atlas registration to ANAT #######
-atlas_list = os.listdir('/media/robbis/DATA/fmri/templates_AAL/')
-atlas_list = [a for a in atlas_list if a.find('mni.nii') != -1]
 
-for d in dlist[-4:]:
+atlas_path = '/media/robbis/DATA/fmri/templates_fcmri/0_findlab/'
+pattern = 'separated'
+
+atlas_list = os.listdir(atlas_path)
+atlas_list = [a for a in atlas_list if a.find(pattern) != -1]
+
+
+for d in dlist[:1]:
+
+    omat_fname = 'anat2mni_%s.mat' % (mm)
+    omat = os.path.join(path, d, 'mprage', omat_fname)
     
-    omat = os.path.join(path, d, 'mprage', 'anat2mni.mat')
-    imat = os.path.join(path, d, 'mprage', 'inv_anat2mni.mat')
+    imat_fname = 'inv_anat2mni_%s.mat' % (mm)
+    imat = os.path.join(path, d, 'mprage', imat_fname)
+    
     ref = os.path.join(path, d, 'mprage', 'mprage_orient.nii.gz')
+    
     command = 'convert_xfm -omat '+imat+' -inverse '+omat
+
     print command 
     
     for a in atlas_list:
-        input_img = os.path.join('/media/robbis/DATA/fmri/templates_AAL/', a)
+        input_img = os.path.join(atlas_path, a)
         output_img = os.path.join(path, d, 'mprage',a.split('.')[0]+'_anat')
         
         command = 'flirt -in '+input_img+' -ref '+ref+' -applyxfm -init '+imat+' '+\
@@ -402,14 +417,24 @@ for d in dlist:
         
         print command
 
-##### Gray Matter Intersection with Atlas #####
+##### Gray Matter Intersection with Atlas ######
 
-for d in dlist:
-    fname = open(os.path.join(path,d,'gm_aal_intersect.sh'), 'w')
+atlas_pattern1 = 'separated'
+atlas_pattern2 = 'anat.nii'
+script_filename = 'gm_findlab_intersect.sh'
+
+'''
+atlas_pattern1 = 'atlas'
+atlas_pattern2 = 'mni_anat'
+script_filename = 'gm_aal_intersect.sh'
+'''
+for d in dlist[:]:
+    fname = open(os.path.join(path, d, script_filename), 'w')
     flist = os.listdir(os.path.join(path, d, 'mprage'))
     tissue_list = [t for t in flist if t.find('gm') != -1 and t.find('atlas') == -1 
                    and t.find('brain') != -1]
-    atlas_list = [t for t in flist if t.find('atlas') != -1 and t.find('mni_anat') != -1]
+    atlas_list = [t for t in flist if t.find(atlas_pattern1) != -1 and t.find(atlas_pattern2) != -1]
+    
     
     for t in tissue_list:
         tissue_fname = os.path.join(path, d, 'mprage',t)
@@ -423,7 +448,7 @@ for d in dlist:
             fname.write(command+'\n')
             #print command
     fname.close()
-    print 'sh '+os.path.join(path,d,'gm_aal_intersect.sh')
+    print 'sh '+os.path.join(path, d, script_filename)
 ###### Anatomical registration to fMRI ##############
 
 for d in dlist:
@@ -519,3 +544,26 @@ for d in dlist:
     real_img = os.path.join(path, d, 'mprage', 'mprage_orient_brain_g.nii.gz')
     command = 'mv '+real_img+' '+input_img
     print command
+
+atlas_networks = ['Auditory', 'Basal', 'LECN', 'Language', 'Precuneus', 'RECN',
+       'Sensorimotor', 'Visuospatial', 'anterior', 'dorsal', 'high', 'post', 'prim',
+       'ventral']
+
+for d in dlist:
+    atlas_img = os.listdir(os.path.join(path, d, 'mprage'))
+    for a in atlas_networks:
+        for p in ['pve', 'seg']:
+            rm_image = ("%s_%s_gm.nii.gz") % (a, p)
+            command = 'rm '+os.path.join(path, d, 'mprage', rm_image)
+            print command
+
+
+############# 4dfp ##########################
+path_4dfp = '/media/robbis/DATA/fmri/template_4dfp/4dfp_refdir'
+list_files = os.listdir(path_4dfp)
+list_files = [f for f in list_files if f.find('4dfp.ifh') != -1]
+for f in list_files:
+    f_ = f.split('.ifh')[0]
+    print 'nifti_4dfp -n '+os.path.join(path_4dfp, f_)+' '+os.path.join(path_4dfp, f_)
+    print 'mv '+os.path.join(path_4dfp, f_)+'.nii '+os.path.join(path_4dfp, 'nifti')
+    

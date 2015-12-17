@@ -5,6 +5,7 @@
 ########################################################
 # pylint: disable=maybe-no-member, method-hidden
 import nibabel as ni
+import numpy as np
 import os
 from ..main_wu import *
 from ..utils import *

@@ -17,12 +17,14 @@ import mvpa_itab.results as rs
 from mvpa2.misc.neighborhood import Sphere, IndexQueryEngine
 from mvpa2.measures.searchlight import Searchlight
 
-path = '/media/robbis/DATA/fmri/memory/'
+
+
+#path = '/media/robbis/DATA/fmri/memory/'
 
 conf = read_configuration(path, 'remote_memory.conf', 'BETA_MVPA')
 
 conf['analysis_type'] = 'searchlight'
-conf['analysis_task'] = 'memory_regression'
+conf['analysis_task'] = 'memory_regression_sample_wise'
 conf['mask_area'] = 'total'
 task_ = 'BETA_MVPA'
 subj = '110929anngio'
@@ -42,13 +44,14 @@ for i, partitioner in enumerate(partitioners):
     ds.sa.memory_evidence[ds.sa.stim == 'N'] = -1
     ds.sa.memory_evidence = ds.sa.memory_evidence * ds.sa.evidence
     
-    ds.targets = [str(i) for i in ds.sa.memory_evidence]
+    ds.targets = [str(ii) for ii in ds.sa.memory_evidence]
     
     conf['label_dropped'] = '0'
-    conf['label_included'] = ','.join([str(i) for i in np.unique([-5,-3,-1,1,3,5])])
+    conf['label_included'] = ','.join([str(n) for n in np.array([-5,-3,-1,1,3,5])])
     
     ds = preprocess_dataset(ds, task_, **conf)
-    ds.targets = np.int_(ds.targets)
+    ds.targets = np.float_(ds.targets)
+    ds.targets = (ds.targets - np.mean(ds.targets))/np.std(ds.targets)
     cv = CrossValidation(slsim.RegressionMeasure(), 
                             partitioner,
                             #NFoldPartitioner(cvtype=1),
@@ -63,25 +66,14 @@ for i, partitioner in enumerate(partitioners):
     
     map_ = sl(ds)
     
-    map = map2nifti(map_, imghdr=ds.a.imghdr)  
+    map_nii = map2nifti(map_, imghdr=ds.a.imghdr)  
     name = "%s_%s_regression_fold_%s" %(subj, task_, str(i))
 
     result_dict['radius'] = 3
-    result_dict['map'] = map
+    result_dict['map'] = map_nii
             
     subj_result = rs.SubjectResult(name, result_dict, savers)
     collection.add(subj_result) 
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
             
             
             

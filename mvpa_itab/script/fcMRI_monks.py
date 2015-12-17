@@ -1,14 +1,18 @@
-from scipy.io import savemat
-import numpy as np
-import os
+# pylint: disable=no-member
+import numpy as np #IGNORE:E1103,E0611
+import os #IGNORE:E1103,E0611
+import matplotlib.pyplot as pl #IGNORE:E1103,E0611
+
 from mvpa_itab.connectivity import load_matrices, z_fisher, plot_matrix
 from nitime.analysis import SeedCorrelationAnalyzer
 from nitime.timeseries import TimeSeries
-from scipy.stats import ttest_ind
+from scipy.stats import ttest_ind #IGNORE:E1103,E0611
 from mvpa_itab.conn.plot import plot_circle
 from nipy.algorithms.statistics.empirical_pvalue import fdr_threshold
+from scipy.io import savemat
 
 import itertools
+
 from numpy.random.mtrand import permutation
 from mvpa_itab.stats import TTest, permutation_test
 from scipy.optimize.minpack import curve_fit
@@ -22,11 +26,19 @@ path = '/media/robbis/DATA/fmri/monks/0_results/'
 results_dir = os.listdir(path)
  
 results_dir = [r for r in results_dir if r.find('connectivity') != -1 
-               and r.find('20150427_19')!=-1]
-
+               and r.find('201511')!=-1]
+"""
 roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_AAL/atlas90.cod', 
                       delimiter='=',
                       dtype=np.str)
+"""
+
+roi_list = np.loadtxt(
+                          '/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
+                          dtype=np.str,
+                          delimiter=','
+                          )
+
 
 subjects = np.loadtxt('/media/robbis/DATA/fmri/monks/attributes_struct.txt',
                       dtype=np.str)
@@ -58,9 +70,9 @@ for r in results_dir:
     
     fields = dict()
     fields['z_matrix'] = zresults
-    #fields['network'] = list(roi_list[roi_mask].T[0])
-    #fields['roi_name'] = list(roi_list[roi_mask].T[2])
-    fields['roi_name'] = list(roi_list[roi_mask].T[1])
+    fields['network'] = list(roi_list[roi_mask].T[0])
+    fields['roi_name'] = list(roi_list[roi_mask].T[2])
+    #fields['roi_name'] = list(roi_list[roi_mask].T[1])
     fields['groups'] = list(subjects.T[1])
     fields['level'] = list(np.int_(subjects.T[-1]))
     
@@ -68,9 +80,13 @@ for r in results_dir:
     
     ################### Tests ###########################
     
+    #roi_names = np.array(fields['roi_name'])
+    networks = fields['network']
     roi_names = np.array(fields['roi_name'])
-    #networks = roi_list[roi_mask].T[-2]   
-    networks = ['AAL Atlas 90']
+    roi_names = np.core.defchararray.add(networks, np.core.defchararray.add('-',roi_names))
+    
+    networks = roi_list[roi_mask].T[-2]   
+    #networks = ['AAL Atlas 90']
     zmean = zresults.mean(axis=2)
     
     labels = []
@@ -104,21 +120,26 @@ for r in results_dir:
                      vipassana[subjects.T[1] == 'N'],
                      #equal_var=False,
                      axis=0)
-    pv_corrected = fdr_threshold(pv[upper_mask], alpha=p_value)
     
+    #pv_corrected = fdr_threshold(pv[upper_mask], alpha=p_value)
+    pv_corrected = p_value
     
     ts, ps = ttest_ind(samatha[subjects.T[1] == 'E'], 
                      samatha[subjects.T[1] == 'N'],
                      #equal_var=False,
-                     axis=0)       
-    ps_corrected = fdr_threshold(ps[upper_mask], alpha=p_value)
+                     axis=0)
+    
+    #ps_corrected = fdr_threshold(ps[upper_mask], alpha=p_value)
+    ps_corrected = p_value
     
     fields['ttest_vipassana_t'] = tv
     fields['ttest_vipassana_p'] = pv
     
     #f = plot_matrix(tv * (pv < 0.01), roi_names, networks)
     f, _ = plot_circle(tv * (pv < pv_corrected), roi_names, None, 
-                       n_lines=np.count_nonzero(pv < pv_corrected))
+                       n_lines=np.count_nonzero(pv < pv_corrected)
+                       #n_lines=20,
+                       )
     f.savefig(os.path.join(path,r,'vipassana_t_test_corr_.png'))
     
 
@@ -127,7 +148,9 @@ for r in results_dir:
     
     #f = plot_matrix(ts * (ps < 0.01), roi_names, networks)
     f, _ = plot_circle(ts * (ps < ps_corrected), roi_names, None, 
-                       n_lines=np.count_nonzero(ps < ps_corrected))
+                       n_lines=np.count_nonzero(ps < ps_corrected)
+                       #n_lines=20,
+                       )
     f.savefig(os.path.join(path,r,'samatha_t_test_corr_.png'))
     
     for level in ['N', 'E']:
@@ -136,18 +159,25 @@ for r in results_dir:
                          #equal_var=False,
                          axis=0)
         pvr_corrected = fdr_threshold(pvr[upper_mask], alpha=p_value)
+        pvr_corrected = p_value
+        
         
         tsr, psr = ttest_ind(samatha[subjects.T[1] == level], 
                          rest[subjects.T[1] == level],
                          #equal_var=False,
-                         axis=0)    
+                         axis=0)
+        
         psr_corrected = fdr_threshold(psr[upper_mask], alpha=p_value)
+        psr_corrected = p_value
+        
         
         tsv, psv = ttest_ind(samatha[subjects.T[1] == level], 
                          vipassana[subjects.T[1] == level],
                          #equal_var=False,
                          axis=0)
+        
         psv_corrected = fdr_threshold(psv[upper_mask], alpha=p_value)
+        psv_corrected = p_value
         
         fields['ttest_samatha_rest_t'] = tsr
         fields['ttest_samatha_rest_p'] = psr

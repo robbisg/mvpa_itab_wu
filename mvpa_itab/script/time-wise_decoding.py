@@ -13,6 +13,10 @@ import numpy as np
 from mvpa2.clfs.base import Classifier
 from mvpa2.generators.resampling import Balancer
 import mvpa_itab.results as rs
+
+from sklearn.svm import SVC
+from mvpa2.clfs.skl.base import SKLLearnerAdapter
+
 #path = '/media/robbis/DATA/fmri/memory/'
 
 
@@ -20,15 +24,17 @@ if __debug__:
     debug.active += ["SLC"]
 
 evidences = [1,3,5]
-subjects = ['110929angque']#, '110929anngio']
-tasks = ['RESIDUALS_MVPA', 'BETA_MVPA']
+#subjects = ['110929angque']#, '110929anngio']
+#tasks = ['BETA_MVPA']#, 'RESIDUALS_MVPA']
+subjects = os.listdir(path)
+tasks = ['memory', 'decision']
 res = []
 result_dict = dict()
  
 conf = read_configuration(path, 'remote_memory.conf', 'RESIDUALS_MVPA')
 
 conf['analysis_type'] = 'searchlight'
-conf['analysis_task'] = 'decision'
+conf['analysis_task'] = 'decision_weights'
 
 summarizers = [rs.SearchlightSummarizer()]
 savers = [rs.SearchlightSaver()]
@@ -37,32 +43,46 @@ for ev in evidences:
     for subj in subjects:
         for task_ in tasks:
             
-            conf = read_configuration(path, 'remote_memory.conf', task_)
-            #conf['mask_area'] = 'PCC'
-            ds = load_dataset(path, subj, task_, **conf)
             
-            # label managing
-            # ds.targets = ds.sa.memory_status
-            ds.targets = np.core.defchararray.add(#np.array(ds.sa.decision, dtype=np.str), 
-                                                  np.array(ds.sa.stim, dtype=np.str),
-                                                  np.array(ds.sa.evidence,dtype= np.str))
+            data_type = 'BETA_MVPA'
+            conf = read_configuration(path, 'remote_memory.conf', data_type)
+            #conf['mask_area'] = 'PCC'
+            ds = load_dataset(path, subj, data_type, **conf)
+            
             ev = str(ev)
             
-            conf['label_dropped'] = 'FIX0'
-            conf['label_included'] = 'NEW'+ev+','+'OLD'+ev
+            # label managing
+            if task_ == 'memory':
+                field_ = 'stim'
+                conf['label_dropped'] = 'F0'
+                conf['label_included'] = 'N'+ev+','+'O'+ev
+                count_ = 1
+            else: # decision
+                field_ = 'decision'
+                conf['label_dropped'] = 'FIX0'
+                conf['label_included'] = 'NEW'+ev+','+'OLD'+ev
+                count_ = 250
+
+            ds.targets = np.core.defchararray.add(np.array(ds.sa[field_].value, dtype=np.str), 
+                                                  #np.array(ds.sa.stim, dtype=np.str),
+                                                  np.array(ds.sa.evidence,dtype= np.str))
+
             
-            ds = preprocess_dataset(ds, task_, **conf)
+            ds = preprocess_dataset(ds, data_type, **conf)
     
-            balanc = Balancer(count=1, apply_selection=True)
+            balanc = Balancer(count=count_, apply_selection=True)
             gen = balanc.generate(ds)
             #clf = AverageLinearCSVM(C=1)
             
             clf = LinearCSVMC(C=1)
             #avg = TrialAverager(clf)
             cv_storage = StoreResults()
-    
+            
+            #skclf = SVC(C=1, kernel='linear', class_weight='auto')
+            #clf = SKLLearnerAdapter(skclf)
+            
             cvte = CrossValidation(clf, 
-                                   HalfPartitioner(),
+                                   NFoldPartitioner(cvtype=2),
                                    #errorfx=ErrorPerTrial(), 
                                    #callback=cv_storage,
                                    enable_ca=['stats', 'probabilities'])
@@ -71,7 +91,11 @@ for ev in evidences:
             maps = []
             
             
-            for i,ds_ in enumerate(gen):
+            for i, ds_ in enumerate(gen):
+                
+                #Avoid balancing!
+                #ds_ = ds
+                
                 sl_map = sl(ds_)
                 sl_map.samples *= -1
                 sl_map.samples +=  1
@@ -79,7 +103,7 @@ for ev in evidences:
                 map = map2nifti(sl_map, imghdr=ds.a.imghdr)
                 maps.append(map)
                 
-                name = "%s_%s_evidence_%s_balance_ds_%s" %(subj, task_, str(ev), str(i+1))
+                name = "%s_%s_evidence_%s_balance_ds_%s" %(subj, task_, data_type, str(ev), str(i+1))
                 result_dict['radius'] = 3
                 result_dict['map'] = map
                 
@@ -95,9 +119,9 @@ os.system('mkdir '+path_results)
 for i, subj in enumerate(subjects):
     path_subj = os.path.join(path_results, subj)
     os.system('mkdir '+path_subj)
-    for j, task_ in enumerate(tasks):
+    for j, data_type in enumerate(tasks):
         
-        task_ = str.lower(task_)
+        data_type = str.lower(data_type)
         index_ = len(subjects)*i + j
         
         r = res[index_]
@@ -106,7 +130,7 @@ for i, subj in enumerate(subjects):
         
         for k, map_ in enumerate(r):
             
-            name_ = task_+'_map_no_'+str(k)+'.nii.gz'
+            name_ = data_type+'_map_no_'+str(k)+'.nii.gz'
             
             # Print each balance map
             ni.save(map_, os.path.join(path_subj, name_))
@@ -117,7 +141,7 @@ for i, subj in enumerate(subjects):
         
         # Mean map across balance
         mean_map = np.array(mean_map).mean(axis=3)
-        fname_ = os.path.join(path_subj, task_+'_balance_avg.nii.gz')
+        fname_ = os.path.join(path_subj, data_type+'_balance_avg.nii.gz')
         ni.save(ni.Nifti1Image(mean_map, map_.get_affine()), fname_)
         
         

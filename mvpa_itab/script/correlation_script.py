@@ -1,5 +1,6 @@
-from ..lib_io import *
-from ..connectivity import *
+# pylint: disable=maybe-no-member, method-hidden, undefined-variable
+from mvpa_itab.io.base import load_wu_file_list
+from mvpa_itab.connectivity import *
 from nitime.timeseries import TimeSeries
 from memory_profiler import profile
 
@@ -60,7 +61,7 @@ if __name__ == '__main__':
         '''
         
         C_pre_nd = CorrelationAnalyzer(dist_ts_pre)
-        #C_pre_d = CorrelationAnalyzer(dist_ts_pre_deconv)
+        C_pre_d = CorrelationAnalyzer(dist_ts_pre_deconv)
         
         fname_c = os.path.join(path_dist_save, 'corr_deconv_'+name+'_'+condition+'_RestPre.txt')
         np.savetxt(fname_c, C_pre_d.corrcoef, fmt='%.6f', delimiter=',')
@@ -257,7 +258,7 @@ if __name__ == '__main__':
         
         fmri = ni.load(fmri_name)
         
-        fmri_ts = get_bold_signals(fmri, brain_mask, 4., average=False)
+        fmri_ts = get_bold_signals(fmri, brain_mask, 4., ts_extraction='none')
         
         global_signal = get_bold_signals(fmri, brain_mask, 4.)
         ventricles_signal = get_bold_signals(fmri, ventricles_mask, 4.)
@@ -291,21 +292,22 @@ if __name__ == '__main__':
         del residual_4d, F, fmri, residuals, brain_mask, wm_mask, ventricles_mask
         gc.collect()
         
-    return
+    
 ##########################################################################
 
-    '''
-    roi_list = np.loadtxt(
-                          '/media/DATA/fmri/templates_fcmri/findlab_rois.txt', 
+'''
+roi_list = np.loadtxt(
+                          '/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
                           dtype=np.str,
                           delimiter=','
                           )
-    '''
+'''
 roi_list = np.loadtxt(
                           '/media/robbis/DATA/fmri/templates_AAL/atlas90.cod',
                           dtype=np.str,
                           delimiter='='
                           )
+
 path = '/media/robbis/DATA/fmri/monks'
 #brain_mask  = ni.load('/media/DATA/fmri/templates_MNI_3mm/MNI152_T1_3mm_brain_mask.nii.gz')
 paradigm_path = '/media/robbis/DATA/fmri/monks/monks_attrib_pymvpa.txt'
@@ -317,44 +319,49 @@ paradigm = np.loadtxt(
     
 combinations = [#['no_gsr', True],
                 #['no_gsr', False],
-                ['gsr',True],
-                #['gsr',False],
+                #['_gsr',True],
+                #['_gsr', False]
+                ['raw',False],
                 ]
 
 for it in combinations:
     results = dict()
     for subj in dlist[:]:
-        print '****** '+subj+' ******'
+        print ' ****** '+subj+' ****** '
         fmri_name = os.path.join(path, subj, 'fmri', 
-                                 'residual_filtered_'+it[0]+'.nii.gz')
+                                 #'residual_filtered_first'+it[0]+'.nii.gz')
+                                 #'residual_filtered_'+it[0]+'.nii.gz')
+                                 'bold_orient.nii.gz')
         fmri = ni.load(fmri_name)
         
-        #brain_mask = ni.load(os.path.join(path,subj,'fmri','bold_orient_mask_mask.nii.gz'))
+        # = ni.load(os.path.join(path,subj,'fmri','bold_orient_mask_mask.nii.gz'))
         
         data = []
         
         mask = ni.load(os.path.join(path, subj, 'fmri', 'atlas90_brain_seg_gm_333.nii.gz'))
         
-        #With findlab rois we loop across networks
+        # With findlab rois we loop across networks
         for roi in np.unique(np.int_(roi_list.T[0])):
-            '''
-            print os.path.join(
-                               '/media/DATA/fmri/templates_fcmri/', 
-                               roi, 
-                               roi+'_separated_3mm.nii.gz'
-                               )
+        #for roi in np.unique((roi_list.T[-2])):   
             
-            mask = ni.load(os.path.join(
-                                        '/media/DATA/fmri/templates_fcmri/', 
-                                        roi, 
-                                        roi+'_separated_3mm.nii.gz')
-                           )
-            '''
+            ### Uncomment for find lab rois analysis ###
+            #roi_name = roi.split('_')[0]
+            
+            #roi_name = roi.split('#')[0]
+            #mask_name = "%s_separated_anat_333.nii.gz" % (roi_name)
+            #mask_path = os.path.join(path, subj, 'fmri', mask_name)
+                                     
+            #print mask_path 
+            #mask = ni.load(mask_path)
+            
             
             #roi_val = roi_list[roi_list.T[-2] == roi].T[-1]
-            roi_val = roi
+            ####
+            
+            roi_val = [roi]
+            
             mask_ts = get_bold_signals(fmri, mask, 4., 
-                                       roi_values=[roi_val],
+                                       roi_values=roi_val,
                                        ts_extraction='mean')
             
             data.append(mask_ts.data)
@@ -366,7 +373,7 @@ for it in combinations:
         ts = TimeSeries(data, sampling_interval=4.)
         
         ts_condition = get_condition_timeserie(ts, paradigm, 
-                                               delete_condition='RestNo',
+                                               delete_condition='Rest',
                                                #ts_extraction='pca',
                                                #delete_condition=None,
                                                paste_runs=it[1])
@@ -376,7 +383,8 @@ for it in combinations:
         
         results[subj] = matrices
         #del ts_condition, ts, fmri, data, mask_ts
-    save_matrices(path, results)
+    save_matrices(path, results, gsr='filtered_after_each_run_'+it[0], atlas='atlas90')
+    
 ################################################
 
 

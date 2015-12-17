@@ -187,7 +187,7 @@ for i in range(X.shape[1]):
 c = Correlation(X)
 
 for i in [1]:
-    corr = c.run(X[groups==i],y[groups==i])[0]
+    corr = c.run(X[groups==i], y[groups==i])[0]
     pl.plot(corr, marker='o', c=color[i], label=labels_group[i])
 
 pl.xticks(np.arange(78), label_list, rotation=90)
@@ -232,7 +232,7 @@ for n in range(n_trial):
         X_fit = X1[:,arg_[:i+1]] # Sequential slicing
         
         for j, alg_ in enumerate(algorithms_):
-            cv=ShuffleSplit(len(y1), n_iter=repetitions, test_size=0.25)
+            cv = ShuffleSplit(len(y1), n_iter=repetitions, test_size=0.25)
     
             k = 0
             for train_index, test_index in cv:
@@ -378,29 +378,34 @@ while (comb<(n_combination-1)):
 X1 = X[groups==1]
 y1 = y[groups==1]
 
+X1 = X_
+y1 = y_
 
 alpha = 1.
 algorithms_ = [SVR(kernel='rbf', C=1), 
-               #SVR(kernel='linear', C=1),
-               #SVR(kernel='poly', C=1, degree=3),
-               #SVR(kernel='rbf', C=10),
-               #SVR(kernel='rbf', C=0.5),
-               #ElasticNet(alpha=alpha, fit_intercept=True),
-               #Lasso(alpha=alpha, fit_intercept=True)
+               SVR(kernel='linear', C=1),
+               SVR(kernel='poly', C=1, degree=3),
+               SVR(kernel='rbf', C=10),
+               SVR(kernel='rbf', C=0.5),
+               ElasticNet(alpha=alpha, fit_intercept=True),
+               Lasso(alpha=alpha, fit_intercept=True)
                ]
 
 labels_alg = ['SVR(kernel=\'rbf\', C=1)', 
-               #'SVR(kernel=\'linear\', C=1)',
-               #'SVR(kernel=\'poly\', C=1, degree=3)',
-               #'SVR(kernel=\'rbf\', C=10, degree=2)',
-               #'SVR(kernel=\'rbf\', C=0.5)',
-               #'ElasticNet',
-               #'Lasso',
+               'SVR(kernel=\'linear\', C=1)',
+               'SVR(kernel=\'poly\', C=1, degree=3)',
+               'SVR(kernel=\'rbf\', C=10, degree=2)',
+               'SVR(kernel=\'rbf\', C=0.5)',
+               'ElasticNet',
+               'Lasso',
                ]
+
 repetitions = 200
-n_permutation = 2000
+n_permutation = 1
 arg_ = np.argsort(np.abs(corr))[::-1]
+
 mse_ = np.zeros((arg_.shape[0], len(algorithms_), repetitions, n_permutation))
+r2_ = np.zeros((arg_.shape[0], len(algorithms_), repetitions, n_permutation))
 
 index_ = np.arange(len(y1))
 
@@ -415,8 +420,10 @@ for i in range(arg_.shape[0]):
             
             for p in range(n_permutation):
                 
-                #train_index_perm = train_index
-                train_index_perm = permutation(train_index)
+                if n_permutation == 1:
+                    train_index_perm = train_index
+                else:
+                    train_index_perm = permutation(train_index)
                 
                 X_train = X_fit[train_index]
                 
@@ -428,9 +435,10 @@ for i in range(arg_.shape[0]):
                 y_predict = alg_.fit(X_train, y_train).predict(X_test)
                 
                 mse = mean_squared_error(y1[test_index], y_predict)
+                r2 = r2_score(y1[test_index], y_predict)
                 
                 mse_[i,j,k,p] = mse
-            
+                r2_[i,j,k,p] = r2
                 #k+=1
             k+=1
             

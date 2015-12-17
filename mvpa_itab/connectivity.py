@@ -1,3 +1,4 @@
+# pylint: disable=maybe-no-member, method-hidden
 import nitime.analysis as nta
 import nitime.fmri.io as io
 
@@ -11,7 +12,7 @@ from scipy.signal.windows import boxcar
 from scipy.signal.signaltools import convolve
 from scipy.stats.mstats import zscore
 
-from mvpa_itab.io.base import load_wu_file_list, read_configuration
+from mvpa_itab.io.base import load_wu_file_list, read_configuration, get_time
 
 import matplotlib.pyplot as pl
 
@@ -27,6 +28,9 @@ from memory_profiler import profile
 from scipy.stats.stats import ttest_ind
 
 from sklearn.decomposition import PCA
+from docutils.parsers.rst.directives import path
+from oauthlib.oauth1.rfc5849.utils import filter_params
+
 
 #@profile
 def analyze_connectivity(imagelist, path_roi, roi_names, ts_param, **kwargs):
@@ -109,45 +113,11 @@ def create_similarity_files(path, subjects, target_label, source_label):
                 
                 np.savetxt(os.path.join(path_save, '_'.join(['similarity',cond,time,s,'.txt'])), data_a, 
                            fmt='%4.4f', delimiter=',')
-    np.savetxt(os.path.join(path_save, 'roi_labels.txt'), roi_a, fmt='%s')
-    
-    '''
-    for f in file_list[:11]:
-        for u, l in zip(ub, lb):
-        
-            data = np.loadtxt(os.path.join(path_save, f),delimiter=',')
-            data = np.sqrt(data.T)
-            data_z = zscore(data, axis=1)
-        
-            ts = TimeSeries(data_z, sampling_interval=float(TR))
-            F = FilterAnalyzer(ts, ub=u, lb=l)
-            
-            f_ts = F.fir.data
-            
-            A = CorrelationAnalyzer(F.fir)
-            
-            #np.savetxt(os.path.join(path_save, 'correlation', f[:f.find('.txt')]+'_corr.txt'), A.corrcoef, fmt='%.4f')
-            pl.figure()
-            pl.plot(f_ts.T)
-            pl.plot(-data_z.T)
-            pl.savefig(os.path.join(path_save, 'correlation', f[:f.find('.txt')]+'_ts_'+str(l)+'_'+str(u)+'_.png'))
-            
-            pl.figure()
-            pl.imshow(A.corrcoef, interpolation='nearest')
-            pl.xticks(np.arange(len(roi_a)), roi_a, rotation='vertical')
-            pl.yticks(np.arange(len(roi_a)), roi_a)
-            pl.colorbar()
-            pl.savefig(os.path.join(path_save, 'correlation', f[:f.find('.txt')]+'_corr'+str(l)+'_'+str(u)+'.png'))
-            
-        corr_list.append(A.corrcoef)
-    '''
-                        
-    
-    return 
+    np.savetxt(os.path.join(path_save, 'roi_labels.txt'), roi_a, fmt='%s')                      
+
 
 def bold_convolution(bold_timeseries, duration, win_func=boxcar):
-     
-             
+              
     window=win_func(duration)
     
     n_roi = bold_timeseries.data.shape[0]
@@ -347,16 +317,18 @@ def get_condition_timeserie(ts, paradigm,
         mask_cond = paradigm.T[0] == c
         
         timeserie[c] = []
-        
+        ts_dummy = []
         for r in runs_list:
             mask_run = paradigm.T[1] == r
             
             general_mask = mask_cond * mask_run
             assert general_mask.shape[0] == ts.data.shape[1]
             ts_data = ts.data[:,general_mask]
-                
-            timeserie[c].append(ts_data)
-        timeserie[c] = np.array(timeserie[c])
+            print ts_data.shape
+            ts_dummy.append(ts_data)
+        
+        ts_dummy = np.array(ts_dummy)
+        timeserie[c] = ts_dummy
             
     return timeserie
 
@@ -482,13 +454,13 @@ def get_bold_signals (image, mask, TR,
     return TimeSeries(np.vstack(final_data), sampling_interval=float(TR))
 
        
-def save_matrices(path, results):
+def save_matrices(path, results, gsr='gsr', atlas='findlab'):
     
     datetime = get_time()
-    analysis = 'connectivity'
+    analysis = 'connectivity_filtered_first'
     task = 'fmri'
         
-    new_dir = datetime+'_'+analysis+'_'+task
+    new_dir = '_'.join([datetime,analysis,gsr,atlas,task])
     command = 'mkdir '+os.path.join(path, '0_results', new_dir)
     os.system(command)
     
@@ -512,7 +484,10 @@ def save_matrices(path, results):
 
    
 def load_matrices(path, condition):
-    
+    """
+    path = path of result file
+    conditions = analysis label
+    """
     subjects = os.listdir(path)
     
     subjects = [s for s in subjects if s.find('configuration') == -1 \
@@ -551,9 +526,3 @@ def z_fisher(r):
     
     return F
 
-
-#class ConditionTimeserie():
-
-    
-
-        

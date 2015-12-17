@@ -150,7 +150,7 @@ class RegressionMeasure(Measure):
           
         y_pred = self.trainer.predict(ds.samples)
         
-        err_ = self.fx(ds.targets, y_pred)
+        err_ = scipy.stats.pearsonr(ds.targets, y_pred)
         mse_ = self.mse(ds.targets, y_pred)
         
         #space = self.get_space()

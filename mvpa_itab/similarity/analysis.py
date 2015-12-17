@@ -182,17 +182,7 @@ class SeedSimilarityAnalysis(object):
         pl.imshow(self._measure, interpolation='nearest', vmax=1, vmin=-1)
         pl.colorbar()
         pl.savefig(fname)
-        
-  
-def progress(count, total, suffix=''):
-    bar_len = 60
-    filled_len = int(round(bar_len * count / float(total)))
 
-    percents = round(100.0 * count / float(total), 1)
-    bar = '=' * filled_len + '-' * (bar_len - filled_len)
-
-    sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', suffix))
-    sys.stdout.flush()
 
 
 class SimilarityAnalyzer(BaseAnalyzer):

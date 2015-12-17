@@ -191,6 +191,8 @@ def preprocess_dataset(ds, type_, **kwargs):
             label_dropped = kwargs[arg] 
         if (arg == 'img_dim'):
             img_dim = int(kwargs[arg])
+        if (arg == 'normalization'):
+            normalization = str(kwargs[arg])
                 
     
     logger.info('Dataset preprocessing: Detrending...')
@@ -213,19 +215,20 @@ def preprocess_dataset(ds, type_, **kwargs):
         ds = ds.get_mapped(avg_mapper)     
     
     
-    logger.info('Dataset preprocessing: Normalization feature-wise...')
-    if img_dim == 4:
-        zscore(ds, chunks_attr='file')
-    zscore(ds)#, param_est=('targets', ['fixation']))
+    if normalization == 'feature' or normalization == 'both':
+        logger.info('Dataset preprocessing: Normalization feature-wise...')
+        if img_dim == 4:
+            zscore(ds, chunks_attr='file')
+        zscore(ds)#, param_est=('targets', ['fixation']))
     
-    '''
-    #Normalizing image-wise
-    logger.info('Dataset preprocessing: Normalization sample-wise...')
-    ds.samples -= np.mean(ds, axis=1)[:, None]
-    ds.samples /= np.std(ds, axis=1)[:, None]
+    if normalization == 'sample' or normalization == 'both':
+        #Normalizing image-wise
+        logger.info('Dataset preprocessing: Normalization sample-wise...')
+        ds.samples -= np.mean(ds, axis=1)[:, None]
+        ds.samples /= np.std(ds, axis=1)[:, None]
+        
+        ds.samples[np.isnan(ds.samples)] = 0
     
-    ds.samples[np.isnan(ds.samples)] = 0
-    '''
     
     ds.a.events = find_events(#event= ds.sa.event_num, 
                               chunks = ds.sa.chunks, 

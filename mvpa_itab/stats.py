@@ -6,7 +6,7 @@ from collections import Counter
 from scipy.stats.stats import ttest_1samp, ttest_ind, pearsonr
 from numpy.random.mtrand import permutation
 from sklearn.metrics import mean_squared_error
-
+from mvpa_itab.utils import progress
 
 def cross_validate(ds, clf, partitioner, permuted_labels):
     
@@ -248,6 +248,9 @@ class Correlation(object):
         corr = np.array(corr)
         
         return corr, _
+    
+    def __str__(self, *args, **kwargs):
+        self.__name__
             
 class SKLRegressionWrapper(object):
     
@@ -287,16 +290,18 @@ class SKLRegressionWrapper(object):
         
 class CrossValidation(object):
     
-    def __init__(self, method, algorithm, error_fx=mean_squared_error):
+    def __init__(self, method, algorithm, error_fx=[mean_squared_error]):
         
         self.method = method
         self.algorithm = algorithm
+        
+        # List of error functions
         self.errorfx = error_fx
         
         
     def run(self, X, y):
         """
-        The output is a vector r x 1 where r is the number
+        The output is a vector r x n where r is the number
         of repetitions of the splitting method
         """
         
@@ -316,10 +321,13 @@ class CrossValidation(object):
             
             # We suppose only scikit-learn fit algorithms are passed!
             y_predict = self.algorithm.fit(X_train, y_train).predict(X_test)
-                
-            mse = mean_squared_error(y[test_index], y_predict)
+            
+            errors = []
+            for error_ in self.errorfx:
+                err_ = error_(y[test_index], y_predict)
+                errors.append(err_)
         
-            mse_.append(mse)
+            mse_.append(errors)
     
         self.result = np.array(mse_)
         
@@ -329,62 +337,34 @@ class CrossValidation(object):
 class RegressionPermutation(object):
     
     def __init__(self, 
-                 analysis, 
-                 permutation_axis=0, 
-                 n_permutation=1000):
+                 analysis,
+                 n_permutation=1000,
+                 print_progress=True):
         
         """permutation dimension indicates the axis to permute on ds"""
         
         self.analysis = analysis   # check to be done
         self.n_permutation = n_permutation
-        self._axis = permutation_axis
+        self.print_progress = print_progress
     
-    def shuffle(self, ds, labels):
-        # Temporary function
-        fp = np.memmap('/media/robbis/DATA/perm.dat',
-                       dtype='float32', 
-                       mode='w+',
-                       shape=(self.n_permutation, 
-                              ds.shape[1],
-                              ds.shape[2])
-                       )
-        #print fp.shape
+    def shuffle(self, y):
+        return permutation(y)
+    
+    def run(self, X, y):
+
+        null_dist = []
+
         for i in range(self.n_permutation):
-            p_labels = permutation(labels)
-            #print p_labels
-            fp[i,:] = self.analysis.run(p_labels)
-            #fp[i,:] = self.analysis.run(ds_p)
+            if self.print_progress:
+                progress(i, self.n_permutation)
+            y_perm = self.shuffle(y)
+            value = self.analysis.run(X, y_perm)
         
-            #null_dist.append(value_)
+            null_dist.append(value)
         
-        #fp = np.array(null_dist)
-        self.null_dist = fp
+        null_dist = np.array(null_dist)
+        self.null_dist = null_dist
     
-        return fp
-    
-    def run(self, ds, labels):
-        # What the fuck is labels???
-        #null_dist = []
-        
-        fp = np.memmap('/media/robbis/DATA/perm.dat',
-                       dtype='float32', 
-                       mode='w+',
-                       shape=(self.n_permutation, 
-                              len(labels),
-                              len(labels))
-                       )
-        
-        for i in range(self.n_permutation):
-            ds_p = self.ds_simple_permutation(ds)
-            #fp[i,:] = self.analysis.run(p_labels)
-            fp[i,:] = self.analysis.run(ds_p)
-        
-            #null_dist.append(value_)
-        
-        #fp = np.array(null_dist)
-        self.null_dist = fp
-    
-        return fp
     
     def p_values(self, true_values, null_dist=None, tails=0):
         """tails = [0, two-tailed; 1, upper; -1, lower]"""
@@ -392,7 +372,7 @@ class RegressionPermutation(object):
         #check stuff
                     
         if null_dist == None:
-            null_dist = self._null_dist
+            null_dist = np.mean(self.null_dist, axis=1)
         
         
         if tails == 0:
@@ -450,6 +430,7 @@ class RegressionPermutation(object):
         
         return ds_
         
+        
                 
 def permutation_test(ds, labels, analysis, n_permutation=1000):
     
@@ -463,6 +444,6 @@ def permutation_test(ds, labels, analysis, n_permutation=1000):
     
     return np.array(null_dist)   
         
-        
+
         
    
