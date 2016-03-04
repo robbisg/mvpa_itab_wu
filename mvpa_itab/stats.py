@@ -316,7 +316,10 @@ class CrossValidation(object):
                 
             X_train = X[train_index]
             y_train = y[train_index]
-                
+            
+            # Feature selection
+            
+            
             X_test = X[test_index]
             
             # We suppose only scikit-learn fit algorithms are passed!

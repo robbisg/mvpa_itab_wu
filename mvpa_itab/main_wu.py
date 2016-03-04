@@ -181,7 +181,7 @@ def preprocess_dataset(ds, type_, **kwargs):
     
     """
     mean = False
-    
+    normalization = 'feature'
     for arg in kwargs:
         if (arg == 'mean_samples'):
             mean = kwargs[arg]

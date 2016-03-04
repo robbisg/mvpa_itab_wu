@@ -5,7 +5,7 @@ import numpy as np
 from mvpa_itab.connectivity import glm, get_bold_signals, load_matrices, z_fisher
 from nitime.timeseries import TimeSeries
 from mvpa2.datasets.base import Dataset, dataset_wizard
-
+import matplotlib.pyplot as pl
 
 class ConnectivityPreprocessing(object):
     
@@ -116,7 +116,10 @@ class ConnectivityTest(object):
         for _ in range(len(results.shape) - 2):
             # For each condition/subject/run check if we have nan
             nan_mask = nan_mask.sum(axis=0)
+            
         
+        #pl.imshow(np.bool_(nan_mask), interpolation='nearest')
+        #print np.nonzero(np.bool_(nan_mask)[0,:])
         # Clean NaNs
         results = results[:,:,:,~np.bool_(nan_mask)]
         
@@ -151,7 +154,7 @@ class ConnectivityTest(object):
         upper_mask[np.tril_indices(zreshaped[0].shape[0])] = 0
         upper_mask = np.bool_(upper_mask)
         
-
+        return nan_mask
 
     def store_details(self, roi_mask):
         
