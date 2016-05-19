@@ -206,8 +206,8 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
         if dir_ == 'none':
             dir_ = ''
         if dir_.find('/') == -1:
-            print dir_
-            path_file_dirs.append(os.path.join(path,name,dir_))
+            logger.debug(dir_)
+        path_file_dirs.append(os.path.join(path,name,dir_))
 
    
     logger.info('Loading...')
@@ -519,7 +519,7 @@ def load_attributes (path, task, subj, **kwargs):
     for dir in sub_dirs:
         if dir == 'none':
             dir = ''
-        if dir.find('/') != -1:
+        if dir[0] == '/':
             completeDirs.append(dir)
             
         completeDirs.append(os.path.join(path,subj,dir))
@@ -528,11 +528,12 @@ def load_attributes (path, task, subj, **kwargs):
     completeDirs.append(os.path.join(path,subj))
     
     attrFiles = []
+    logger.debug(completeDirs)
     for dir in completeDirs:
         attrFiles = attrFiles + os.listdir(dir)
 
     attrFiles = [f for f in attrFiles if f.find(event_file) != -1]
-    #print attrFiles
+    logger.debug(attrFiles)
     if len(attrFiles) > 2:
         attrFiles = [f for f in attrFiles if f.find(subj) != -1]
         

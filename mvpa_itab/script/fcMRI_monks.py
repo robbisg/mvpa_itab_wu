@@ -7,7 +7,7 @@ from mvpa_itab.connectivity import load_matrices, z_fisher, plot_matrix
 from nitime.analysis import SeedCorrelationAnalyzer
 from nitime.timeseries import TimeSeries
 from scipy.stats import ttest_ind #IGNORE:E1103,E0611
-from mvpa_itab.conn.plot import plot_circle
+from mvpa_itab.conn.plot import plot_connectivity_circle_edited
 from nipy.algorithms.statistics.empirical_pvalue import fdr_threshold
 from scipy.io import savemat
 
@@ -45,10 +45,10 @@ subjects = np.loadtxt('/media/robbis/DATA/fmri/monks/attributes_struct.txt',
 
 
 
-p_value = np.float(0.05)
+p_value = np.float(0.01)
 for r in results_dir:
-    results = load_matrices(os.path.join(path,r), ['Samatha', 'Vipassana', 'Rest'])
-    
+    #results = load_matrices(os.path.join(path,r), ['Samatha', 'Vipassana', 'Rest'])
+    results = load_matrices(os.path.join(path,r), ['Samatha', 'Vipassana'])
     
     nan_mask = np.isnan(results)
     for i in range(len(results.shape) - 2):
@@ -110,7 +110,7 @@ for r in results_dir:
     
     vipassana = zmean[1]
     samatha = zmean[0]
-    rest = zmean[2]
+    #rest = zmean[2]
     
     mask_v = labels=='Vipassana'
     #vt, vp = TTest(conditions=['E', 'N']).run(zreshaped[mask_v], group[mask_v])
@@ -136,24 +136,25 @@ for r in results_dir:
     fields['ttest_vipassana_p'] = pv
     
     #f = plot_matrix(tv * (pv < 0.01), roi_names, networks)
-    f, _ = plot_circle(tv * (pv < pv_corrected), roi_names, None, 
+    f, _ = plot_connectivity_circle_edited(tv * (pv < pv_corrected), roi_names, None, 
                        n_lines=np.count_nonzero(pv < pv_corrected)
                        #n_lines=20,
                        )
-    f.savefig(os.path.join(path,r,'vipassana_t_test_corr_.png'))
+    f.savefig(os.path.join(path,r,'vipassana_t_test.png'), facecolor='black')
     
 
     fields['ttest_samatha_t'] = ts
     fields['ttest_samatha_p'] = ps
     
     #f = plot_matrix(ts * (ps < 0.01), roi_names, networks)
-    f, _ = plot_circle(ts * (ps < ps_corrected), roi_names, None, 
+    f, _ = plot_connectivity_circle_edited(ts * (ps < ps_corrected), roi_names, None, 
                        n_lines=np.count_nonzero(ps < ps_corrected)
                        #n_lines=20,
                        )
-    f.savefig(os.path.join(path,r,'samatha_t_test_corr_.png'))
+    f.savefig(os.path.join(path,r,'samatha_t_test.png'), facecolor='black')
     
     for level in ['N', 'E']:
+        '''
         tvr, pvr = ttest_ind(vipassana[subjects.T[1] == level], 
                          rest[subjects.T[1] == level],
                          #equal_var=False,
@@ -170,7 +171,7 @@ for r in results_dir:
         psr_corrected = fdr_threshold(psr[upper_mask], alpha=p_value)
         psr_corrected = p_value
         
-        
+        '''
         tsv, psv = ttest_ind(samatha[subjects.T[1] == level], 
                          vipassana[subjects.T[1] == level],
                          #equal_var=False,
@@ -179,26 +180,28 @@ for r in results_dir:
         psv_corrected = fdr_threshold(psv[upper_mask], alpha=p_value)
         psv_corrected = p_value
         
+        '''
         fields['ttest_samatha_rest_t'] = tsr
         fields['ttest_samatha_rest_p'] = psr
         
         fields['ttest_vipassana_rest_t'] = tvr
         fields['ttest_vipassana_rest_p'] = pvr    
+        '''
         
         fields['ttest_samatha_vipassana_t'] = tsv
         fields['ttest_samatha_vipassana_p'] = psv
+        '''
+        f, _ = plot_connectivity_circle_edited(tsr * (psr < psr_corrected), roi_names, None, 
+                                               n_lines=np.count_nonzero(psr < psr_corrected))
+        f.savefig(os.path.join(path,r,'samatha_rest_t_test_corr_'+level+'.png'), facecolor='black')
         
-        f, _ = plot_circle(tsr * (psr < psr_corrected), roi_names, None, 
-                           n_lines=np.count_nonzero(psr < psr_corrected))
-        f.savefig(os.path.join(path,r,'samatha_rest_t_test_corr_'+level+'.png'))
-        
-        f, _ = plot_circle(tvr * (pvr < pvr_corrected), roi_names, None, 
-                           n_lines=np.count_nonzero(pvr < pvr_corrected))
-        f.savefig(os.path.join(path,r,'vipassana_rest_t_test_corr_'+level+'.png'))
-        
-        f, _ = plot_circle(tsv * (psv < psv_corrected), roi_names, None, 
-                           n_lines=np.count_nonzero(psv < psv_corrected))
-        f.savefig(os.path.join(path,r,'samatha_vipassana_t_test_corr_'+level+'.png'))
+        f, _ = plot_connectivity_circle_edited(tvr * (pvr < pvr_corrected), roi_names, None, 
+                                               n_lines=np.count_nonzero(pvr < pvr_corrected))
+        f.savefig(os.path.join(path,r,'vipassana_rest_t_test_corr_'+level+'.png'), facecolor='black')
+        '''
+        f, _ = plot_connectivity_circle_edited(tsv * (psv < psv_corrected), roi_names, None, 
+                                               n_lines=np.count_nonzero(psv < psv_corrected))
+        f.savefig(os.path.join(path,r,'samatha_vipassana_t_test_corr_'+level+'.png'), facecolor='black')
     pl.close('all')
     ############### Behavioral correlation ###############
     
@@ -213,12 +216,12 @@ for r in results_dir:
     fields['samatha_expertise_corr'] = S_s.corrcoef       
     
     #f = plot_matrix(S_s.corrcoef * (np.abs(S_s.corrcoef) > 0.6), roi_names, networks)
-    f, _ = plot_circle(S_s.corrcoef * (np.abs(S_s.corrcoef) > 0.7), roi_names, None)
-    f.savefig(os.path.join(path,r,'samatha_correlation_expertise_0.7.png'))
+    f, _ = plot_connectivity_circle_edited(S_s.corrcoef * (np.abs(S_s.corrcoef) > 0.7), roi_names, None)
+    f.savefig(os.path.join(path,r,'samatha_correlation_expertise_0.7.png'), facecolor='black')
     
     #f = plot_matrix(S_v.corrcoef * (np.abs(S_v.corrcoef) > 0.6), roi_names, networks)
-    f, _ = plot_circle(S_v.corrcoef * (np.abs(S_v.corrcoef) > 0.7), roi_names, None)
-    f.savefig(os.path.join(path,r,'vipassana_correlation_expertise_0.7.png'))
+    f, _ = plot_connectivity_circle_edited(S_v.corrcoef * (np.abs(S_v.corrcoef) > 0.7), roi_names, None)
+    f.savefig(os.path.join(path,r,'vipassana_correlation_expertise_0.7.png'), facecolor='black')
     
     savemat(os.path.join(path,r,'all_analysis.mat'), fields)
     pl.close('all')
@@ -331,7 +334,7 @@ for m in methods:
     n_ = []
     
     # Number of clusters we want to obtain
-    cluster_size = 10
+    cluster_size = 4
     # We try different thresholds
     cutoff_range = np.linspace(Y[:,2].max()/2., Y[:,2].min(), 50)
     is_csize_reached = False
@@ -368,7 +371,8 @@ for m in methods:
     Z = sch.dendrogram(Y, 
                        orientation='right', 
                        color_threshold=t_color, 
-                       labels=label_list)
+                       #labels=label_list,
+                       )
     axdendro.set_xticks([])
     axdendro.set_yticks([])
     

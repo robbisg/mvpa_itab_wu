@@ -557,8 +557,12 @@ def signal_detection_measures(confusion_):
     
     return result
     
-def subjects_merged_ds(path, subjects, conf_file, task, **kwargs):
+def subjects_merged_ds(path, subjects, conf_file, task, extra_sa=None, **kwargs):
+    """
+    extra_sa: dict or None, sample attributes added to the final dataset, they should be
+    the same length as the subjects.
     
+    """
     
     conf = read_configuration(path, conf_file, task)
    
@@ -576,11 +580,18 @@ def subjects_merged_ds(path, subjects, conf_file, task, **kwargs):
         ds = load_dataset(data_path, subj, task, **conf)
         ds = preprocess_dataset(ds, task, **conf)
         
+        # add extra samples
+        for k, v in extra_sa.iteritems():
+            if len(v) == len(subjects):
+                ds.sa[k] = [v[i] for _ in range(ds.samples.shape[0])]
+        
         if i == 0:
             ds_merged = ds.copy()
         else:
             ds_merged = vstack((ds_merged, ds))
             ds_merged.a.update(ds.a)
+            
+        
         i = i + 1
         
         del ds

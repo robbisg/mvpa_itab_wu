@@ -119,7 +119,37 @@ class TargetCombinationPartitioner(Partitioner):
         for task in uniquetask:
             targets = ds[ds.sa[self.__attr_task].value == task].uniquetargets
             listattr.append(targets)                  
+        print listattr
+        rule = self._get_partition_specs(listattr)
+        
+        return rule
+        
+    def _get_partition_specs(self, listattr):
+        
+        prod = itertools.product(*listattr)
+        
+        return [('None', [item[0]], [item[1]])  for item in prod]
 
+
+
+class SubjectGroupPartitioner(Partitioner):
+    
+    def __init__(self, attr_task='task', **kwargs):
+        
+        Partitioner.__init__(self, **kwargs)
+        
+        self.__attr_task = attr_task
+        
+    
+    def get_partition_specs(self, ds):
+        #uniqueattr = ds.sa[self.__attr].unique()
+        uniquetask = ds.sa[self.__attr_task].unique
+        
+        listattr = []
+        for task in uniquetask:
+            targets = ds[ds.sa[self.__attr_task].value == task].uniquetargets
+            listattr.append(targets)                  
+        print listattr
         rule = self._get_partition_specs(listattr)
         
         return rule

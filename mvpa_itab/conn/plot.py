@@ -99,7 +99,7 @@ def plot_dendrogram(dendrogram, dissimilarity_matrix):
 
 def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
                                      node_angles=None, node_width=None,
-                                     node_size=200, con_thresh=None,
+                                     node_size=100, con_thresh=None,
                                      node_colors=None, facecolor='black',
                                      textcolor='white', node_edgecolor='black',
                                      linewidth=1.5, colormap='hot', vmin=None,
@@ -287,7 +287,7 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
 
     # Make figure background the same colors as axes
     if fig is None:
-        fig = plt.figure(figsize=(8, 8), facecolor=facecolor)
+        fig = plt.figure(figsize=(13, 13), facecolor=facecolor)
 
     # Use a polar axes
     if not isinstance(subplot, tuple):

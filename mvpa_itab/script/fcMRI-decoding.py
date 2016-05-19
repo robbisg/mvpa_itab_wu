@@ -7,7 +7,7 @@ from nitime.timeseries import TimeSeries
 from scipy.io import loadmat
 from scipy.stats import ttest_ind
 from scipy.stats import zscore as sscore
-from mvpa_itab.lib_io import load_dataset
+from mvpa_itab.io.base import load_dataset
 from mvpa_itab.conn.io import load_fcmri_dataset, copy_matrix
 from mvpa2.clfs.svm import LinearCSVMC
 from scipy.stats.stats import zscore
@@ -61,7 +61,7 @@ for r in results_dir:
         print cv.ca.stats
         
 ##########################################
-file_ = open(os.path.join(path, '0_results', 'results_decoding.txt'), 'w')
+file_ = open(os.path.join('/media/robbis/DATA/fmri/monks/', '0_results', 'results_decoding_new.txt'), 'w')
 line_ = ""
 for r in results_dir:
     
@@ -74,8 +74,10 @@ for r in results_dir:
     ds = ds.get_mapped(fx)  
     '''
     clf = LinearCSVMC(C=10)
-    
+    #clf = RbfCSVMC()
     ds.targets = ds.sa.groups
+    
+    #ds.samples = decomposition.KernelPCA(kernel="poly", n_components=30).fit_transform(ds.samples)
     
     fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  
                                             FractionTailSelector(0.01,
@@ -83,9 +85,10 @@ for r in results_dir:
                                                                 tail='upper'))
     
     fclf = FeatureSelectionClassifier(clf, fsel)
-    ds.samples = sscore(ds.samples, axis=1)
+    
+    ds.samples = sscore(ds.samples, axis=0)
     cv = CrossValidation(fclf, 
-                        NFoldPartitioner(cvtype=2), 
+                        NFoldPartitioner(cvtype=1), 
                         enable_ca=['stats'])
     results = dict()
     
@@ -103,7 +106,7 @@ for r in results_dir:
         
         ds_med = ds[ds.sa.meditation == med]
         #zscore(ds_med, chunks_attr='subjects')  
-        balancer = Balancer(count=100, apply_selection=True)#, limit='subjects')
+        balancer = Balancer(count=100, apply_selection=True)
         
         gen = balancer.generate(ds_med)
         
@@ -111,8 +114,13 @@ for r in results_dir:
             print '---------'
             
             err = cv(ds_)
-            
-            sensana = fclf.get_sensitivity_analyzer()
+            print cv.ca.stats
+            try:
+                sensana = fclf.get_sensitivity_analyzer()
+            except NotImplementedError:
+                results[med].append(1 - np.mean(err))
+                line_ += "%s ---> %.2f\n" % (med, np.mean(results[med]))
+                continue
             ds_sens = sensana(ds_)
             
             feature_selected[med][np.nonzero(ds_sens.samples)[1]] += 1
@@ -120,15 +128,15 @@ for r in results_dir:
             
             results[med].append(1 - np.mean(err))
             
-            print str(1 - np.mean(err))
+            #print str(1 - np.mean(err))
         
         feature_weights[med] /= feature_selected[med]
         feature_weights[med][np.isnan(feature_weights[med])] = 0
 
         line_ += "%s ---> %.2f\n" % (med, np.mean(results[med]))
     
-#file_.write(line_)
-#file_.close()
+file_.write(line_)
+file_.close()
 
 
 for med, l_ in zip(['Samatha','Vipassana'], ['(FA)', '(OM)']):
