@@ -6,18 +6,31 @@
 # pylint: disable=maybe-no-member, method-hidden, no-member
 
 import os
+import sys
 import datetime as ora
 import nibabel as ni
 import numpy as np
 import cPickle as pickle
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-from xlrd.biffh import XLRDError
 from mvpa2.base.hdf5 import h5load
 import logging
+import itertools
 
 #from mvpa2.suite import h5load
+      
+  
+def progress(count, total, suffix=''):
+    bar_len = 60
+    filled_len = int(round(bar_len * count / float(total)))
 
+    percents = round(100.0 * count / float(total), 1)
+    bar = '=' * filled_len + '-' * (bar_len - filled_len)
+
+    sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', suffix))
+    sys.stdout.flush()
+    
+    
 def writeResults(experiment, list):
     
     '''
@@ -169,7 +182,7 @@ def fidl2txt (fidlPath, outPath):
     
     outFile.close()
             
-def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
+def fidl2txt_2(fidlPath, outPath, runs=12., vol_run=248, stim_tr=4, offset_tr=2):
     '''
     Fidl file event to text utility.
     
@@ -179,7 +192,7 @@ def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
     outPath: output pathname
     runs: number of runs 
     vol_run: number of volumes per run
-    stim_tr: number of event/stimulus volumes
+    stim_tr: number of volumes to consider a stimulus in the trial
     offset_tr: number of volumes to eliminate at event/stimulus beginning
     '''
     print 'Converting fidl file '+fidlPath+' in '+outPath
@@ -193,12 +206,17 @@ def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
     
     exp_end = vol_run * runs
     
-    fidlFile = open(fidlPath)
+    fidlFile = open(fidlPath, 'r')
+        
+    line_ = fidlFile.readline().split(delimiter)
+    line_ = [l.split(' ') for l in line_ if l!='' and l!='\r\n']
+    line_ = list(itertools.chain(*line_))
+    line_ = [l.split('\r')[0] for l in line_]
     
-    firstRow = fidlFile.readline().split(delimiter)
-    tokens = firstRow
-    tokens.reverse()
-    TR = float(tokens.pop())
+    tokens = line_
+    #tokens.reverse()
+    TR = float(tokens[0])
+    tokens = tokens[1:]
        
     fidlFile.close()
     data = np.loadtxt(fidlPath, 
@@ -222,7 +240,7 @@ def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
     
     noEvents = len(tokens)
     
-    tokens.reverse()
+    #tokens.reverse()
     for i in range(noEvents):
         eventLabels.append(tokens[i][:])
     
@@ -235,7 +253,8 @@ def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
         while f < np.rint(onset[0]/TR):
             outFile.write(u'FIX 0 0 0\n')
             f = f + 1
-     
+    
+    chunk_size = len(line_)/runs
     for i in range(len(onset)-1):
         '''
         if i <= 1:
@@ -250,10 +269,10 @@ def fidl2txt_2(fidlPath, outPath, runs=12, vol_run=248, stim_tr=4, offset_tr=2):
         while j < np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR):
             
             #if (j < np.rint(duration[i]/TR)):#-1
-            if (offset_tr < j < offset_tr + stim_tr):#-1
+            if (offset_tr < (j+1) <= offset_tr + stim_tr):#-1
                 #outFile.write(eventLabels[int(events[i])]+' '+str(runArr[int(events[i])])+'\n')
                 outFile.write(eventLabels[int(events[i])]+' '
-                                            +str(i/30)+' '  #Chunk
+                                            +str(i/chunk_size)+' '  #Chunk
                                             +str(i)+' '     #Event
                                             +str(j+1)+'\n') #Frame
             else:
@@ -282,12 +301,14 @@ def extract_events_xls(filename, sheet_name):
     
     duration = sh.col_values(2)
     duration = np.array(duration[1:])
+    
     logging.debug(duration)
     
     duration = [onset[i+1] - onset[i] for i in range(len(onset)-1)]
     
     event_labels = sh.col_values(5)
     event_labels = np.array([e for e in event_labels if e != ''])
+    
     logging.debug(event_labels)
     
     return onset, duration, event_labels, events_num
@@ -338,16 +359,85 @@ def build_attributes(out_path,
     outFile.close()
     
     return
-    
 
 
-def watch_results (path, task):
-    resFolder = '0_results'
+def beta_attributes(fidl_file, output_filename, nrun=12.):
     
-    fileList = os.listdir(os.path.join(path, resFolder))
-    fileList = [f for f in fileList if f.find(task) != -1]
+    file_ = open(fidl_file, 'r')
+    line_ = file_.readline()
+    line_ = line_.split('\t')[1:]
+    line_ = [l.split(' ') for l in line_ if l != '' and l != '\r\n']
+    line_ = list(itertools.chain(*line_))
+    line_ = [l.split('\r')[0] for l in line_]
+    line_ = ['_'.join(l.split('_')[:-1]) for l in line_]
     
-    return fileList
+    chunk_size = len(line_)/nrun
+    chunks = [np.int(i/chunk_size) for i in range(len(line_))]
+    
+    attr_ = np.vstack((line_, chunks)).T
+    np.savetxt(output_filename, attr_, fmt='%s')
+    
+
+def enhance_attributes(filename, current_header=['targets', 'chunks', 'trial', 'frame']):
+    
+    """Only for Carlo's memory experiment"""
+    import re
+    attr = np.loadtxt(filename, dtype=np.str_)
+    
+    assert attr.shape[1] == len(current_header)
+    
+    pattern_old = ['O_._1', 'N_._0']
+    pattern_new = ['O_._0', 'N_._1']
+    
+    def is_in(pattern_list, string_):
+        
+        return np.array([re.search(pt, string_)!=None for pt in pattern_list]).any()
+    
+    mask_old = np.array([is_in(pattern_old, a) for a in attr.T[0]])
+    mask_new = np.array([is_in(pattern_new, a) for a in attr.T[0]])
+    
+    decision = attr.T[0].copy()
+    decision[mask_new] = 'NEW'
+    decision[mask_old] = 'OLD'
+    
+    
+    pattern_old = ['O_._1', 'N_._0']
+    pattern_new = ['O_._0', 'N_._1']
+    
+    
+    mask_old = np.array([a[0]=='O' for a in attr.T[0]])
+    mask_new = np.array([a[0]=='N' for a in attr.T[0]])
+    
+    memory_status = attr.T[0].copy()
+    memory_status[mask_new] = 'NEW'
+    memory_status[mask_old] = 'OLD'    
+    
+    stim = []
+    for a_ in attr.T[0]:
+        if a_ != 'FIX':
+            stim.append(a_.split('_')[:3]) # Used if attributes are more than 3
+        else:
+            stim.append(['F', '0', '0'])
+    
+    stim = np.array(stim)
+    
+    attr_ = np.hstack((attr, stim, memory_status[:,np.newaxis], decision[:,np.newaxis]))
+    current_header = current_header+['stim', 'evidence', 'accuracy', 'memory_status', 'decision']
+    
+    assert len(current_header) == attr_.shape[1]
+    
+    attr_ = np.vstack((current_header, attr_))
+    
+    filename_pts = filename.split('/')
+    filename_ = filename_pts.pop()
+    filename_new = filename_.split('.')[0]+'_plus.txt'
+    filename_pts.append(filename_new)
+    
+    fname = '/'.join(filename_pts)
+
+    np.savetxt(fname, attr_, fmt='%s')
+    
+    
 
 def load_results(path, name, task):
 

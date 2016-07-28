@@ -1,3 +1,4 @@
+# pylint: disable=maybe-no-member, method-hidden
 import nitime.analysis as nta
 import nitime.fmri.io as io
 
@@ -6,12 +7,12 @@ from nipy.modalities.fmri.glm import GeneralLinearModel
 from nitime.timeseries import TimeSeries
 from nitime.analysis.correlation import CorrelationAnalyzer,\
     SeedCorrelationAnalyzer
-from mvpa_itab.lib_io import get_time
+from mvpa_itab.io.base import get_time
 from scipy.signal.windows import boxcar
 from scipy.signal.signaltools import convolve
 from scipy.stats.mstats import zscore
 
-from lib_io import load_wu_file_list, read_configuration
+from mvpa_itab.io.base import load_wu_file_list, read_configuration, get_time
 
 import matplotlib.pyplot as pl
 
@@ -20,11 +21,15 @@ import nibabel as ni
 import numpy as np
 from nitime.analysis.coherence import CoherenceAnalyzer
 
-from conn.plot import *
 from nitime.analysis.spectral import FilterAnalyzer
 
 from memory_profiler import profile
 from scipy.stats.stats import ttest_ind
+
+from sklearn.decomposition import PCA
+from docutils.parsers.rst.directives import path
+from oauthlib.oauth1.rfc5849.utils import filter_params
+
 
 #@profile
 def analyze_connectivity(imagelist, path_roi, roi_names, ts_param, **kwargs):
@@ -107,45 +112,11 @@ def create_similarity_files(path, subjects, target_label, source_label):
                 
                 np.savetxt(os.path.join(path_save, '_'.join(['similarity',cond,time,s,'.txt'])), data_a, 
                            fmt='%4.4f', delimiter=',')
-    np.savetxt(os.path.join(path_save, 'roi_labels.txt'), roi_a, fmt='%s')
-    
-    '''
-    for f in file_list[:11]:
-        for u, l in zip(ub, lb):
-        
-            data = np.loadtxt(os.path.join(path_save, f),delimiter=',')
-            data = np.sqrt(data.T)
-            data_z = zscore(data, axis=1)
-        
-            ts = TimeSeries(data_z, sampling_interval=float(TR))
-            F = FilterAnalyzer(ts, ub=u, lb=l)
-            
-            f_ts = F.fir.data
-            
-            A = CorrelationAnalyzer(F.fir)
-            
-            #np.savetxt(os.path.join(path_save, 'correlation', f[:f.find('.txt')]+'_corr.txt'), A.corrcoef, fmt='%.4f')
-            pl.figure()
-            pl.plot(f_ts.T)
-            pl.plot(-data_z.T)
-            pl.savefig(os.path.join(path_save, 'correlation', f[:f.find('.txt')]+'_ts_'+str(l)+'_'+str(u)+'_.png'))
-            
-            pl.figure()
-            pl.imshow(A.corrcoef, interpolation='nearest')
-            pl.xticks(np.arange(len(roi_a)), roi_a, rotation='vertical')
-            pl.yticks(np.arange(len(roi_a)), roi_a)
-            pl.colorbar()
-            pl.savefig(os.path.join(path_save, 'correlation', f[:f.find('.txt')]+'_corr'+str(l)+'_'+str(u)+'.png'))
-            
-        corr_list.append(A.corrcoef)
-    '''
-                        
-    
-    return 
+    np.savetxt(os.path.join(path_save, 'roi_labels.txt'), roi_a, fmt='%s')                      
+
 
 def bold_convolution(bold_timeseries, duration, win_func=boxcar):
-     
-             
+              
     window=win_func(duration)
     
     n_roi = bold_timeseries.data.shape[0]
@@ -313,7 +284,10 @@ def get_similarity_timeserie(path, name, condition, time, **kwargs):
     
     return ts
     
-def get_condition_timeserie(ts, paradigm, delete_condition=None, paste_runs=False):
+def get_condition_timeserie(ts, paradigm, 
+                            delete_condition=None,
+                            #ts_extraction='mean',
+                            paste_runs=False):
     
     '''
     Gets a whole fmri timeserie and returns an object partioned by condition and runs
@@ -331,7 +305,7 @@ def get_condition_timeserie(ts, paradigm, delete_condition=None, paste_runs=Fals
     if delete_condition != None:
         m = conditions != delete_condition
         conditions = conditions[m]
-        runs = runs[m]
+        runs = runs[m] 
     
     cond_list = np.unique(conditions)
     runs_list = np.unique(runs)  
@@ -339,19 +313,21 @@ def get_condition_timeserie(ts, paradigm, delete_condition=None, paste_runs=Fals
     timeserie = dict()
     
     for c in cond_list:
-        mask_cond = conditions == c
+        mask_cond = paradigm.T[0] == c
         
         timeserie[c] = []
-        
+        ts_dummy = []
         for r in runs_list:
-            mask_run = runs == r
+            mask_run = paradigm.T[1] == r
             
             general_mask = mask_cond * mask_run
-            
-            ts_data = ts.data.T[general_mask].T
-            
-            timeserie[c].append(ts_data)
-        timeserie[c] = np.array(timeserie[c])
+            assert general_mask.shape[0] == ts.data.shape[1]
+            ts_data = ts.data[:,general_mask]
+            print ts_data.shape
+            ts_dummy.append(ts_data)
+        
+        ts_dummy = np.array(ts_dummy)
+        timeserie[c] = ts_dummy
             
     return timeserie
 
@@ -421,7 +397,11 @@ def glm(image_ts, regressors):
     return beta
 
 #@profile       
-def get_bold_signals (image, mask, TR, normalize=True, average=True, filter_par=None, roi_values=None):
+def get_bold_signals (image, mask, TR, 
+                      normalize=True, 
+                      ts_extraction='mean', 
+                      filter_par=None, 
+                      roi_values=None):
     '''
     Image and mask must be in nibabel format
     '''
@@ -433,7 +413,7 @@ def get_bold_signals (image, mask, TR, normalize=True, average=True, filter_par=
         labels = np.int_(roi_values)
     
     final_data = []
-    print labels
+    #print labels
     for v in labels[:]:
         #print str(v)
         data = image.get_data()[mask_data == v]
@@ -441,10 +421,17 @@ def get_bold_signals (image, mask, TR, normalize=True, average=True, filter_par=
         if normalize == True:
             data = zscore(data, axis = 1)
             data[np.isnan(data)] = 0
-        
-        if average == True:
+
+        if ts_extraction=='mean':
+            #assert np.mean(data, axis=0) == data.mean(axis=0)
             data = data.mean(axis=0)
-        
+        elif ts_extraction=='pca':
+            if data.shape[0] > 0:
+                data = PCA(n_components=1).fit_transform(data.T)
+                data = np.squeeze(data)
+            else:
+                data = data.mean(axis=0)
+                
         ts = TimeSeries(data, sampling_interval=float(TR))
         
         if filter_par != None:
@@ -466,13 +453,13 @@ def get_bold_signals (image, mask, TR, normalize=True, average=True, filter_par=
     return TimeSeries(np.vstack(final_data), sampling_interval=float(TR))
 
        
-def save_matrices(path, results):
+def save_matrices(path, results, gsr='gsr', atlas='findlab'):
     
     datetime = get_time()
-    analysis = 'connectivity'
+    analysis = 'connectivity_filtered_first'
     task = 'fmri'
         
-    new_dir = datetime+'_'+analysis+'_'+task
+    new_dir = '_'.join([datetime,analysis,gsr,atlas,task])
     command = 'mkdir '+os.path.join(path, '0_results', new_dir)
     os.system(command)
     
@@ -496,7 +483,10 @@ def save_matrices(path, results):
 
    
 def load_matrices(path, condition):
-    
+    """
+    path = path of result file
+    conditions = analysis label
+    """
     subjects = os.listdir(path)
     
     subjects = [s for s in subjects if s.find('configuration') == -1 \
@@ -506,17 +496,20 @@ def load_matrices(path, condition):
     result = []
     
     for c in condition:
-        
+
         s_list = []
         
         for s in subjects:
+
             sub_path = os.path.join(path, s)
 
             filel = os.listdir(sub_path)
             filel = [f for f in filel if f.find(c) != -1]
             c_list = []
             for f in filel:
+
                 matrix = np.loadtxt(os.path.join(sub_path, f))
+                
                 c_list.append(matrix)
         
             s_list.append(np.array(c_list))
@@ -532,9 +525,3 @@ def z_fisher(r):
     
     return F
 
-
-#class ConditionTimeserie():
-
-    
-
-        

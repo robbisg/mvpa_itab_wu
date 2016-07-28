@@ -1,7 +1,7 @@
 from mvpa_itab.test_wu import *
 import numpy as np
 from mvpa2.clfs.svm import LinearCSVMC
-from mvpa_itab.washu import load
+from mvpa_itab.io.washu import load
 
 #img = load('/media/robbis/DATA/fmri/memory/nibabel__/angque_task_4RES_GOonly_res_b1.4dfp.ifh')
 #data = img.get_data()

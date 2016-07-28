@@ -3,6 +3,13 @@ from scipy.io import loadmat
 from scipy.stats import zscore as sc_zscore
 from mvpa2.suite import dataset_wizard, zscore
 import os
+from nitime.analysis.base import BaseAnalyzer
+from scipy.spatial.distance import euclidean
+from mvpa2.datasets.base import Dataset, dataset_wizard
+from mvpa_itab.connectivity import load_matrices, z_fisher
+from mvpa_itab.conn.utils import flatten_correlation_matrix
+
+
 
 def load_fcmri_dataset(data, subjects, conditions, group, level, n_run=3):
     
@@ -104,27 +111,239 @@ def load_mat_dataset(datapath, bands, conditions, networks=None):
         
     return ds
 
-def flatten_correlation_matrix(matrix):
-    
-    il = np.tril_indices(matrix.shape[0])
-    out_matrix = matrix.copy()
-    out_matrix[il] = np.nan
-    
-    out_matrix[range(matrix.shape[0]),range(matrix.shape[0])] = np.nan
-    '''
-    iu = np.triu_indices(matrix.shape[0])
-    out_matrix[out_matrix[iu] == 0] = np.nan
-    
-    out_matrix = out_matrix[np.nonzero(out_matrix)]
-    out_matrix[np.isnan(out_matrix)] == 0
-    '''
-    return matrix[~np.isnan(out_matrix)]
-    
 
+def load_correlation_matrix(path, pattern_):
+    
+    """
+    Gets a pathname in which is supposed to be a list of txt files
+    with the connectivity matrices, filenames are composed by a common
+    pattern to filter the file list in the folder.
+    
+    The output is the array shaped subj x node x node
+    """ 
+    
+    flist_conn = os.listdir(path)
+    flist_conn = [f for f in flist_conn if f.find(pattern_) != -1]
+        
+    conn_data = []
+    for f in flist_conn:
+        data_ = np.genfromtxt(os.path.join(path, f))
+        conn_data.append(data_)
+    
+    conn_data = np.array(conn_data)
+    
+    return conn_data
 
-def load_correlation():
+def load_correlation(path, filepattern, format, dictionary):
+    """
+    path: where to find the file?
+    filepattern: is a single file or a serie of?
+    format: which routine use to open the file?
+    dictonary: what is the meaning of each matrix dimension?
+    """
     # To be implemented
     
-    
-    
     return
+
+class CorrelationLoader(object):
+        
+    def load(self, path, filepattern, conditions=None):
+        
+        # Check what we have in the path (subjdirs, subjfiles, singlefile)
+        
+        
+        subjects = os.listdir(path)
+            
+        subjects = [s for s in subjects if s.find('configuration') == -1 \
+            and s.find('.') == -1]
+    
+    
+        result = []
+    
+        for c in conditions:
+
+            s_list = []
+    
+            for s in subjects:
+
+                sub_path = os.path.join(path, s)
+
+                filel = os.listdir(sub_path)
+                filel = [f for f in filel if f.find(c) != -1]
+                c_list = []
+                
+                for f in filel:
+
+                    matrix = np.loadtxt(os.path.join(sub_path, f))
+            
+                c_list.append(matrix)
+    
+            s_list.append(np.array(c_list))
+
+            result.append(np.array(s_list))
+    
+        return np.array(result)   
+        
+
+class RegressionDataset(object):
+    
+    
+    def __init__(self, X, y, group=None, conditions=None):
+        
+        self.X = X
+        self.y = y
+        
+        if group != None:
+            if len(self.group) != len(y):
+                raise ValueError("Data mismatch: Check if \
+                data and group have the same numerosity!")
+            
+        self.group = np.array(group)
+        
+        if conditions != None:
+            if len(self.group) != len(y):
+                raise ValueError("Data mismatch: Check if \
+                data and conditions have the same numerosity!")
+        
+        self.conditions = conditions
+    
+    
+    def get_group(self, group_name):
+        
+        if group_name not in np.unique(self.group):
+            raise ValueError("%s not included in loaded groups!", 
+                             group_name)
+        
+        group_mask = self.group == group_name
+        
+        rds = RegressionDataset(self.X[group_mask],
+                                self.y[group_mask],
+                                group=self.group[group_mask])
+        return rds
+    
+    
+class ConnectivityLoader(object):
+    
+    def __init__(self, path, subjects, res_dir, roi_list):
+        
+        self.path = os.path.join(path, res_dir)
+        self.subjects = subjects
+        self.roi_list = roi_list
+    
+    
+    def get_results(self, conditions):
+        
+        
+        self.conditions = dict(zip(conditions, range(len(conditions))))
+        
+        # Loads data for each subject
+        # results is in the form (condition x subjects x runs x matrix)
+        results = load_matrices(self.path, conditions)
+        
+        # Check if there are NaNs in the data
+        nan_mask = np.isnan(results)
+        for _ in range(len(results.shape) - 2):
+            # For each condition/subject/run check if we have nan
+            nan_mask = nan_mask.sum(axis=0)
+        
+        
+            
+        
+        #pl.imshow(np.bool_(nan_mask), interpolation='nearest')
+        #print np.nonzero(np.bool_(nan_mask)[0,:])
+        # Clean NaNs
+        results = results[:,:,:,~np.bool_(nan_mask)]
+        
+        # Reshaping because numpy masking flattens matrices        
+        rows = np.sqrt(results.shape[-1])
+        shape = list(results.shape[:-1])
+        shape.append(int(rows))
+        shape.append(-1)
+        results = results.reshape(shape)
+        
+        # We apply z fisher to results
+        zresults = z_fisher(results)
+        zresults[np.isinf(zresults)] = 1
+        
+        self.results = zresults
+        
+        # Select mask to delete labels
+        roi_mask = ~np.bool_(np.diagonal(nan_mask))
+
+        # Get some information to store stuff
+        self.store_details(roi_mask)   
+
+        # Mean across runs
+        zmean = zresults.mean(axis=2)
+                
+        new_shape = list(zmean.shape[-2:])
+        new_shape.insert(0, -1)
+        
+        zreshaped = zmean.reshape(new_shape)
+        
+        upper_mask = np.ones_like(zreshaped[0])
+        upper_mask[np.tril_indices(zreshaped[0].shape[0])] = 0
+        upper_mask = np.bool_(upper_mask)
+        
+        # Returns the mask of the not available ROIs.
+        self.nan_mask = nan_mask
+        return self.nan_mask
+
+    def store_details(self, roi_mask):
+        
+        fields = dict()
+        # Depending on data
+        self.network_names = list(self.roi_list[roi_mask].T[0])
+        #self.roi_names = list(self.roi_list[roi_mask].T[2]) #self.roi_names = list(self.roi_list[roi_mask].T[1])
+        self.subject_groups = list(self.subjects.T[1])
+        self.subject_level = list(np.int_(self.subjects.T[-1]))
+        #self.networks = self.roi_list[roi_mask].T[-2]
+        
+        return fields
+
+    def get_dataset(self):
+        
+        zresults = self.results
+        
+        new_shape = list(zresults.shape[-2:])
+        new_shape.insert(0, -1)
+        
+        zreshaped = zresults.reshape(new_shape)
+        
+        upper_mask = np.ones_like(zreshaped[0])
+        upper_mask[np.tril_indices(zreshaped[0].shape[0])] = 0
+        upper_mask = np.bool_(upper_mask)
+        
+        # Reshape data to have samples x features
+        ds_data = zreshaped[:,upper_mask]
+    
+        labels = []
+        n_runs = zresults.shape[2]
+        n_subj = zresults.shape[1]
+        
+        for l in self.conditions.keys():
+            labels += [l for _ in range(n_runs * n_subj)]
+        ds_labels = np.array(labels)
+        
+        ds_subjects = []
+
+        for s in self.subjects:
+            ds_subjects += [s for _ in range(n_runs)]
+        ds_subjects = np.array(ds_subjects)
+        ds_info = np.vstack((ds_subjects, ds_subjects))
+        
+        
+        self.ds = dataset_wizard(ds_data, targets=ds_labels, chunks=np.int_(ds_info.T[4]))
+        self.ds.sa['subjects'] = ds_info.T[0]
+        self.ds.sa['groups'] = ds_info.T[1]
+        self.ds.sa['expertise'] = ds_info.T[3]
+        self.ds.sa['chunks_1'] = ds_info.T[2]
+        self.ds.sa['chunks_2'] = ds_info.T[4]
+        self.ds.sa['meditation'] = ds_labels
+        
+        return self.ds
+              
+        
+            
+               
+    
