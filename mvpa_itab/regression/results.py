@@ -1,99 +1,117 @@
-from mvpa_itab.conn.utils import ConnectivityTest
+import os
+import numpy as np
+import matplotlib.pyplot as pl
+from mvpa_itab.conn.utils import ConnectivityLoader
 from mvpa_itab.conn.io import copy_matrix
 from mvpa_itab.conn.plot import *
 import nibabel as ni
 from scipy.stats.stats import zscore
+from __builtin__ import str
 
 
-
-def get_plot_stuff(directory_):
+def save_results(path, results):
     
-    if directory_.find('atlas90') != -1 or directory_.find('20150') != -1:
-        coords = get_atlas90_coords()
-        roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_AAL/atlas90.cod',
-                              delimiter='=',
-                              dtype=np.str)
-        names = roi_list.T[1]
-        names_inv = np.array([n[::-1] for n in names])
-        index_ = np.argsort(names_inv)
-        names_lr = names[index_]
-        dict_ = {'L':'#89CC74', 'R':'#7A84CC'}
-        colors_lr = np.array([dict_[n[:1]] for n in names_inv])    
-        names = np.array([n.replace('_', ' ') for n in names])
-
+    fields_ = ['error', 'weights', 'features', 'subjects']
     
-    elif directory_.find('findlab') != -1 or directory_.find('2014') != -1:
-        coords = get_findlab_coords()
-        roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
-                      delimiter=',',
-                      dtype=np.str)
-        names = roi_list.T[2]
-        """
-        dict_ = {'Auditory':'#89CC74', 
-                 'Basal_Ganglia':'#7A84CC', 
-                 'LECN':'#FF1800',
-                 'Language':'#BF2B54', 
-                 'Precuneus':'#390996',
-                 'RECN':'#FF230B', 
-                 'Sensorimotor':'#4D0DC8', 
-                 'Visuospatial':'#DBBF00', 
-                 'anterior_Salience':'#37AEC4',
-                 'dorsal_DMN':'#9AF30B', 
-                 'high_Visual':'#FF8821', 
-                 'post_Salience':'#0289A2', 
-                 'prim_Visual':'#FF7600',
-                 'ventral_DMN':'#92ED00'
-                 }"""
-        dict_ = {'Auditory':'silver', 
-                 'Basal_Ganglia':'white', 
-                 'LECN':'red',
-                 'Language':'orange', 
-                 'Precuneus':'green',
-                 'RECN':'plum', 
-                 'Sensorimotor':'gold', 
-                 'Visuospatial':'blueviolet', 
-                 'anterior_Salience':'beige',
-                 'dorsal_DMN':'cyan', 
-                 'high_Visual':'yellow', 
-                 'post_Salience':'lime', 
-                 'prim_Visual':'magenta',
-                 'ventral_DMN':'royalblue'
-                 }
-        colors_lr = np.array([dict_[r.T[-2]] for r in roi_list])
-        index_ = np.arange(90)
+    for result in results:
+    
+        conf_ = result[0]
+        real_res = result[1][0][0]
+        perm_res = result[1][0][1]
         
+                    
+        array_save = dict()
+        perm_save = dict()
         
-    return names, colors_lr, index_, coords
+        for i, _ in enumerate(real_res):
+            array_save[fields_[i]] = np.array(real_res[i])
+            perm_save[fields_[i]] = np.array([np.vstack([f for f in s]) for s in perm_res[:,i,:]])
+            
+        
+        p_name = build_name(path, conf_, field='permutation', perm=1000, cv=50)
+        v_name = build_name(path, conf_, field='values', perm=1000, cv=50)
+        
+        np.savez_compressed(p_name, perm_save)
+        np.savez_compressed(v_name, array_save)
+            
+    
+    
+    
+            
+def build_name(path, conf, field='values', **kwargs):
+    
+    fname = os.path.join(path, conf['directory'])
+    alg = conf['learner'].__str__()[:3]
+    kernel = conf['learner'].kernel
+    med_ = conf['meditation']
+    
+    return os.path.join(fname,
+                        "%s_%s_%s_%s.npz" %(med_, 
+                                              #alg, 
+                                              #kernel, 
+                                              field, 
+                                              str(kwargs['perm']), 
+                                              str(kwargs['cv'])) )       
+        
 
 
 
-def write_results(directory_list, conditions, n_permutations=1000.):
+def analyze_results(directory, 
+                    conditions, 
+                    n_permutations=1000.):
+    
+    
+    """Write the results of the regression analysis
+
+    Parameters
+    ----------
+    directory : string or list of strings
+        Path or list of paths where put results.
+    
+    condition : string or list of strings
+        Conditions to be analyzed.
+
+
+    Returns
+    -------
+    fig : instance of matplotlib.pyplot.Figure
+        The figure handle.
+
+    """
     
     res_path = '/media/robbis/DATA/fmri/monks/0_results/'
     roi_list = []
     roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
                           delimiter=',',
                           dtype=np.str)
-    for dir_ in directory_list:
+    
+    if isinstance(directory, str):
+        directory = [directory]
+        
+    if isinstance(conditions, str):
+        conditions = [conditions]
+        
+    
+    for dir_ in directory:
         for cond_ in conditions:
             
-            fname_ = os.path.join(res_path, dir_, cond_+'_values_1000_cv_50.npz')
+            fname_ = os.path.join(res_path, dir_, cond_+'_values_1000_50.npz')
             
             results_ = np.load(fname_)
             values_ = results_['arr_0'].tolist()
-            errors_ = values_['errors_']
-            sets_ = values_['sets_']
-            weights_ = values_['weights_']
-            samples_ = values_['samples_']
+            errors_ = values_['error']      #values_['errors_']
+            sets_ = values_['weights']     #values_['sets_']
+            weights_ = values_['features']   #values_['weights_']
+            samples_ = values_['subjects']  #values_['samples_']
             
-            fname_ = os.path.join(res_path, dir_, cond_+'_permutation_1000_cv_50.npz')
+            fname_ = os.path.join(res_path, dir_, cond_+'_permutation_1000_50.npz')
             
             results_ = np.load(fname_)
             values_p = results_['arr_0'].tolist()
-            errors_p = values_p['errors_p']
-            sets_p = values_p['sets_p']
-            weights_p = values_p['weights_p']
-            samples_p = values_p['samples_p']
+            errors_p = values_p['error']        #values_p['errors_p']
+            sets_p = values_p['weights']       #values_p['sets_p']
+            weights_p = values_p['features']     #values_p['weights_p']
+            samples_p = values_p['subjects']    #values_p['samples_p']
             
             errors_p = np.nanmean(errors_p, axis=1)
                         
@@ -110,7 +128,7 @@ def write_results(directory_list, conditions, n_permutations=1000.):
             prename = "%s_%s" %(cond_, learner_)
             
             ######## Get matrix infos ###############
-            conn_test = ConnectivityTest(path, 
+            conn_test = ConnectivityLoader(path, 
                                          subjects, 
                                          directory_, 
                                          roi_list)
@@ -219,9 +237,9 @@ def write_results(directory_list, conditions, n_permutations=1000.):
             
             
             fname = "%s_features_weight.png" %(prename)
-            #f.savefig(os.path.join(res_path, directory_, fname),
-            #          facecolor='black',
-            #          dpi=150)
+            f.savefig(os.path.join(res_path, directory_, fname),
+                      facecolor='black',
+                      dpi=150)
             for d_ in ['x', 'y', 'z']:
                 fname = "%s_connectome_feature_weight_%s.png" %(prename, d_)
                 fname = os.path.join(res_path, directory_, fname)
@@ -274,9 +292,9 @@ def write_results(directory_list, conditions, n_permutations=1000.):
                                             )
             
             fname = "%s_features_choices.png" %(prename)
-            #f.savefig(os.path.join(res_path, directory_, fname),
-            #          facecolor='black',
-            #          dpi=150)
+            f.savefig(os.path.join(res_path, directory_, fname),
+                      facecolor='black',
+                      dpi=150)
             
             for d_ in ['x', 'y', 'z']:
                 fname = "%s_connectome_feature_choices_%s.png" %(prename, d_)
@@ -299,105 +317,6 @@ def write_results(directory_list, conditions, n_permutations=1000.):
             fname = os.path.join(res_path, directory_, fname)
             print_connections(matrix_, names_lr,fname)
             
-            pl.close('all')   
-    
-###################################################
-
-def plot_connectome(matrix_, 
-                    coords, 
-                    colors, 
-                    size, 
-                    order_, 
-                    threshold, 
-                    fname, cmap=pl.cm.hot, title='', max_=None, min_=None, display_='ortho'):
-    
-    from nilearn import plotting
-    plotting.plot_connectome(adjacency_matrix=matrix_[order_][:,order_], 
-                             node_coords=coords[order_], 
-                             node_color=colors[order_].tolist(), 
-                             node_size=1.5*size[order_], 
-                             edge_cmap=cmap, 
-                             edge_vmin=min_, 
-                             edge_vmax=max_, 
-                             edge_threshold=threshold, 
-                             output_file=fname, 
-                             display_mode=display_, 
-                             figure=pl.figure(figsize=(16*1.2,9*1.2)),# facecolor='k', edgecolor='k'), 
-                             #axes, 
-                             title=title, 
-                             #annotate, 
-                             black_bg=True, 
-                             #alpha, 
-                             edge_kwargs={
-                                          'alpha':0.8,
-                                          'linewidth':9,
-                                          }, 
-                             node_kwargs={
-                                          'edgecolors':'k',
-                                          }, 
-                             #colorbar=True
-                             )
-
-
-def find_roi_center(img, roi_value):
-    
-    affine = img.get_affine()
-    
-    mask_ = np.int_(img.get_data()) == roi_value
-    ijk_coords = np.array(np.nonzero(mask_)).mean(1)
-    
-    xyz_coords = ijk_coords * affine.diagonal()[:-1] + affine[:-1,-1]
-    
-    return xyz_coords
-
-
-
-def get_atlas90_coords():
-    atlas90 = ni.load('/media/robbis/DATA/fmri/templates_AAL/atlas90_mni_2mm.nii.gz')
-    coords = [find_roi_center(atlas90, roi_value=i) for i in np.unique(atlas90.get_data())[1:]]
-    
-    return np.array(coords)
-
-
-
-def get_findlab_coords():
-    roi_list = os.listdir('/media/robbis/DATA/fmri/templates_fcmri/0_findlab/')
-    roi_list.sort()
-    findlab = [ni.load('/media/robbis/DATA/fmri/templates_fcmri/0_findlab/'+roi) for roi in roi_list]
-    f_coords = []
-    for img_ in findlab:
-        f_coords.append(np.array([find_roi_center(img_, roi_value=np.int(i)) for i in np.unique(img_.get_data())[1:]]))
-        
-    return np.vstack(f_coords)
-
-
-def print_connections(matrix, labels, fname):
-
-    file_ = open(fname, 'w')
-    
-    upp_ind = np.triu_indices(matrix.shape[0], k=1)
-    upp_matrix = matrix[upp_ind]
-    sort_index = np.argsort(np.abs(upp_matrix))
-    sort_matrix = upp_matrix[sort_index]
-    ord_ind = tuple([i[sort_index] for i in upp_ind])
-    
-    for i, elem in enumerate(sort_matrix):
-        file_.write(labels[ord_ind[0][i]]+','+labels[ord_ind[1][i]]+','+str(elem))
-        file_.write('\n')
-    
-    file_.close()
-    
-    
-    
-def overlap_atlases():
-    overlapping = []
-
-    for n, net in enumerate(findlab):
-        for sub_net in np.unique(net)[1:]:
-            maskd = img.get_data() * (net == sub_net)
-            over_roi = np.unique(maskd)[1:]
-            print '%s %s: %s %s' % (str(n), str(sub_net), str(over_roi), collections.Counter(maskd[maskd!=0]))
-            overlapping.append([n, sub_net, np.unique(maskd)[1:]])
-
-#############################################
+            pl.close('all')
+            
 

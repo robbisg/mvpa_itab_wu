@@ -412,7 +412,7 @@ for i in range(data_movie.shape[1]):
                                             axis=1)
     p = seed_similarity.p_values(value)
     f = pl.figure()
-    pl
+    
     
     
     

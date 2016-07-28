@@ -1,7 +1,7 @@
 import numpy as np
 from mvpa_itab.stats import CrossValidation
 from scipy.stats.stats import zscore
-from mvpa_itab.conn.utils import ConnectivityTest
+from mvpa_itab.conn.utils import ConnectivityLoader
 import os
 from mvpa_itab.stats import Correlation
 from mvpa_itab.measure import ranking_correlation
@@ -34,7 +34,7 @@ class ConnectivityDataLoader(Analysis):
         self.conditions = conditions
         self.subjects = subjects
         
-        conn = ConnectivityTest(path, self.subjects, self.directory, roi_list)
+        conn = ConnectivityLoader(path, self.subjects, self.directory, roi_list)
         conn.get_results(self.conditions)
         self.ds = conn.get_dataset()
         
@@ -343,7 +343,7 @@ iterator_setup = {'directory':['20151030_141350_connectivity_filtered_first_no_g
 subjects = np.loadtxt('/media/robbis/DATA/fmri/monks/attributes_struct.txt',
                       dtype=np.str)
 
-_test_fields = {'path':'/media/robbis/DATA/fmri/monks/', 
+_fields = {'path':'/media/robbis/DATA/fmri/monks/', 
                'roi_list':np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
                       delimiter=',',
                       dtype=np.str), 
@@ -365,19 +365,11 @@ _test_fields = {'path':'/media/robbis/DATA/fmri/monks/',
 
 
 '''
-loader = ConnectivityDataLoader()
-conditions = ['Samatha', 'Vipassana']
-result_dir = ['dir1', 'dir2']
-
-kwargs = {'cond':conditions, 'dir':result_dir}
-
-loader.setup_analysis(path, roi_list, directory, conditions, subjects)
-
-filter_ = {'meditation':'Samatha', 'group':'E'}
-
-loader.filter(filter_)
-
-X = loader.ds.samples
-y = np.float_(loader.ds.sa.expertise)*0.01
+from mvpa_itab.regression.base import *
+pipeline = FeaturePermutationRegression()
+pipeline.setup_analysis(**_fields)
+iter_ = ScriptIterator()
+iter_.setup_analysis(**iterator_setup)
+results = iter_.run(pipeline)
 '''
 

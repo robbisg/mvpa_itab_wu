@@ -4,8 +4,8 @@ import nibabel as ni
 import numpy as np
 from mvpa_itab.connectivity import glm, get_bold_signals, load_matrices, z_fisher
 from nitime.timeseries import TimeSeries
-from mvpa2.datasets.base import Dataset, dataset_wizard
-import matplotlib.pyplot as pl
+import itertools
+
 
 class ConnectivityPreprocessing(object):
     
@@ -93,124 +93,211 @@ class ConnectivityPreprocessing(object):
         self.regressors = np.vstack(regressor)
 
 
-class ConnectivityTest(object):
+
+def find_roi_center(img, roi_value):
     
-    def __init__(self, path, subjects, res_dir, roi_list):
-        
-        self.path = os.path.join(path, '0_results', res_dir)
-        self.subjects = subjects
-        self.roi_list = roi_list
+    affine = img.get_affine()
     
+    mask_ = np.int_(img.get_data()) == roi_value
+    ijk_coords = np.array(np.nonzero(mask_)).mean(1)
     
-    def get_results(self, conditions):
-        
-        
-        self.conditions = dict(zip(conditions, range(len(conditions))))
-        
-        # Loads data for each subject
-        # results is in the form (condition x subjects x runs x matrix)
-        results = load_matrices(self.path, conditions)
-        
-        # Check if there are NaNs in the data
-        nan_mask = np.isnan(results)
-        for _ in range(len(results.shape) - 2):
-            # For each condition/subject/run check if we have nan
-            nan_mask = nan_mask.sum(axis=0)
-            
-        
-        #pl.imshow(np.bool_(nan_mask), interpolation='nearest')
-        #print np.nonzero(np.bool_(nan_mask)[0,:])
-        # Clean NaNs
-        results = results[:,:,:,~np.bool_(nan_mask)]
-        
-        # Reshaping because numpy masking flattens matrices        
-        rows = np.sqrt(results.shape[-1])
-        shape = list(results.shape[:-1])
-        shape.append(int(rows))
-        shape.append(-1)
-        results = results.reshape(shape)
-        
-        # We apply z fisher to results
-        zresults = z_fisher(results)
-        zresults[np.isinf(zresults)] = 1
-        
-        self.results = zresults
-        
-        # Select mask to delete labels
-        roi_mask = ~np.bool_(np.diagonal(nan_mask))
-
-        # Get some information to store stuff
-        self.store_details(roi_mask)   
-
-        # Mean across runs
-        zmean = zresults.mean(axis=2)
-                
-        new_shape = list(zmean.shape[-2:])
-        new_shape.insert(0, -1)
-        
-        zreshaped = zmean.reshape(new_shape)
-        
-        upper_mask = np.ones_like(zreshaped[0])
-        upper_mask[np.tril_indices(zreshaped[0].shape[0])] = 0
-        upper_mask = np.bool_(upper_mask)
-        
-        return nan_mask
-
-    def store_details(self, roi_mask):
-        
-        fields = dict()
-        # Depending on data
-        self.network_names = list(self.roi_list[roi_mask].T[0])
-        #self.roi_names = list(self.roi_list[roi_mask].T[2]) #self.roi_names = list(self.roi_list[roi_mask].T[1])
-        self.subject_groups = list(self.subjects.T[1])
-        self.subject_level = list(np.int_(self.subjects.T[-1]))
-        #self.networks = self.roi_list[roi_mask].T[-2]
-        
-        return fields
-
-    def get_dataset(self):
-        
-        zresults = self.results
-        
-        new_shape = list(zresults.shape[-2:])
-        new_shape.insert(0, -1)
-        
-        zreshaped = zresults.reshape(new_shape)
-        
-        upper_mask = np.ones_like(zreshaped[0])
-        upper_mask[np.tril_indices(zreshaped[0].shape[0])] = 0
-        upper_mask = np.bool_(upper_mask)
-        
-        # Reshape data to have samples x features
-        ds_data = zreshaped[:,upper_mask]
+    xyz_coords = ijk_coords * affine.diagonal()[:-1] + affine[:-1,-1]
     
-        labels = []
-        n_runs = zresults.shape[2]
-        n_subj = zresults.shape[1]
-        
-        for l in self.conditions.keys():
-            labels += [l for _ in range(n_runs * n_subj)]
-        ds_labels = np.array(labels)
-        
-        ds_subjects = []
+    return xyz_coords
 
-        for s in self.subjects:
-            ds_subjects += [s for _ in range(n_runs)]
-        ds_subjects = np.array(ds_subjects)
-        ds_info = np.vstack((ds_subjects, ds_subjects))
+
+
+def get_atlas90_coords():
+    atlas90 = ni.load('/media/robbis/DATA/fmri/templates_AAL/atlas90_mni_2mm.nii.gz')
+    coords = [find_roi_center(atlas90, roi_value=i) for i in np.unique(atlas90.get_data())[1:]]
+    
+    return np.array(coords)
+
+
+
+def get_findlab_coords():
+    roi_list = os.listdir('/media/robbis/DATA/fmri/templates_fcmri/0_findlab/')
+    roi_list.sort()
+    findlab = [ni.load('/media/robbis/DATA/fmri/templates_fcmri/0_findlab/'+roi) for roi in roi_list]
+    f_coords = []
+    for img_ in findlab:
+        f_coords.append(np.array([find_roi_center(img_, roi_value=np.int(i)) for i in np.unique(img_.get_data())[1:]]))
         
-        
-        self.ds = dataset_wizard(ds_data, targets=ds_labels, chunks=np.int_(ds_info.T[4]))
-        self.ds.sa['subjects'] = ds_info.T[0]
-        self.ds.sa['groups'] = ds_info.T[1]
-        self.ds.sa['expertise'] = ds_info.T[3]
-        self.ds.sa['chunks_'] = ds_info.T[2]
-        self.ds.sa['meditation'] = ds_labels
-        
-        return self.ds
-        
-        
+    return np.vstack(f_coords)
            
+
+def array_to_matrix(array, nan_mask=None):
+    
+    if nan_mask == None:
+        # second degree resolution to get matrix dimensions #
+        c = -2*array.shape[0]
+        a = 1
+        b = -1
+        det =  b*b - 4*a*c
+        rows = np.int((-b + np.sqrt(det))/(2*a))
+        
+        matrix = np.ones((rows, rows))
+    else:
+        matrix = np.float_(np.logical_not(nan_mask))
+    
+    il = np.tril_indices(matrix.shape[0])
+    matrix[il] = 0
+    
+    matrix[np.nonzero(matrix)] = array
+    
+    return matrix
+
+
+def get_plot_stuff(directory_):
+    
+    if directory_.find('atlas90') != -1 or directory_.find('20150') != -1:
+        coords = get_atlas90_coords()
+        roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_AAL/atlas90.cod',
+                              delimiter='=',
+                              dtype=np.str)
+        names = roi_list.T[1]
+        names_inv = np.array([n[::-1] for n in names])
+        index_ = np.argsort(names_inv)
+        names_lr = names[index_]
+        dict_ = {'L':'#89CC74', 'R':'#7A84CC'}
+        colors_lr = np.array([dict_[n[:1]] for n in names_inv])    
+        names = np.array([n.replace('_', ' ') for n in names])
+
+    
+    elif directory_.find('findlab') != -1 or directory_.find('2014') != -1:
+        coords = get_findlab_coords()
+        roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
+                      delimiter=',',
+                      dtype=np.str)
+        names = roi_list.T[2]
+
+        dict_ = {'Auditory':'silver', 
+                 'Basal_Ganglia':'white', 
+                 'LECN':'red',
+                 'Language':'orange', 
+                 'Precuneus':'green',
+                 'RECN':'plum', 
+                 'Sensorimotor':'gold', 
+                 'Visuospatial':'blueviolet', 
+                 'anterior_Salience':'beige',
+                 'dorsal_DMN':'cyan', 
+                 'high_Visual':'yellow', 
+                 'post_Salience':'lime', 
+                 'prim_Visual':'magenta',
+                 'ventral_DMN':'royalblue'
+                 }
+        
+        colors_lr = np.array([dict_[r.T[-2]] for r in roi_list])
+        index_ = np.arange(90)
+        
+        
+    return names, colors_lr, index_, coords
+
+
+def flatten_correlation_matrix(matrix):
+    
+    il = np.tril_indices(matrix.shape[0])
+    out_matrix = matrix.copy()
+    out_matrix[il] = np.nan
+    
+    out_matrix[range(matrix.shape[0]),range(matrix.shape[0])] = np.nan
+
+    return matrix[~np.isnan(out_matrix)]
+
+
+
+def copy_matrix(matrix, diagonal_filler=1):
+
+    iu = np.triu_indices(matrix.shape[0])
+    il = np.tril_indices(matrix.shape[0])
+
+    matrix[il] = diagonal_filler
+
+    for i, j in zip(iu[0], iu[1]):
+        matrix[j, i] = matrix[i, j]
+
+    return matrix    
+  
+
+        
+def network_connections(matrix, label, roi_list, method='within'):
+    """
+    Function used to extract within- or between-networks values
+    """
+    
+    mask1 = roi_list == label
+    
+    if method == 'within':
+        mask2 = roi_list == label
+    else:
+        mask2 = roi_list != label
+    
+    matrix_mask = np.meshgrid(mask1, mask1)[1] * np.meshgrid(mask2, mask2)[0]
+    
+    connections_ = matrix * matrix_mask
+    
+    return connections_
+    
+
+
+def get_signed_connectome(matrix, method='negative'):
+    """
+    Function used to extract positive or negative values from matrix
+    """
+    
+    sign = 1
+    if method == 'negative':
+        sign = -1
+    
+    mask_ = (matrix * sign) > 0
+    signed_matrix = matrix * mask_
+    
+    return signed_matrix       
+
+
+def aggregate_networks(matrix, roi_list):
+    """
+    Function used to aggregate matrix values using 
+    aggregative information provided by roi_list
+    """
+    
+    unique_rois = np.unique(roi_list)
+    n_roi = unique_rois.shape[0]
+
+    aggregate_matrix = np.zeros((n_roi, n_roi), dtype=np.float)
+    
+    network_pairs = itertools.combinations(unique_rois, 2)
+    indexes = np.vstack(np.triu_indices(n_roi, k=1)).T
+    
+    # This is to fill upper part of the aggregate matrix
+    for i, (n1, n2) in enumerate(network_pairs):
+        
+        x = indexes[i][0]
+        y = indexes[i][1]
+        
+        mask1 = roi_list == n1
+        mask2 = roi_list == n2
+        
+        # Build the mask of the intersection between
+        mask_roi = np.meshgrid(mask1, mask1)[1] * np.meshgrid(mask2, mask2)[0]
+        
+        value = np.sum(matrix * mask_roi)
+        
+        aggregate_matrix[x, y] = value
+    
+    # Copy matrix in the lower part
+    aggregate_matrix = copy_matrix(aggregate_matrix)
+    
+    # This is to fill the diagonal with within-network sum of elements
+    for i, n in enumerate(unique_rois):
+        
+        diag_matrix = network_connections(matrix, n, roi_list)
+        aggregate_matrix[i, i] = np.sum(diag_matrix)
+        
+    
+    return aggregate_matrix
+        
+        
         
         
         

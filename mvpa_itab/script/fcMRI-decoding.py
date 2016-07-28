@@ -10,7 +10,10 @@ from scipy.stats import zscore as sscore
 from mvpa_itab.io.base import load_dataset
 from mvpa_itab.conn.io import load_fcmri_dataset, copy_matrix
 from mvpa2.clfs.svm import LinearCSVMC
-from scipy.stats.stats import zscore
+from mvpa2.mappers.zscore import zscore
+from mvpa_itab.conn.plot import get_plot_stuff, get_atlas_info,\
+    plot_connectivity_circle_edited, plot_connectome
+#from scipy.stats.stats import zscore
 
 path = '/media/robbis/DATA/fmri/monks/0_results/'
 
@@ -63,10 +66,12 @@ for r in results_dir:
 ##########################################
 file_ = open(os.path.join('/media/robbis/DATA/fmri/monks/', '0_results', 'results_decoding_new.txt'), 'w')
 line_ = ""
+#results_dir = ['20140513_163451_connectivity_fmri']
+
 for r in results_dir:
-    
+    print '··········· '+r+' ·············'
     conn = ConnectivityTest(path, subjects, r, roi_list)
-    conn.get_results(['Samatha', 'Vipassana'])
+    nan_mask = conn.get_results(['Samatha', 'Vipassana'])
     
     ds = conn.get_dataset()
     '''
@@ -74,10 +79,10 @@ for r in results_dir:
     ds = ds.get_mapped(fx)  
     '''
     clf = LinearCSVMC(C=10)
-    #clf = RbfCSVMC()
+    # clf = RbfCSVMC()
     ds.targets = ds.sa.groups
     
-    #ds.samples = decomposition.KernelPCA(kernel="poly", n_components=30).fit_transform(ds.samples)
+    # ds.samples = decomposition.KernelPCA(kernel="poly", n_components=30).fit_transform(ds.samples)
     
     fsel = SensitivityBasedFeatureSelection(OneWayAnova(),  
                                             FractionTailSelector(0.01,
@@ -86,7 +91,9 @@ for r in results_dir:
     
     fclf = FeatureSelectionClassifier(clf, fsel)
     
-    ds.samples = sscore(ds.samples, axis=0)
+    ds.samples = sscore(ds.samples, axis=1)
+    # ds.samples = sscore(ds.samples, axis=0)
+    # zscore(ds)
     cv = CrossValidation(fclf, 
                         NFoldPartitioner(cvtype=1), 
                         enable_ca=['stats'])
@@ -99,41 +106,46 @@ for r in results_dir:
     feature_weights = dict()
     
     for med in ['Samatha','Vipassana']:
-        print '----------%s-------------' % (med)
+        #print '----------%s-------------' % (med)
         results[med] = []
         feature_selected[med] = np.zeros_like(ds.samples[0])
         feature_weights[med] = np.zeros_like(ds.samples[0])
         
         ds_med = ds[ds.sa.meditation == med]
-        #zscore(ds_med, chunks_attr='subjects')  
-        balancer = Balancer(count=100, apply_selection=True)
+        
+        balancer = Balancer(count=100, apply_selection=True, limit=None)
         
         gen = balancer.generate(ds_med)
         
+        balancer_res = []
         for i, ds_ in enumerate(gen):
-            print '---------'
-            
+            # print '---------'
+            # ds_.samples = sscore(ds_.samples, axis=1)
             err = cv(ds_)
-            print cv.ca.stats
+            #print cv.ca.stats
             try:
                 sensana = fclf.get_sensitivity_analyzer()
             except NotImplementedError:
                 results[med].append(1 - np.mean(err))
                 line_ += "%s ---> %.2f\n" % (med, np.mean(results[med]))
                 continue
-            ds_sens = sensana(ds_)
             
+            ds_sens = sensana(ds_)
+            # Add numerosity to selected features
             feature_selected[med][np.nonzero(ds_sens.samples)[1]] += 1
+            # Add weights to selected features
             feature_weights[med] += ds_sens.samples[0]
             
-            results[med].append(1 - np.mean(err))
-            
+            #results[med].append(1 - np.mean(err))
+            balancer_res.append(1 - np.mean(err))
             #print str(1 - np.mean(err))
         
         feature_weights[med] /= feature_selected[med]
         feature_weights[med][np.isnan(feature_weights[med])] = 0
+        results[med].append(np.mean(balancer_res))
+        line_ += "%s ---> %.4f\n" % (med, np.mean(balancer_res))
+    
 
-        line_ += "%s ---> %.2f\n" % (med, np.mean(results[med]))
     
 file_.write(line_)
 file_.close()
@@ -147,9 +159,9 @@ for med, l_ in zip(['Samatha','Vipassana'], ['(FA)', '(OM)']):
     f_nz = f_array[np.nonzero(f_array)]
     
     # We selected only feature selected often
-    threshold = f_nz.mean() + 2*f_nz.std()
-    f_array[f_array < threshold] = 0
-    w_array[f_array < threshold] = 0 # Weights selected based on features
+    threshold = f_nz.mean() + 0.5*f_nz.std()
+    #f_array[f_array < threshold] = 0
+    #w_array[f_array < threshold] = 0 # Weights selected based on chosen features
     
     # zscoring weights
     w_nz = w_array[np.nonzero(w_array)]
@@ -157,62 +169,86 @@ for med, l_ in zip(['Samatha','Vipassana'], ['(FA)', '(OM)']):
     
     w_array[np.nonzero(w_array)] = w_nz
     
-    f_matrix = copy_matrix(array_to_matrix(f_array), diagonal_filler=0)
-    w_matrix = copy_matrix(array_to_matrix(w_array), diagonal_filler=0)
+    f_matrix = copy_matrix(array_to_matrix(f_array, nan_mask), diagonal_filler=0)
+    w_matrix = copy_matrix(array_to_matrix(w_array, nan_mask), diagonal_filler=0)
     
-    # reorder labels
-    names = roi_list[conn.network_names].T[1]
-    names_inv = np.array([n[::-1] for n in names])
-    index_ = np.argsort(names_inv)
-    names_lr = names[index_]
-    dict_ = {'L':'#89CC74', 'R':'#7A84CC'}
-    colors_lr = np.array([dict_[n[:1]] for n in names_inv])[index_]
-    
-    
-    names_lr = np.array([n.replace('_', ' ') for n in names_lr])
-    
-    #names = conn.network_names
-    # plot graphs
+   
+    names, colors, index_, coords = get_atlas_info('findlab')
+
     
     title_ = "%s %s" % (med, l_)
-    f_matrix[f_matrix == 0] = np.nan
-    f, _ = plot_connectivity_circle(f_matrix[index_], 
-                                    names_lr, 
-                                    node_colors=colors_lr, 
-                                    title=title_,
-                                    node_angles=circular_layout(names_lr, list(names_lr)),
-                                    fontsize_title=19,
-                                    fontsize_names=13,
-                                    fontsize_colorbar=13,
-                                    colorbar_size=0.3,
-                                    colormap='summer',
-                                    #vmin=40,
-                                    fig=pl.figure(figsize=(13,13))
-                                    )
+    # f_matrix[f_matrix == 0] = np.nan
+    f, _ = plot_connectivity_circle_edited(f_matrix[index_][:,index_], 
+                                            names[index_], 
+                                            node_colors=colors[index_],
+                                            node_size=f_matrix.sum(0)[index_]*3.5,
+                                            con_thresh = 15.,
+                                            title=title_,
+                                            node_angles=circular_layout(names, 
+                                                                        list(names),
+                                                                        ),
+                                            fontsize_title=19,
+                                            fontsize_names=13,
+                                            fontsize_colorbar=13,
+                                            colorbar_size=0.3,
+                                            #colormap='bwr',
+                                            #colormap='terrain',
+                                            #vmin=40,
+                                            fig=pl.figure(figsize=(16,16))
+                                            )
     
     f.savefig(os.path.join(path, med+'_features.png'), facecolor='black')
+    plot_connectome(f_matrix, 
+                    coords, 
+                    colors, 
+                    3.5*f_matrix.sum(0)[index_],                    
+                    15.,
+                    os.path.join(path, med+'_features_brain.png'),
+                    order=index_,
+                    title=None,
+                    max_=100.,
+                    min_=20.,
+                    #display_='ortho'
+                    )
     
     vmax = np.max(np.abs(w_matrix))
     
-    w_matrix[w_matrix == 0] = np.nan
+    # w_matrix[w_matrix == 0] = np.nan
     
-    f, _ = plot_connectivity_circle(w_matrix[index_], 
-                                    names_lr, 
-                                    node_colors=colors_lr, 
-                                    title=title_,
-                                    node_angles=circular_layout(names_lr, list(names_lr)),
-                                    fontsize_title=19,
-                                    fontsize_names=13,
-                                    fontsize_colorbar=13,
-                                    colorbar_size=0.3,
-                                    vmax=vmax,
-                                    vmin=-vmax,
-                                    colormap='bwr',
-                                    fig=pl.figure(figsize=(13,13))
-                                    )
+    f, _ = plot_connectivity_circle_edited(w_matrix[index_][:,index_], 
+                                            names[index_], 
+                                            node_colors=colors[index_],
+                                            node_size=1.5*np.abs(w_matrix).sum(0)[index_]**2.5,
+                                            con_thresh = 1.4,
+                                            title=title_,
+                                            node_angles=circular_layout(names, 
+                                                                        list(names),
+                                                                        ),
+                                            fontsize_title=19,
+                                            fontsize_names=13,
+                                            fontsize_colorbar=13,
+                                            colorbar_size=0.3,
+                                            colormap='bwr',
+                                            #colormap=cm_,
+                                            vmin=-3.,
+                                            vmax=3.,
+                                            fig=pl.figure(figsize=(16,16))
+                                            )
     
     f.savefig(os.path.join(path, med+'_weights.png'), facecolor='black')  
-
+    plot_connectome(w_matrix, 
+                    coords, 
+                    colors, 
+                    4.*np.abs(w_matrix).sum(0)[index_]**2.,
+                    1.4,
+                    os.path.join(path, med+'_weights_brain.png'),
+                    order=index_,
+                    title=None,
+                    max_=3.,
+                    min_=-3.,
+                    cmap=pl.cm.bwr,
+                    #display_='ortho'
+                    )
 
 #### Permutation ###
 

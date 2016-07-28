@@ -2,6 +2,9 @@ from mne.viz import *
 from mne.viz.circle import _plot_connectivity_circle_onpick
 import matplotlib.pyplot as plt
 import numpy as np
+from mvpa_itab.conn.utils import get_atlas90_coords, get_findlab_coords
+
+
 
 def plot_matrix(matrix, roi_names, networks):
     
@@ -23,16 +26,18 @@ def plot_matrix(matrix, roi_names, networks):
         items = np.count_nonzero(networks == net)
         counter = counter + items
         
-        network_ticks.append((counter + 0.5) - (items * 0.5)) 
+        #network_ticks.append((counter + 0.5) - (items * 0.5)) 
         
         a.axvline(x=counter, ymin=min_, ymax=max_)
         a.axhline(y=counter, xmin=min_, xmax=max_)
     
     
-    a.set_yticks(network_ticks)
+    #a.set_yticks(network_ticks)
+    a.set_yticks(np.arange(0, len(np.unique(networks))))
     a.set_yticklabels(np.unique(networks))
     
-    a.set_xticks(network_ticks)
+    #a.set_xticks(network_ticks)
+    a.set_xticks(np.arange(0, len(np.unique(networks))))
     a.set_xticklabels(np.unique(networks), rotation='vertical')
     
     f.colorbar(ax)
@@ -92,9 +97,12 @@ def plot_cross_correlation(xcorr, t_start, t_end, labels):
     plt.show()
     #ani.save('/home/robbis/xcorrelation_.mp4')
     
+
+
 def plot_dendrogram(dendrogram, dissimilarity_matrix):
     
     return
+
 
 
 def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
@@ -395,3 +403,114 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
         fig.canvas.mpl_connect('button_press_event', callback)
 
     return fig, axes
+
+
+
+def plot_connectome(matrix, 
+                    coords, 
+                    colors, 
+                    size, 
+                    threshold, 
+                    fname,                    
+                    cmap=plt.cm.hot, 
+                    title='', 
+                    max_=None, 
+                    min_=None, 
+                    display_='ortho'):
+    
+    from nilearn import plotting
+    
+    plotting.plot_connectome(adjacency_matrix=matrix, 
+                             node_coords=coords, 
+                             node_color=colors.tolist(), 
+                             node_size=1.5*size, 
+                             edge_cmap=cmap, 
+                             edge_vmin=min_, 
+                             edge_vmax=max_, 
+                             edge_threshold=threshold, 
+                             output_file=fname, 
+                             display_mode=display_, 
+                             figure=plt.figure(figsize=(16*1.2,9*1.2)),# facecolor='k', edgecolor='k'), 
+                             #axes, 
+                             title=title, 
+                             #annotate, 
+                             black_bg=True, 
+                             #alpha, 
+                             edge_kwargs={
+                                          'alpha':0.8,
+                                          'linewidth':9,
+                                          }, 
+                             node_kwargs={
+                                          'edgecolors':'k',
+                                          }, 
+                             #colorbar=True
+                             )
+    
+    
+    
+    
+def get_atlas_info(directory_):
+    
+    """
+    Loads colors, Roi names, coordinates and plot order for connectome plots
+    """
+    
+    if directory_.find('atlas90') != -1 or directory_.find('20150') != -1:
+        coords = get_atlas90_coords()
+        roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_AAL/atlas90.cod',
+                              delimiter='=',
+                              dtype=np.str)
+        names = roi_list.T[1]
+        names_inv = np.array([n[::-1] for n in names])
+        index_ = np.argsort(names_inv)
+        names_lr = names[index_]
+        dict_ = {'L':'#89CC74', 'R':'#7A84CC'}
+        colors_lr = np.array([dict_[n[:1]] for n in names_inv])    
+        names = np.array([n.replace('_', ' ') for n in names])
+        networks = names
+
+    
+    elif directory_.find('findlab') != -1 or directory_.find('2014') != -1:
+        coords = get_findlab_coords()
+        roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
+                      delimiter=',',
+                      dtype=np.str)
+        networks = roi_list.T[-2]
+        names = roi_list.T[2]
+        """
+        dict_ = {'Auditory':'#89CC74', 
+                 'Basal_Ganglia':'#7A84CC', 
+                 'LECN':'#FF1800',
+                 'Language':'#BF2B54', 
+                 'Precuneus':'#390996',
+                 'RECN':'#FF230B', 
+                 'Sensorimotor':'#4D0DC8', 
+                 'Visuospatial':'#DBBF00', 
+                 'anterior_Salience':'#37AEC4',
+                 'dorsal_DMN':'#9AF30B', 
+                 'high_Visual':'#FF8821', 
+                 'post_Salience':'#0289A2', 
+                 'prim_Visual':'#FF7600',
+                 'ventral_DMN':'#92ED00'
+                 }"""
+        dict_ = {'Auditory':'silver', 
+                 'Basal_Ganglia':'white', 
+                 'LECN':'red',
+                 'Language':'orange', 
+                 'Precuneus':'green',
+                 'RECN':'plum', 
+                 'Sensorimotor':'gold', 
+                 'Visuospatial':'blueviolet', 
+                 'anterior_Salience':'beige',
+                 'dorsal_DMN':'cyan', 
+                 'high_Visual':'yellow', 
+                 'post_Salience':'lime', 
+                 'prim_Visual':'magenta',
+                 'ventral_DMN':'royalblue'
+                 }
+        colors_lr = np.array([dict_[r.T[-2]] for r in roi_list])
+        index_ = np.arange(90)
+        
+        
+    return names, colors_lr, index_, coords, networks
+    

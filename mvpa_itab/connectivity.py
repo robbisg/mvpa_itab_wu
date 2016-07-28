@@ -21,7 +21,6 @@ import nibabel as ni
 import numpy as np
 from nitime.analysis.coherence import CoherenceAnalyzer
 
-from conn.plot import *
 from nitime.analysis.spectral import FilterAnalyzer
 
 from memory_profiler import profile

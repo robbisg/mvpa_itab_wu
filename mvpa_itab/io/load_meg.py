@@ -16,7 +16,7 @@ class MEGHeader:
     def __init__(self):
         
         self.fmt = None
-        self.
+
         
         return
     

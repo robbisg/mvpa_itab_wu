@@ -181,21 +181,25 @@ from scipy.io import loadmat
 from PIL import Image
 
 path = '/home/robbis/phantoms/TIFF/PHANTOM_2015/mat/'
+path = '/home/robbis/phantoms/TIFF/PHANTOM_2015/'
 lista_file = os.listdir(path)
+lista_file = [f for f in lista_file if f.find('.mat') != -1]
 
 for f in lista_file:
     
     mat_ = loadmat(os.path.join(path, f))
-    stack_ = mat_['pippopippo']
+    #stack_ = mat_['pippopippo']
+    stack_ = mat_['image']
     #print stack_.max()
+    stack_ = np.abs(stack_)
     stack_ = np.array(255*stack_/stack_.max(), np.uint8)
     
     dir_ = f[11:-4]
     command_ = 'mkdir '+os.path.join(path, dir_)
     os.system(command_)
     
-    for j in range(stack_.shape[0]):
-        img_ = stack_[j,:,:]
+    for j in range(stack_.shape[1]):
+        img_ = stack_[:,j,:]
         fname_ = '%s_%02d.tif' %(f[:-4], j)
         #tif_ = np.array(256*img_, dtype=np.uint8)
         im = Image.fromarray(img_)
@@ -220,7 +224,25 @@ for f in lista_file:
     print command_
   
   
-  
-  
-  
+####################################
+path = '/home/robbis/development/svn/mutual/trunk/fileList/'
+lista_file = os.listdir(path)
+
+lista_file = [f for f in lista_file if f.find('listaLF_phantom') != -1 and f.find('txt~') == -1]
+for f in lista_file:
+    
+    input_fname = os.path.join(path, f)
+    output_fname = os.path.join('/home/robbis/development/svn/mutual/trunk/result',f[:-4]+'_best.txt')
+    command = './Mutual.x %s %s > %s' % (input_fname, str(9), output_fname)
+    print command
+    os.system(command)
+    
+##########################################
+file_name = '/home/robbis/development/svn/mutual/trunk/fileList/listaLF_phantom_37ave.txt'
+
+for i in [6, 9, 12]:
+    out_name = '/home/robbis/development/svn/mutual/trunk/result/37ave_%s.txt' % (str(i))
+    command = './Mutual.x %s %s > %s' % (file_name, str(i), out_name)
+    print command
+    os.system(command)
   
