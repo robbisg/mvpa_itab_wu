@@ -31,6 +31,8 @@ def plot_states_matrices(X,
         pl.xticks(position_label, node_networks)
         pl.yticks(position_label, node_networks)
         
+        pl.colorbar()
+        
     #Save!
     
    

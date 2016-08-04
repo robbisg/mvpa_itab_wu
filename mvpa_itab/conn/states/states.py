@@ -23,10 +23,11 @@ def get_data(filename):
     #filename = '/media/robbis/DATA/fmri/movie_viviana/mat_corr_sub_REST.mat'
     data = loadmat(filename)
     data = np.array(data['data'], dtype=np.float16)
+    n_roi = data.shape[-1]
     ix, iy = np.triu_indices(data.shape[-1], k=1)
     data = data[:,:,ix,iy]
     
-    return data, data.shape[-1]
+    return data, n_roi
 
 
 def get_max_variance_arguments(data):
@@ -75,12 +76,16 @@ def fit_states(X, centroids, distance=euclidean):
 
 def calculate_metrics(X, 
                       clustering_labels, 
-                      metrics={'Silhouette': metrics.silhouette_score,
-                               'Calinski-Harabasz': ch_criterion, 
-                               'Krzanowski-Lai': kl_criterion,
-                               'Explained Variance':explained_variance,
-                               'Gap': gap,
-                               }):
+                      metrics_kwargs=None):
+    
+    default_metrics = {'Silhouette': metrics.silhouette_score,
+                       'Calinski-Harabasz': ch_criterion, 
+                       'Krzanowski-Lai': kl_criterion,
+                       'Explained Variance':explained_variance,
+                       #'Gap': gap,
+                        }
+    if metrics_kwargs != None:
+        default_metrics.update(metrics_kwargs)
     
     metrics_ = []
     k_step = np.zeros(len(clustering_labels), dtype=np.int8)
@@ -94,7 +99,7 @@ def calculate_metrics(X,
         
         metric_list = []
         
-        for metric_name, metric_function in metrics.items():
+        for metric_name, metric_function in default_metrics.items():
             
             if metric_name == 'Krzanowski-Lai':
                 if i == 0 or i == len(clustering_labels) - 1:
@@ -120,5 +125,5 @@ def calculate_metrics(X,
         metrics_.append(metric_list)
     
     
-    return np.array(metrics_), k_step, metrics.keys()
+    return np.array(metrics_), k_step, default_metrics.keys()
 

@@ -102,8 +102,7 @@ def load_dataset(path, subj, folder, **kwargs):
     
     ### Code to substitute   
     attr = load_attributes(path, folder, subj, **kwargs)              
-     
-    
+
     # Loading mask 
     mask = load_mask(path, subj, **kwargs)        
        
@@ -389,7 +388,7 @@ def load_mask_wu(path, subj, **kwargs):
         if (arg == 'scaled'):
             isScaled = kwargs[arg]
             
-            
+
     '''
     for m in mask_list:
         if coords in locals():
@@ -411,13 +410,18 @@ def load_mask_wu(path, subj, **kwargs):
         mask_list = [m for m in mask_list if m.find(scaled) != -1 and m.find('hdr')!=-1 ]
                                  
     elif (mask_area == ['total']):
-        mask_path = os.path.join(path, subj)
+        #mask_path = os.path.join(path, subj)
+        mask_path = os.path.join(path)
         mask_list = os.listdir(mask_path)
         mask_to_find1 = subj+'_mask_mask'
         mask_to_find2 = 'mask_'+subj+'_mask'
-        mask_to_find3 = '_mask.nii.gz'
-        mask_list = [m for m in mask_list if m.find(mask_to_find1) != -1 or m.find(mask_to_find2) != -1 \
-                     or m.find(mask_to_find3) != -1 or m.find('brain_mask') != -1]
+        mask_to_find3 = subj+'_mask.nii.gz'
+
+        mask_list = [m for m in mask_list if m.find(mask_to_find1) != -1 \
+                     or m.find(mask_to_find2) != -1 \
+                     or m.find(mask_to_find3) != -1 \
+                     or m.find('brain_mask') != -1]
+        
     elif (mask_area == ['searchlight_3'] or mask_area == ['searchlight_5']):
         mask_list = os.listdir(mask_path)
         if mask_area == ['searchlight_3']:

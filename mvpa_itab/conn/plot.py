@@ -3,60 +3,108 @@ from mne.viz.circle import _plot_connectivity_circle_onpick
 import matplotlib.pyplot as plt
 import numpy as np
 from mvpa_itab.conn.utils import get_atlas90_coords, get_findlab_coords
+import os
+from scipy.stats import zscore
 
 
 
-def plot_matrix(matrix, roi_names, networks):
+def plot_matrix(matrix, roi_names, networks, **kwargs):
     
-    f = plt.figure(figsize=(12.0, 10.0))
     
+    _plot_cfg = {'ticks_type':'networks',
+                 'ticks_color':get_atlas_info('findlab')[1],
+                 'facecolor':'k'
+                 }
+    
+    
+    _plot_cfg.update(kwargs)
+    
+    facecolor_ = _plot_cfg['facecolor']
+    if facecolor_ == 'k':
+        ax_color = 'white'
+    else:
+        ax_color = 'k'
+    
+    f = plt.figure(figsize=(16., 12.), facecolor=facecolor_, dpi=600)
     a = f.add_subplot(111)
     
-    ax = a.imshow(matrix, interpolation='nearest')
+    max_value = np.max(np.abs(matrix))
+    
+    ax = a.imshow(matrix, 
+                  interpolation='nearest', 
+                  cmap=plt.cm.bwr,
+                  vmax=max_value,
+                  vmin=max_value*-1
+                  )
     
 
     min_ = -0.5
     max_ = len(networks) + 0.5
+    
     ### Draw networks separation lines ###
     network_ticks = [] 
     network_name, indices = np.unique(networks, return_index=True)
     counter = -0.5
+    
+    colors_ = []
     for net in np.unique(networks):
+                    
+        items_idx = np.nonzero(networks == net)
+        items = items_idx[0].shape[0]
         
-        items = np.count_nonzero(networks == net)
+        ix = np.nonzero(networks == net)
+        if _plot_cfg['ticks_type'] == 'networks':
+            tick_ = items_idx[0].mean()
+            colors_.append(np.unique(_plot_cfg['ticks_color']))
+        else:
+            tick_ = items_idx[0]
+            colors_.append(_plot_cfg['ticks_color'][tick_])
+            
         counter = counter + items
         
-        #network_ticks.append((counter + 0.5) - (items * 0.5)) 
-        
+        network_ticks.append(tick_)
         a.axvline(x=counter, ymin=min_, ymax=max_)
         a.axhline(y=counter, xmin=min_, xmax=max_)
     
     
-    #a.set_yticks(network_ticks)
-    a.set_yticks(np.arange(0, len(np.unique(networks))))
-    a.set_yticklabels(np.unique(networks))
+    if _plot_cfg['ticks_type'] == 'networks':
+        ticks_labels = np.unique(networks)
+    else:
+        ticks_labels = roi_names
+        
+    network_ticks = np.hstack(network_ticks)
+    colors_ = np.hstack(colors_)
     
-    #a.set_xticks(network_ticks)
-    a.set_xticks(np.arange(0, len(np.unique(networks))))
-    a.set_xticklabels(np.unique(networks), rotation='vertical')
+    a.set_yticks(network_ticks)
+    a.set_yticklabels(ticks_labels, fontsize=15)
     
-    f.colorbar(ax)
+    a.set_xticks(network_ticks)
+    a.set_xticklabels(ticks_labels, fontsize=15, rotation='vertical')
+    
+    
+    colors_[colors_ == facecolor_] = ax_color
+    colors_[colors_ == 'beige'] = 'darkgray'
+    
+    [t.set_color(colors_[i]) for i,t in enumerate(a.xaxis.get_ticklabels())]
+    [t.set_color(colors_[i]) for i,t in enumerate(a.yaxis.get_ticklabels())]
+    
+    cbar = f.colorbar(ax)
+
+    [t.set_color(ax_color) for i,t in enumerate(cbar.ax.yaxis.get_ticklabels())]
+    
     return f
 
 
 
 def plot_cross_correlation(xcorr, t_start, t_end, labels):
 
-
     import matplotlib.pyplot as plt
     import matplotlib.animation as animation
 
     dim = len(labels)
     
-    
     fig = plt.figure()
     ax = plt.axes(xlim=(-0.5, dim-0.5), ylim=(dim-0.5, -0.5))
-    
     
     #im = ax.imshow(xcorr.at(t_start), interpolation='nearest', vmin=-1, vmax=1)
     im = ax.imshow(np.eye(dim), interpolation='nearest', vmin=-4, vmax=4)
@@ -76,8 +124,6 @@ def plot_cross_correlation(xcorr, t_start, t_end, labels):
         plt.draw()
         return im, title
         
-    
-    
     def animate(i):
         global l_time        
         j = np.int(np.rint(i/20))
@@ -513,4 +559,157 @@ def get_atlas_info(directory_):
         
         
     return names, colors_lr, index_, coords, networks
+
+
+
+def plot_connectomics(matrix, 
+                      node_size, 
+                      save_path, 
+                      prename,
+                      save=False,
+                      **kwargs
+                      ):
     
+    
+    
+    _plot_cfg = {
+                 'threshold':1.4,
+                 'fontsize_title':19,
+                 'fontsize_colorbar':13,
+                 'fontsize_names':13,
+                 'colorbar_size':0.3,
+                 'colormap':'hot',
+                 'vmin':-3,
+                 'vmax':3,
+                 'figure':plt.figure(figsize=(16,16)),
+                 'facecolor':'black',
+                 'dpi':150,
+                 'name':'weights',
+                 'title':'Connectome'               
+                }
+    
+    
+    
+    _plot_cfg.update(kwargs)
+     
+    directory_ = save_path[save_path.rfind('/')+1:]
+    
+    #names_lr, colors_lr, index_, coords = get_plot_stuff(directory_)
+    
+    names_lr = kwargs['node_names']
+    colors_lr = kwargs['node_colors']
+    index_ = kwargs['node_order']
+    coords = kwargs['node_coords']
+    networks = kwargs['networks']
+    
+    matrix = matrix[index_][:,index_]
+    names_lr = names_lr[index_]
+    node_colors = colors_lr[index_]
+    node_size = node_size[index_]
+    
+    
+    f, _ = plot_connectivity_circle_edited(matrix, 
+                                            names_lr, 
+                                            node_colors=node_colors,
+                                            node_size=node_size,
+                                            con_thresh=_plot_cfg['threshold'],
+                                            title=_plot_cfg['title'],
+                                            node_angles=circular_layout(names_lr, 
+                                                                        list(names_lr),
+                                                                        ),
+                                            fontsize_title=_plot_cfg['fontsize_title'],
+                                            fontsize_names=_plot_cfg['fontsize_names'],
+                                            fontsize_colorbar=_plot_cfg['fontsize_colorbar'],
+                                            colorbar_size=_plot_cfg['colorbar_size'],
+                                            colormap=_plot_cfg['colormap'],
+                                            vmin=_plot_cfg['vmin'],
+                                            vmax=_plot_cfg['vmax'],
+                                            fig=_plot_cfg['figure'],
+                                            )
+            
+    if save == True:
+        fname = "%s_features_%s.png" % (prename, _plot_cfg['name'])
+        
+        f.savefig(os.path.join(save_path, fname),
+                          facecolor=_plot_cfg['facecolor'],
+                          dpi=_plot_cfg['dpi'])
+    
+    
+    for d_ in ['x', 'y', 'z']:
+        
+        fname = None
+        if save == True:
+            fname = "%s_connectome_feature_%s_%s.png" %(prename, _plot_cfg['name'], d_)
+            fname = os.path.join(save_path, fname)
+            
+        plot_connectome(matrix, 
+                        coords, 
+                        colors_lr, 
+                        node_size,
+                        _plot_cfg['threshold'],
+                        fname,
+                        cmap=_plot_cfg['colormap'],
+                        title=None,
+                        display_=d_,
+                        max_=_plot_cfg['vmax'],
+                        min_=_plot_cfg['vmin']
+                        )
+        
+    
+    f = plot_matrix(matrix, _, networks)
+    if save == True:
+        fname = "%s_matrix_%s.png" %(prename, _plot_cfg['name'])
+        f.savefig(os.path.join(save_path, fname),
+                          #facecolor=_plot_cfg['facecolor'],
+                          dpi=_plot_cfg['dpi'])
+
+
+def plot_regression_errors(errors, permutation_error, save_path, prename='distribution', errors_label=['MSE','COR']):
+    
+    fig_ = plt.figure()
+    bpp = plt.boxplot(permutation_error, showfliers=False, showmeans=True, patch_artist=True)
+    bpv = plt.boxplot(errors, showfliers=False, showmeans=True, patch_artist=True)
+    fname = "%s_perm_1000_boxplot.png" %(prename)
+   
+    
+    for box_, boxp_ in zip(bpv['boxes'], bpp['boxes']):
+        box_.set_facecolor('lightgreen')
+        boxp_.set_facecolor('lightslategrey')
+      
+      
+    plt.xticks(np.array([1,2]), errors_label)
+    
+    plt.savefig(os.path.join(save_path, fname))
+    plt.close()
+    
+    return fig_
+
+
+def plot_features_distribution(feature_set, 
+                               feature_set_permutation, 
+                               save_path, 
+                               prename='features', 
+                               n_features=90, 
+                               n_bins=20):
+    
+    plt.figure()
+    h_values_p, _ = np.histogram(feature_set_permutation.flatten(), 
+                                 bins=np.arange(0, n_features+1))
+    
+    plt.hist(zscore(h_values_p), bins=n_bins)
+    
+    fname = "%s_features_set_permutation_distribution.png" % (prename)
+    plt.savefig(os.path.join(save_path, 
+                            fname))
+    
+    plt.figure()
+    h_values_, _ = np.histogram(feature_set.flatten(), 
+                                bins=np.arange(0, n_features+1))
+    plt.plot(zscore(h_values_))
+        
+    
+    fname = "%s_features_set_cross_validation.png" % (prename)
+    plt.savefig(os.path.join(save_path, 
+                            fname))
+    
+    plt.close('all')

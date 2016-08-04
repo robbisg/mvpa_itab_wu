@@ -25,6 +25,7 @@ from scipy.stats import ttest_1samp
 from numpy.random.mtrand import permutation
 
 #path = '/DATA11/roberto/fmri/memory/'
+path = '/home/robbis/fmri/memory/'
 
 
 if __debug__:
@@ -68,7 +69,7 @@ summarizers = [rs.SearchlightSummarizer()]
 savers = [rs.SearchlightSaver()]
 collection = rs.ResultsCollection(conf, path, summarizers)
 
-subjects = subjects[19:]
+subjects = subjects[:3]
 
 for subj in subjects:
     
@@ -85,7 +86,7 @@ for subj in subjects:
     ev = str(ev)
     
     ds = ds_original.copy()
-    
+    '''
     # label managing
     if task_ == 'memory':
         field_ = 'stim'
@@ -98,22 +99,23 @@ for subj in subjects:
         conf['label_included'] = 'NEW'+ev+','+'OLD'+ev
         count_ = 5
 
-    
-    
     ds.targets = np.core.defchararray.add(np.array(ds.sa[field_].value, dtype=np.str), 
                                           np.array(ds.sa.evidence,dtype= np.str))
-
     '''
+
     ds.targets = ds.sa.memory_status
-    '''
-    ds = preprocess_dataset(ds, data_type, **conf)
 
+    conf['label_dropped'] = 'None'
+    conf['label_included'] = 'all'
+    ds = preprocess_dataset(ds, data_type, **conf)
+    count_ = 1
+    field_ = 'memory'
     balanc = Balancer(count=count_, apply_selection=True, limit=None)
     gen = balanc.generate(ds)
     
     cv_storage = StoreResults()
 
-    maps = []
+    
     
     clf = LinearCSVMC(C=1)
                 
@@ -126,7 +128,7 @@ for subj in subjects:
     
     permut_ = []
     
-    i = 5
+    i = 3
     
     partitioner = SKLCrossValidation(StratifiedKFold(y, n_folds=i))
     
@@ -136,9 +138,11 @@ for subj in subjects:
     
     sl = sphere_searchlight(cvte, radius=3, space = 'voxel_indices')
     
+    maps = []
+    
     for p_ in range(100):
         
-        print '-------- '+str(p_)+' of 100 ------------'
+        print '-------- '+str(p_+1)+' of 100 ------------'
         
         y_perm = permutation(range(len(ds.targets)))
         
@@ -149,20 +153,21 @@ for subj in subjects:
         sl_map.samples +=  1
     
         map_ = map2nifti(sl_map, imghdr=ds.a.imghdr)
-        
+        ni.save(map_, os.path.join(path, subj+'_permutation_'+str(p_+1)+'.nii.gz'))
         permut_.append(map_.get_data())
         
         
-    permut_ = np.array(permut_)
-    permut_ = np.roll(permut_, 0, 4)
-    ni.save(ni.Nifti1Image(permut_, map_.get_affine()), 
-            os.path.join(path, subj, 'permutation_'+str(i)+'_'+task_+'_'+ev+'.nii.gz'))
+    permut_ = np.array(permut_).mean(4)
+    permut_ = np.rollaxis(permut_, 0, 4)
+    perm_map = ni.Nifti1Image(permut_, map_.get_affine())
+    ni.save(perm_map, 
+            os.path.join(path, subj+'_permutation_'+str(i)+'_'+task_+'_'+ev+'.nii.gz'))
         
-    maps.append(map_)
+    maps.append(permut_)
         
     name = "%s_%s_%s_evidence_%s_balance_ds_%s" %(subj, task_, data_type, str(ev), str(i+1))
     result_dict['radius'] = 3
-    result_dict['map'] = map_
+    result_dict['map'] = perm_map
         
     subj_result = rs.SubjectResult(name, result_dict, savers)
     collection.add(subj_result)

@@ -7,55 +7,7 @@ import matplotlib.pyplot as pl
 import os
 
 
-def plot_regression_errors(errors, permutation_error, save_path, prename='distribution', errors_label=['MSE','COR']):
-    
-    fig_ = pl.figure()
-    bpp = pl.boxplot(permutation_error, showfliers=False, showmeans=True, patch_artist=True)
-    bpv = pl.boxplot(errors, showfliers=False, showmeans=True, patch_artist=True)
-    fname = "%s_perm_1000_boxplot.png" %(prename)
-   
-    
-    for box_, boxp_ in zip(bpv['boxes'], bpp['boxes']):
-        box_.set_facecolor('lightgreen')
-        boxp_.set_facecolor('lightslategrey')
-      
-      
-    pl.xticks(np.array([1,2]), errors_label)
-    
-    pl.savefig(os.path.join(save_path, fname))
-    pl.close()
-    
-    return fig_
 
-
-def plot_features_distribution(feature_set, 
-                               feature_set_permutation, 
-                               save_path, 
-                               prename='features', 
-                               n_features=90, 
-                               n_bins=20):
-    
-    pl.figure()
-    h_values_p, _ = np.histogram(feature_set_permutation.flatten(), 
-                                 bins=np.arange(0, n_features+1))
-    
-    pl.hist(zscore(h_values_p), bins=n_bins)
-    
-    fname = "%s_features_set_permutation_distribution.png" % (prename)
-    pl.savefig(os.path.join(save_path, 
-                            fname))
-    
-    pl.figure()
-    h_values_, _ = np.histogram(feature_set.flatten(), 
-                                bins=np.arange(0, n_features+1))
-    pl.plot(zscore(h_values_))
-        
-    
-    fname = "%s_features_set_cross_validation.png" % (prename)
-    pl.savefig(os.path.join(save_path, 
-                            fname))
-    
-    pl.close('all')
     
 
 def get_feature_selection_matrix(feature_set, n_features, mask):
@@ -99,106 +51,7 @@ def get_node_size(matrix, absolute=True):
 
 
 
-def plot_connectomics(matrix, 
-                      node_size, 
-                      save_path, 
-                      prename,
-                      save=False,
-                      **kwargs
-                      ):
-    
-    
-    
-    _plot_cfg = {
-                 'threshold':1.4,
-                 'fontsize_title':19,
-                 'fontsize_colorbar':13,
-                 'fontsize_names':13,
-                 'colorbar_size':0.3,
-                 'colormap':'hot',
-                 'vmin':-3,
-                 'vmax':3,
-                 'figure':pl.figure(figsize=(16,16)),
-                 'facecolor':'black',
-                 'dpi':150,
-                 'name':'weights',
-                 'title':'Connectome'               
-                }
-    
-    
-    
-    _plot_cfg.update(kwargs)
-     
-    directory_ = save_path[save_path.rfind('/')+1:]
-    
-    #names_lr, colors_lr, index_, coords = get_plot_stuff(directory_)
-    
-    names_lr = kwargs['node_names']
-    colors_lr = kwargs['node_colors']
-    index_ = kwargs['node_order']
-    coords = kwargs['node_coords']
-    networks = kwargs['networks']
-    
-    matrix = matrix[index_][:,index_]
-    names_lr = names_lr[index_]
-    node_colors = colors_lr[index_]
-    node_size = node_size[index_]
-    
-    
-    f, _ = plot_connectivity_circle_edited(matrix, 
-                                            names_lr, 
-                                            node_colors=node_colors,
-                                            node_size=node_size,
-                                            con_thresh=_plot_cfg['threshold'],
-                                            title=_plot_cfg['title'],
-                                            node_angles=circular_layout(names_lr, 
-                                                                        list(names_lr),
-                                                                        ),
-                                            fontsize_title=_plot_cfg['fontsize_title'],
-                                            fontsize_names=_plot_cfg['fontsize_names'],
-                                            fontsize_colorbar=_plot_cfg['fontsize_colorbar'],
-                                            colorbar_size=_plot_cfg['colorbar_size'],
-                                            colormap=_plot_cfg['colormap'],
-                                            vmin=_plot_cfg['vmin'],
-                                            vmax=_plot_cfg['vmax'],
-                                            fig=_plot_cfg['figure'],
-                                            )
-            
-    if save == True:
-        fname = "%s_features_%s.png" % (prename, _plot_cfg['name'])
-        
-        f.savefig(os.path.join(save_path, fname),
-                          facecolor=_plot_cfg['facecolor'],
-                          dpi=_plot_cfg['dpi'])
-    
-    
-    for d_ in ['x', 'y', 'z']:
-        
-        fname = None
-        if save == True:
-            fname = "%s_connectome_feature_%s_%s.png" %(prename, _plot_cfg['name'], d_)
-            fname = os.path.join(save_path, fname)
-            
-        plot_connectome(matrix, 
-                        coords, 
-                        colors_lr, 
-                        node_size,
-                        _plot_cfg['threshold'],
-                        fname,
-                        cmap=_plot_cfg['colormap'],
-                        title=None,
-                        display_=d_,
-                        max_=_plot_cfg['vmax'],
-                        min_=_plot_cfg['vmin']
-                        )
-        
-    
-    f = plot_matrix(matrix, _, networks)
-    if save == True:
-        fname = "%s_matrix_%s.png" %(prename, _plot_cfg['name'])
-        f.savefig(os.path.join(save_path, fname),
-                          #facecolor=_plot_cfg['facecolor'],
-                          dpi=_plot_cfg['dpi'])
+
   
     
     
@@ -341,7 +194,9 @@ def write_results(directory_list, conditions, n_permutations=1000.):
                                         
             ######### Plot choice connectomics #################
             
-            matrix_ = get_feature_selection_matrix(sets_, n_features, mask=np.float_(~np.bool_(nan_mask)))
+            matrix_ = get_feature_selection_matrix(sets_, 
+                                                   n_features, 
+                                                   mask=np.float_(~np.bool_(mask_)))
             
             size_f = get_node_size(matrix_)
             

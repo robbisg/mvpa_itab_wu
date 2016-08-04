@@ -201,7 +201,7 @@ def preprocess_dataset(ds, type_, **kwargs):
     poly_detrend(ds, polyord = 1, chunks_attr = 'chunks')
     
     
-    if  label_dropped != 'none':
+    if  label_dropped != 'None':
         logger.info('Removing labels...')
         ds = ds[ds.sa.targets != label_dropped]
     if  label_included != ['all']:
