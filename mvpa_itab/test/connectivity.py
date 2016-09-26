@@ -1,5 +1,5 @@
 import unittest
-from mvpa_itab.connectivity import ConnectivityPreprocessing
+from mvpa_itab.conn.connectivity import ConnectivityPreprocessing
 import os
 import nibabel as ni
 import numpy as np

@@ -25,8 +25,8 @@ from scipy.stats import ttest_ind
 from scipy.stats import ttest_1samp
 from numpy.random.mtrand import permutation
 #path = '/media/robbis/DATA/fmri/memory/'
-#path = '/home/robbis/fmri/memory/'
-path = '/DATA11/roberto/fmri/memory/'
+path = '/home/robbis/fmri/memory/'
+#path = '/DATA11/roberto/fmri/memory/'
 
 
 if __debug__:

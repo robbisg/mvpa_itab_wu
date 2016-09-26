@@ -1,13 +1,15 @@
 import numpy as np
+import nibabel as ni
 from scipy.io import loadmat
 from scipy.stats import zscore as sc_zscore
 from mvpa2.suite import dataset_wizard, zscore
 import os
 from nitime.analysis.base import BaseAnalyzer
+from nitime.timeseries import TimeSeries
 from scipy.spatial.distance import euclidean
 from mvpa2.datasets.base import Dataset, dataset_wizard
-from mvpa_itab.connectivity import load_matrices, z_fisher
-from mvpa_itab.conn.utils import flatten_correlation_matrix
+from mvpa_itab.conn.connectivity import load_matrices, z_fisher, glm, get_bold_signals
+from mvpa_itab.conn.operations import flatten_correlation_matrix
 
 
 
@@ -330,7 +332,11 @@ class ConnectivityLoader(object):
         for s in self.subjects:
             ds_subjects += [s for _ in range(n_runs)]
         ds_subjects = np.array(ds_subjects)
-        ds_info = np.vstack((ds_subjects, ds_subjects))
+        
+        ds_info = []
+        for _ in self.conditions.keys():
+            ds_info.append(ds_subjects)
+        ds_info = np.vstack(ds_info)
         
         
         self.ds = dataset_wizard(ds_data, targets=ds_labels, chunks=np.int_(ds_info.T[4]))
@@ -343,7 +349,91 @@ class ConnectivityLoader(object):
         
         return self.ds
               
+
+class ConnectivityPreprocessing(object):
+    
+    def __init__(self, path, subject, boldfile, brainmask, regressormask, subdir='fmri'):
         
+        self.path = path
+        self.subject = subject
+        self.subdir = subdir
+        self.bold = ni.load(os.path.join(path, subject, subdir, boldfile))
+        self.loadedSignals = False
+        self.brain_mask = ni.load(os.path.join(path, subject, subdir, brainmask))
+        
+        self.mask = []
+        for mask_ in regressormask:
+            m = ni.load(os.path.join(path, subject, subdir, mask_))
+            self.mask.append(m)
+                    
+    
+    def execute(self, gsr=True, filter_params={'ub': 0.08, 'lb':0.009}, tr=4.):
+        
+        # Get timeseries
+        if not self.loadedSignals:
+            self._load_signals(tr, gsr, filter_params=filter_params)
+        elif self.loadedSignals['gsr']!=gsr or self.loadedSignals['filter_params']!=filter_params:
+            self._load_signals(tr, gsr, filter_params=filter_params)
+        
+        beta = glm(self.fmri_ts.data.T, self.regressors.T)
+        
+        residuals = self.fmri_ts.data.T - np.dot(self.regressors.T, beta)
+        
+        ts_residual = TimeSeries(residuals.T, sampling_interval=tr)
+    
+        '''
+        ub = filter_params['ub']
+        lb = filter_params['lb']
+        
+        F = FilterAnalyzer(ts_residual, ub=ub, lb=lb)
+        '''
+        residual_4d = np.zeros_like(self.bold.get_data())
+        residual_4d [self.brain_mask.get_data() > 0] = ts_residual.data
+        residual_4d[np.isnan(residual_4d)] = 0
+        
+        self._save(residual_4d, gsr=gsr)
+        
+    
+    def _save(self, image, gsr=True):
+        
+        gsr_string = ''
+        if gsr:
+            gsr_string = '_gsr'
+        
+        filename = 'residual_filtered_first%s.nii.gz' % (gsr_string)
+        img = ni.Nifti1Image(image, self.bold.get_affine())
+        filepath = os.path.join(self.path, self.subject, self.subdir, filename)
+        
+        ni.save(img, filepath)
+        
+    
+    
+    def _load_signals(self, tr, gsr, filter_params=None):
+        
+        regressor = []
+        
+        self.fmri_ts = get_bold_signals(self.bold, 
+                                        self.brain_mask, 
+                                        tr, 
+                                        ts_extraction='none',
+                                        filter_par=filter_params)
+        
+        if gsr:
+            gsr_ts = get_bold_signals(self.bold, 
+                                      self.brain_mask, 
+                                      tr, 
+                                      filter_par=filter_params)
+            regressor.append(gsr_ts.data)
+        
+        for mask_ in self.mask:
+            ts_ = get_bold_signals(self.bold, 
+                                   mask_, 
+                                   tr,
+                                   filter_par=filter_params ) 
+            regressor.append(ts_.data)
+        
+        self.loadedSignals = {'gsr':gsr, 'filter_params':filter_params}
+        self.regressors = np.vstack(regressor)      
             
                
     

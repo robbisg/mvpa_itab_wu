@@ -27,8 +27,6 @@ from memory_profiler import profile
 from scipy.stats.stats import ttest_ind
 
 from sklearn.decomposition import PCA
-from docutils.parsers.rst.directives import path
-from oauthlib.oauth1.rfc5849.utils import filter_params
 
 
 #@profile

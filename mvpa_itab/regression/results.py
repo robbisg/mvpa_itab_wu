@@ -1,17 +1,18 @@
 import os
 import numpy as np
 import matplotlib.pyplot as pl
-from mvpa_itab.conn.utils import ConnectivityLoader
-from mvpa_itab.conn.io import copy_matrix
+from mvpa_itab.conn.io import ConnectivityLoader
+from mvpa_itab.conn.operations import copy_matrix
+from mvpa_itab.conn.utils import get_atlas_info
 from mvpa_itab.conn.plot import *
 import nibabel as ni
 from scipy.stats.stats import zscore
-from __builtin__ import str
+
 
 
 def save_results(path, results):
     
-    fields_ = ['error', 'weights', 'features', 'subjects']
+    fields_ = ['error', 'features', 'weights', 'subjects']
     
     for result in results:
     
@@ -43,7 +44,7 @@ def build_name(path, conf, field='values', **kwargs):
     fname = os.path.join(path, conf['directory'])
     alg = conf['learner'].__str__()[:3]
     kernel = conf['learner'].kernel
-    med_ = conf['meditation']
+    med_ = conf['conditions']
     
     return os.path.join(fname,
                         "%s_%s_%s_%s.npz" %(med_, 
@@ -80,6 +81,10 @@ def analyze_results(directory,
     """
     
     res_path = '/media/robbis/DATA/fmri/monks/0_results/'
+    subjects = np.loadtxt('/media/robbis/DATA/fmri/monks/attributes_struct.txt',
+                      dtype=np.str)
+
+    path = '/media/robbis/DATA/fmri/monks/'
     roi_list = []
     roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
                           delimiter=',',
@@ -100,8 +105,8 @@ def analyze_results(directory,
             results_ = np.load(fname_)
             values_ = results_['arr_0'].tolist()
             errors_ = values_['error']      #values_['errors_']
-            sets_ = values_['weights']     #values_['sets_']
-            weights_ = values_['features']   #values_['weights_']
+            sets_ = values_['features']     #values_['sets_']
+            weights_ = values_['weights']   #values_['weights_']
             samples_ = values_['subjects']  #values_['samples_']
             
             fname_ = os.path.join(res_path, dir_, cond_+'_permutation_1000_50.npz')
@@ -109,8 +114,8 @@ def analyze_results(directory,
             results_ = np.load(fname_)
             values_p = results_['arr_0'].tolist()
             errors_p = values_p['error']        #values_p['errors_p']
-            sets_p = values_p['weights']       #values_p['sets_p']
-            weights_p = values_p['features']     #values_p['weights_p']
+            sets_p = values_p['features']       #values_p['sets_p']
+            weights_p = values_p['weights']     #values_p['weights_p']
             samples_p = values_p['subjects']    #values_p['samples_p']
             
             errors_p = np.nanmean(errors_p, axis=1)
@@ -128,7 +133,8 @@ def analyze_results(directory,
             prename = "%s_%s" %(cond_, learner_)
             
             ######## Get matrix infos ###############
-            conn_test = ConnectivityLoader(path, 
+            
+            conn_test = ConnectivityLoader(res_path, 
                                          subjects, 
                                          directory_, 
                                          roi_list)
@@ -204,7 +210,7 @@ def analyze_results(directory,
             
             matrix_ = np.nan_to_num(copy_matrix(mask_, diagonal_filler=0))
         
-            names_lr, colors_lr, index_, coords = get_plot_stuff(directory_)
+            names_lr, colors_lr, index_, coords, _ = get_atlas_info(dir_)
             
             '''
             matrix_[matrix_ == 0] = np.nan
@@ -247,10 +253,9 @@ def analyze_results(directory,
                                 coords, 
                                 colors_lr, 
                                 2*size_w**2,
-                                index_,
                                 1.4,
                                 fname,
-                                cmap=pl.cm.bwr,
+                                #cmap=pl.cm.bwr,
                                 title=None,
                                 display_=d_,
                                 #max_=3.,
@@ -258,7 +263,7 @@ def analyze_results(directory,
                                 )
             fname = "%s_connections_list_feature_weights.txt" %(prename)
             fname = os.path.join(res_path, directory_, fname)
-            print_connections(matrix_, names_lr, fname)
+            #print_connections(matrix_, names_lr, fname)
             
             #########
             mask_ = np.float_(~np.bool_(nan_mask))
@@ -304,7 +309,6 @@ def analyze_results(directory,
                                 coords, 
                                 colors_lr, 
                                 4.*size_,
-                                index_,
                                 15.,
                                 fname,
                                 title=None,
@@ -315,7 +319,7 @@ def analyze_results(directory,
                 
             fname = "%s_connections_list_feature_choices.txt" %(prename)
             fname = os.path.join(res_path, directory_, fname)
-            print_connections(matrix_, names_lr,fname)
+            #print_connections(matrix_, names_lr,fname)
             
             pl.close('all')
             

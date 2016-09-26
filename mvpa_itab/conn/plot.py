@@ -2,13 +2,49 @@ from mne.viz import *
 from mne.viz.circle import _plot_connectivity_circle_onpick
 import matplotlib.pyplot as plt
 import numpy as np
-from mvpa_itab.conn.utils import get_atlas90_coords, get_findlab_coords
+from mvpa_itab.conn.utils import get_atlas90_coords, get_findlab_coords,\
+    get_atlas_info
 import os
 from scipy.stats import zscore
 
 
 
 def plot_matrix(matrix, roi_names, networks, **kwargs):
+    """
+    This function is used to plot connections in square matrix form.
+    
+    Parameters
+    ----------
+    
+    matrix : numpy array (n x n) float
+            The values of connectivity between each of n ROI
+            
+    roi_names :  list of n string
+            The names of each of the n ROI
+            
+    networks : list of p string
+            List of names representing the networks subdivision
+            
+    ticks_type : {'networks', 'roi'}, optional
+            Indicates if the tick names should be ROI or networks
+            
+    ticks_color : list of colors, optional
+            The list in matplotlib formats of colors used to
+            color the ticks names, this should be in line with
+            the ticks_type choice: p colors if we choose 'networks'
+            
+    facecolor : string, optional
+            As in matplotlib it indicates the background color of 
+            the plot
+            
+    
+    Returns
+    -------
+    
+    f : matplotlib figure
+            The figure just composed.
+    
+    """ 
     
     
     _plot_cfg = {'ticks_type':'networks',
@@ -24,8 +60,10 @@ def plot_matrix(matrix, roi_names, networks, **kwargs):
         ax_color = 'white'
     else:
         ax_color = 'k'
+        facecolor_ = 'white'
     
-    f = plt.figure(figsize=(16., 12.), facecolor=facecolor_, dpi=600)
+    f = plt.figure(figsize=(16., 12.), facecolor=facecolor_, dpi=300)
+    #f = plt.figure()
     a = f.add_subplot(111)
     
     max_value = np.max(np.abs(matrix))
@@ -79,7 +117,7 @@ def plot_matrix(matrix, roi_names, networks, **kwargs):
     a.set_yticklabels(ticks_labels, fontsize=15)
     
     a.set_xticks(network_ticks)
-    a.set_xticklabels(ticks_labels, fontsize=15, rotation='vertical')
+    a.set_xticklabels(ticks_labels, fontsize=15, rotation=80)
     
     
     colors_[colors_ == facecolor_] = ax_color
@@ -96,61 +134,6 @@ def plot_matrix(matrix, roi_names, networks, **kwargs):
 
 
 
-def plot_cross_correlation(xcorr, t_start, t_end, labels):
-
-    import matplotlib.pyplot as plt
-    import matplotlib.animation as animation
-
-    dim = len(labels)
-    
-    fig = plt.figure()
-    ax = plt.axes(xlim=(-0.5, dim-0.5), ylim=(dim-0.5, -0.5))
-    
-    #im = ax.imshow(xcorr.at(t_start), interpolation='nearest', vmin=-1, vmax=1)
-    im = ax.imshow(np.eye(dim), interpolation='nearest', vmin=-4, vmax=4)
-    title = ax.set_title('')
-    xt = ax.set_xticks(np.arange(dim))
-    xl = ax.set_xticklabels(labels, rotation='vertical')
-    yt = ax.set_yticks(np.arange(dim))
-    yl = ax.set_yticklabels(labels)
-    fig.colorbar(im)
-
-    l_time = np.arange(-50, 50, 1)
-    mask = (l_time >= t_start) * (l_time<=t_end)
-    
-    def init():
-        im.set_array(np.eye(dim))
-        title.set_text('Cross-correlation at time lag of '+str(t_start)+' TR.')
-        plt.draw()
-        return im, title
-        
-    def animate(i):
-        global l_time        
-        j = np.int(np.rint(i/20))
-        print l_time[mask][j]
-        #im.set_array(xcorr.at(l_time[j]))
-        im.set_array(x[mask][j])
-        title.set_text('Cross-correlation at time lag of '+str(l_time[mask][j])+' TR.')
-        plt.draw()
-        return im, title
-
-    ani = animation.FuncAnimation(fig, animate, 
-                                  init_func=init, 
-                                  frames=20*(t_end-t_start), 
-                                  interval=10,
-                                  repeat=False, 
-                                  blit=True)
-    plt.show()
-    #ani.save('/home/robbis/xcorrelation_.mp4')
-    
-
-
-def plot_dendrogram(dendrogram, dissimilarity_matrix):
-    
-    return
-
-
-
 def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
                                      node_angles=None, node_width=None,
                                      node_size=100, con_thresh=None,
@@ -162,7 +145,9 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
                                      fontsize_title=12, fontsize_names=8,
                                      fontsize_colorbar=8, padding=6.,
                                      fig=None, subplot=111, interactive=True):
-    """Visualize connectivity as a circular graph.
+    
+    """Visualize connectivity as a circular graph, using circles to identify ROIs, their size
+    is proportional to the sum of the connections it has in absolute value.
 
     Note: This code is based on the circle graph example by Nicolas P. Rougier
     http://www.loria.fr/~rougier/coding/recipes.html
@@ -187,6 +172,11 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
     node_width : float | None
         Width of each node in degrees. If None, "360. / len(node_names)" is
         used.
+    node_size : array, shape=(len(node_names,)) | None
+        Size of the circles.
+    con_thresh : float | None
+        Threshold of the connection used to exclude arcs with a smaller absolute value
+        to be plotted.
     node_colors : list of tuples | list of str
         List with the color to use for each node. If fewer colors than nodes
         are provided, the colors will be repeated. Any color supported by
@@ -464,6 +454,11 @@ def plot_connectome(matrix,
                     min_=None, 
                     display_='ortho'):
     
+    """
+    Wrapper of the plot_connectome function in nilearn with some fixed
+    values
+    """
+    
     from nilearn import plotting
     
     plotting.plot_connectome(adjacency_matrix=matrix, 
@@ -492,75 +487,6 @@ def plot_connectome(matrix,
                              #colorbar=True
                              )
     
-    
-    
-    
-def get_atlas_info(directory_):
-    
-    """
-    Loads colors, Roi names, coordinates and plot order for connectome plots
-    """
-    
-    if directory_.find('atlas90') != -1 or directory_.find('20150') != -1:
-        coords = get_atlas90_coords()
-        roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_AAL/atlas90.cod',
-                              delimiter='=',
-                              dtype=np.str)
-        names = roi_list.T[1]
-        names_inv = np.array([n[::-1] for n in names])
-        index_ = np.argsort(names_inv)
-        names_lr = names[index_]
-        dict_ = {'L':'#89CC74', 'R':'#7A84CC'}
-        colors_lr = np.array([dict_[n[:1]] for n in names_inv])    
-        names = np.array([n.replace('_', ' ') for n in names])
-        networks = names
-
-    
-    elif directory_.find('findlab') != -1 or directory_.find('2014') != -1:
-        coords = get_findlab_coords()
-        roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
-                      delimiter=',',
-                      dtype=np.str)
-        networks = roi_list.T[-2]
-        names = roi_list.T[2]
-        """
-        dict_ = {'Auditory':'#89CC74', 
-                 'Basal_Ganglia':'#7A84CC', 
-                 'LECN':'#FF1800',
-                 'Language':'#BF2B54', 
-                 'Precuneus':'#390996',
-                 'RECN':'#FF230B', 
-                 'Sensorimotor':'#4D0DC8', 
-                 'Visuospatial':'#DBBF00', 
-                 'anterior_Salience':'#37AEC4',
-                 'dorsal_DMN':'#9AF30B', 
-                 'high_Visual':'#FF8821', 
-                 'post_Salience':'#0289A2', 
-                 'prim_Visual':'#FF7600',
-                 'ventral_DMN':'#92ED00'
-                 }"""
-        dict_ = {'Auditory':'silver', 
-                 'Basal_Ganglia':'white', 
-                 'LECN':'red',
-                 'Language':'orange', 
-                 'Precuneus':'green',
-                 'RECN':'plum', 
-                 'Sensorimotor':'gold', 
-                 'Visuospatial':'blueviolet', 
-                 'anterior_Salience':'beige',
-                 'dorsal_DMN':'cyan', 
-                 'high_Visual':'yellow', 
-                 'post_Salience':'lime', 
-                 'prim_Visual':'magenta',
-                 'ventral_DMN':'royalblue'
-                 }
-        colors_lr = np.array([dict_[r.T[-2]] for r in roi_list])
-        index_ = np.arange(90)
-        
-        
-    return names, colors_lr, index_, coords, networks
-
-
 
 def plot_connectomics(matrix, 
                       node_size, 
@@ -660,11 +586,15 @@ def plot_connectomics(matrix,
     if save == True:
         fname = "%s_matrix_%s.png" %(prename, _plot_cfg['name'])
         f.savefig(os.path.join(save_path, fname),
-                          #facecolor=_plot_cfg['facecolor'],
+                          facecolor=_plot_cfg['facecolor'],
                           dpi=_plot_cfg['dpi'])
 
 
-def plot_regression_errors(errors, permutation_error, save_path, prename='distribution', errors_label=['MSE','COR']):
+def plot_regression_errors(errors, 
+                           permutation_error, 
+                           save_path, 
+                           prename='distribution', 
+                           errors_label=['MSE','COR']):
     
     fig_ = plt.figure()
     bpp = plt.boxplot(permutation_error, showfliers=False, showmeans=True, patch_artist=True)
@@ -683,6 +613,39 @@ def plot_regression_errors(errors, permutation_error, save_path, prename='distri
     plt.close()
     
     return fig_
+
+
+def plot_within_between_weights(connections,
+                                condition,
+                                savepath,
+                                atlas='findlab', 
+                                background='white'):
+    
+    import matplotlib.pyplot as pl
+    names_lr, colors_lr, index_, coords, networks = get_atlas_info(atlas, background=background)
+    _, idxnet = np.unique(networks, return_index=True)
+    _, idx = np.unique(colors_lr, return_index=True)
+    
+    color_net = dict(zip(networks[np.sort(idxnet)], colors_lr[np.sort(idx)]))
+
+    fig = pl.figure(figsize=(13.2,10), dpi=200)
+    
+    for k_, v_ in connections.iteritems():
+        lines_ = [pl.plot(v_, 'o-', c=color_net[k_], 
+                          markersize=20, linewidth=5, alpha=0.6, 
+                          label=k_)]
+         
+    
+    pl.legend()
+    pl.ylabel("Average connection weight")
+    pl.xticks([0,1,1.4], ['Between-Network', 'Within-Network',''])
+    pl.title(condition+' within- and between-networks average weights')
+    pl.savefig(os.path.join(savepath, condition+'_decoding_within_between.png'),
+               dpi=200)
+
+    
+    return fig
+
 
 
 def plot_features_distribution(feature_set, 
@@ -711,5 +674,59 @@ def plot_features_distribution(feature_set,
     fname = "%s_features_set_cross_validation.png" % (prename)
     plt.savefig(os.path.join(save_path, 
                             fname))
-    
+
     plt.close('all')
+    
+    
+    
+def plot_cross_correlation(xcorr, t_start, t_end, labels):
+
+    import matplotlib.pyplot as plt
+    import matplotlib.animation as animation
+
+    dim = len(labels)
+    
+    fig = plt.figure()
+    ax = plt.axes(xlim=(-0.5, dim-0.5), ylim=(dim-0.5, -0.5))
+    
+    #im = ax.imshow(xcorr.at(t_start), interpolation='nearest', vmin=-1, vmax=1)
+    im = ax.imshow(np.eye(dim), interpolation='nearest', vmin=-4, vmax=4)
+    title = ax.set_title('')
+    xt = ax.set_xticks(np.arange(dim))
+    xl = ax.set_xticklabels(labels, rotation='vertical')
+    yt = ax.set_yticks(np.arange(dim))
+    yl = ax.set_yticklabels(labels)
+    fig.colorbar(im)
+
+    l_time = np.arange(-50, 50, 1)
+    mask = (l_time >= t_start) * (l_time<=t_end)
+    
+    def init():
+        im.set_array(np.eye(dim))
+        title.set_text('Cross-correlation at time lag of '+str(t_start)+' TR.')
+        plt.draw()
+        return im, title
+        
+    def animate(i):
+        global l_time        
+        j = np.int(np.rint(i/20))
+        print l_time[mask][j]
+        #im.set_array(xcorr.at(l_time[j]))
+        im.set_array(x[mask][j])
+        title.set_text('Cross-correlation at time lag of '+str(l_time[mask][j])+' TR.')
+        plt.draw()
+        return im, title
+
+    ani = animation.FuncAnimation(fig, animate, 
+                                  init_func=init, 
+                                  frames=20*(t_end-t_start), 
+                                  interval=10,
+                                  repeat=False, 
+                                  blit=True)
+    plt.show()
+    #ani.save('/home/robbis/xcorrelation_.mp4')
+    
+      
+def plot_dendrogram(dendrogram, dissimilarity_matrix):
+    
+    return

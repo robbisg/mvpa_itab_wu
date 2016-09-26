@@ -1,25 +1,33 @@
 import matplotlib.pyplot as pl
 import numpy as np
-from mvpa_itab.conn.utils import copy_matrix, array_to_matrix
+import os
+from mvpa_itab.conn.operations import copy_matrix, array_to_matrix
 from mvpa_itab.conn.states.states import get_centroids
 
 
 def plot_states_matrices(X, 
-                         labels, 
+                         labels,
+                         save_path,
+                         condition_label,
                          node_number=[6,5,8,10,4,5,7], 
-                         node_networks = ['DAN','VAN','SMN','VIS','AUD','LAN','DMN']):
+                         node_networks = ['DAN','VAN','SMN','VIS','AUD','LAN','DMN'],
+                         use_centroid=False,
+                         ):
 
 
     position = [sum(node_number[:i+1]) for i in range(len(node_number))]
     
-    centroids = get_centroids(X, labels)
-    
-    total_nodes = len(np.unique(labels))
+    if not use_centroid:
+        centroids = get_centroids(X, labels)
+        total_nodes = len(np.unique(labels))
+    else:
+        centroids = X.copy()
+        total_nodes = X.shape[0]
     
     position_label = [-0.5+position[i]-node_number[i]/2. for i in range(len(node_number))]
     
-    for i in np.unique(labels):
-        pl.figure()
+    for i in np.arange(total_nodes):
+        fig = pl.figure()
         matrix_ = copy_matrix(array_to_matrix(centroids[i]))
         total_nodes = matrix_.shape[0]
         pl.imshow(matrix_, interpolation='nearest')
@@ -33,7 +41,9 @@ def plot_states_matrices(X,
         
         pl.colorbar()
         
-    #Save!
+        fname = "%s_state_%s.png" % (condition_label, str(i))
+        
+        pl.savefig(os.path.join(save_path, fname))
     
    
     

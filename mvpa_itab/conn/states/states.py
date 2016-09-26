@@ -17,7 +17,23 @@ from scipy.signal import argrelextrema, argrelmin
 
 def get_data(filename):
     """
-    Returns upper triangular matrix data and number of ROIs
+    Returns upper triangular matrix data and number of ROIs.
+    The data is specific for the task, is a non-stationary connectivity
+    matrix. 
+    
+    Parameters
+    ----------
+    filename : string
+        The filename of a .mat matlab file in which the matrix is
+        a data variable in matlab.
+        
+    Returns
+    -------
+    data : n_session x n_timepoints x n_connections numpy array
+        The upper-part of the non-stationary matrix
+        
+    n_roi : int
+        Number of ROI of the original matrix.
     """
     
     #filename = '/media/robbis/DATA/fmri/movie_viviana/mat_corr_sub_REST.mat'
@@ -55,10 +71,52 @@ def get_min_speed_arguments(data):
 
 
 def get_centroids(X, labels):
+    """
+    Returns the centroid of a clustering experiment
+    
+    Parameters
+    ----------
+    X : n_samples x n_features array
+        The full dataset used for clustering
+    
+    labels : n_samples array
+        The clustering labels for each sample.
+        
+        
+    Returns
+    -------
+    centroids : n_cluster x n_features shaped array
+        The centroids of the clusters.
+    """
+    
+    
     return np.array([X[labels == l].mean(0) for l in np.unique(labels)])
 
 
 def fit_states(X, centroids, distance=euclidean):
+    """
+    Returns the similarity of the dataset to each centroid,
+    using a dissimilarity distance function.
+    
+    Parameters
+    ----------
+    X : n_samples x n_features array
+        The full dataset used for clustering
+    
+    centroids : n_cluster x n_features array
+        The cluster centroids.
+        
+    distance : a scipy.spatial.distance function | default: euclidean
+        This is the dissimilarity measure, this should be a python
+        function, see scipy.spatial.distance.
+        
+    
+    Returns
+    -------
+    results : n_samples x n_centroids array
+        The result of the analysis,
+    
+    """
     
 
     ts_seed = TimeSeries(centroids, sampling_interval=1.)

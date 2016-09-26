@@ -1,7 +1,7 @@
 import numpy as np
 import scipy as sp
 from mvpa_itab.stats import Correlation, CrossValidation
-from mvpa_itab.conn.utils import ConnectivityTest
+from mvpa_itab.conn.io import ConnectivityLoader
 from sklearn.metrics.metrics import mean_squared_error, r2_score
 from mvpa_itab.stats import RegressionPermutation
 from mvpa_itab.measure import correlation
@@ -44,7 +44,7 @@ algorithm = SVR(kernel='linear', C=1)
 
 
 # Load data
-conn = ConnectivityTest(path, subjects, r, roi_list)
+conn = ConnectivityLoader(path, subjects, r, roi_list)
 conn.get_results(conditions)
 ds = conn.get_dataset()
 ds = ds[np.logical_and(ds.sa.meditation == style_, ds.sa.groups == group_)]
@@ -61,7 +61,7 @@ c = Correlation(X_)
 corr = c.run(X_, y_)[0]
 
 arg_ = np.argsort(np.abs(corr))[::-1]
-arg_ = arg_[:500] # Focusing on first 500 features
+arg_ = arg_[:80] # Focusing on first 500 features
 
 
 # Cross validate

@@ -1,7 +1,7 @@
 import numpy as np
 from mvpa_itab.stats import CrossValidation
 from scipy.stats.stats import zscore
-from mvpa_itab.conn.utils import ConnectivityLoader
+from mvpa_itab.conn.io import ConnectivityLoader
 import os
 from mvpa_itab.stats import Correlation
 from mvpa_itab.measure import ranking_correlation
@@ -332,40 +332,41 @@ roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt'
                       delimiter=',',
                       dtype=np.str)
 
-iterator_setup = {'directory':['20151030_141350_connectivity_filtered_first_no_gsr_findlab_fmri',
-                            '20150427_124039_connectivity_fmri'],
-                  'conditions': ['Samatha', 'Vipassana'],
-                  'learner': [SVR(kernel='linear', C=1), 
-                              SVR(kernel='rbf', C=1)]
+iterator_setup = {'directory':['20151030_141350_connectivity_filtered_first_no_gsr_findlab_fmri'],
+                  'conditions': ['Rest'],
+                  'learner': [SVR(kernel='linear', C=1)]
                   
                   }
 
 subjects = np.loadtxt('/media/robbis/DATA/fmri/monks/attributes_struct.txt',
                       dtype=np.str)
 
-_fields = {'path':'/media/robbis/DATA/fmri/monks/', 
+_fields = {'path':'/media/robbis/DATA/fmri/monks/0_results', 
                'roi_list':np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
                       delimiter=',',
                       dtype=np.str), 
-               'directory':'20150427_124039_connectivity_fmri', 
-               'conditions':['Samatha', 'Vipassana'],
+               #'directory':'20150427_124039_connectivity_fmri', 
+               #'conditions':['Samatha', 'Vipassana'],
+               'directory':'20150427_124039_connectivity_fmri',
+               'condition_list':['Rest'],
                'subjects':subjects,
-               'filter_':{'meditation':'Samatha', 'groups':'E'},
+               'filter_':{'meditation':'Rest', 'groups':'E'},
                'fs_algorithm':Correlation,
                'fs_ranking_fx':ranking_correlation,
                'cv_schema':ShuffleSplit(12, 
                                         n_iter=250, 
                                         test_size=0.25),
                'learner':SVR(kernel='linear', C=1),
-               'error_fx':[mean_squared_error, correlation, r2_score],
+               'error_fx':[mean_squared_error, correlation],
                'y_field':'expertise',
-               'n_permutations':200
+               'n_permutations':1000
                }
 
 
 
 '''
 from mvpa_itab.regression.base import *
+from mvpa_itab.regression.pipelines import FeaturePermutationRegression
 pipeline = FeaturePermutationRegression()
 pipeline.setup_analysis(**_fields)
 iter_ = ScriptIterator()

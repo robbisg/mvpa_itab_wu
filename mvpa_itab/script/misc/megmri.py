@@ -69,8 +69,6 @@ for k, image_stack in images_.iteritems():
         
         
 
-
-
 target = ['LF']
 metrics_ = []
 for name, fx in dict_functions.iteritems():

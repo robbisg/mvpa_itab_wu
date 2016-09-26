@@ -8,11 +8,13 @@ from scipy.io import loadmat
 from scipy.stats import ttest_ind
 from scipy.stats import zscore as sscore
 from mvpa_itab.io.base import load_dataset
-from mvpa_itab.conn.io import load_fcmri_dataset, copy_matrix
+from mvpa_itab.conn.io import load_fcmri_dataset, copy_matrix,\
+    ConnectivityLoader
 from mvpa2.clfs.svm import LinearCSVMC
 from mvpa2.mappers.zscore import zscore
 from mvpa_itab.conn.plot import get_plot_stuff, get_atlas_info,\
     plot_connectivity_circle_edited, plot_connectome
+from ubuntu_sso.networkstate.networkstates import NetworkState
 #from scipy.stats.stats import zscore
 
 path = '/media/robbis/DATA/fmri/monks/0_results/'
@@ -66,11 +68,11 @@ for r in results_dir:
 ##########################################
 file_ = open(os.path.join('/media/robbis/DATA/fmri/monks/', '0_results', 'results_decoding_new.txt'), 'w')
 line_ = ""
-#results_dir = ['20140513_163451_connectivity_fmri']
+results_dir = ['20140513_163451_connectivity_fmri']
 
 for r in results_dir:
     print '··········· '+r+' ·············'
-    conn = ConnectivityTest(path, subjects, r, roi_list)
+    conn = ConnectivityLoader(path, subjects, r, roi_list)
     nan_mask = conn.get_results(['Samatha', 'Vipassana'])
     
     ds = conn.get_dataset()
@@ -150,7 +152,9 @@ for r in results_dir:
 file_.write(line_)
 file_.close()
 
-
+directory = r
+save_path = path
+wb_meditation = dict()
 for med, l_ in zip(['Samatha','Vipassana'], ['(FA)', '(OM)']):
     
     f_array = feature_selected[med].copy()
@@ -171,84 +175,141 @@ for med, l_ in zip(['Samatha','Vipassana'], ['(FA)', '(OM)']):
     
     f_matrix = copy_matrix(array_to_matrix(f_array, nan_mask), diagonal_filler=0)
     w_matrix = copy_matrix(array_to_matrix(w_array, nan_mask), diagonal_filler=0)
+        
+    title = "%s %s" % (med, l_)
+    # f_matrix[f_matrix == 0] = np.nan
+    ##################################################################################
+    condition = med
+    w_aggregate = aggregate_networks(w_matrix, roi_list.T[-2])
     
-   
-    names, colors, index_, coords = get_atlas_info('findlab')
+    names_lr, colors_lr, index_, coords, networks = get_atlas_info('findlab')
+    
+    _, idx = np.unique(networks, return_index=True)
+    
+    
+    ##########################################################################
+    
+    plot_connectomics(w_aggregate, 
+                      5*np.abs(w_aggregate.sum(axis=1))**2, 
+                      save_path=os.path.join(path, directory), 
+                      prename=condition+'_aggregate_weights_decoding', 
+                      save=True,
+                      colormap='bwr',
+                      vmin=-1*w_aggregate.max(),
+                      vmax=w_aggregate.max(),
+                      node_names=np.unique(networks),
+                      node_colors=colors_lr[idx],
+                      node_coords=coords[idx],
+                      node_order=np.arange(0, len(idx)),
+                      networks=np.unique(networks),
+                      title=title                   
+                      )
+    
+    plot_connectomics(w_matrix,
+                      5*np.abs(w_matrix.sum(axis=1))**2, 
+                      save_path=os.path.join(path, directory), 
+                      prename=condition+'_weights_decoding', 
+                      save=True,
+                      colormap='bwr',
+                      vmin=w_matrix.max()*-1,
+                      vmax=w_matrix.max(),
+                      node_names=names_lr,
+                      node_colors=colors_lr,
+                      node_coords=coords,
+                      node_order=index_,
+                      networks=networks,
+                      threshold=1.4,
+                      title=title             
+                      )
+    
+    for method in ['positive', 'negative']:
+        aggregate = get_signed_connectome(w_aggregate, method=method)
+        colormap_ = 'bwr'
+    
+        plot_connectomics(aggregate, 
+                          5*np.abs(aggregate.sum(axis=1))**2, 
+                          save_path=os.path.join(path, directory), 
+                          prename=condition+'_'+method+'_aggregate_weights_decoding', 
+                          save=True,
+                          colormap=colormap_,
+                          vmin=np.abs(aggregate).max()*-1,
+                          vmax=np.abs(aggregate).max(),
+                          node_names=np.unique(networks),
+                          node_colors=colors_lr[idx],
+                          node_coords=coords[idx],
+                          node_order=np.arange(0, len(idx)),
+                          networks=np.unique(networks),
+                          threshold=1.,
+                          title=title+' '+method+' aggregate'                  
+                          )
+    
 
     
-    title_ = "%s %s" % (med, l_)
-    # f_matrix[f_matrix == 0] = np.nan
-    f, _ = plot_connectivity_circle_edited(f_matrix[index_][:,index_], 
-                                            names[index_], 
-                                            node_colors=colors[index_],
-                                            node_size=f_matrix.sum(0)[index_]*3.5,
-                                            con_thresh = 15.,
-                                            title=title_,
-                                            node_angles=circular_layout(names, 
-                                                                        list(names),
-                                                                        ),
-                                            fontsize_title=19,
-                                            fontsize_names=13,
-                                            fontsize_colorbar=13,
-                                            colorbar_size=0.3,
-                                            #colormap='bwr',
-                                            #colormap='terrain',
-                                            #vmin=40,
-                                            fig=pl.figure(figsize=(16,16))
-                                            )
     
-    f.savefig(os.path.join(path, med+'_features.png'), facecolor='black')
-    plot_connectome(f_matrix, 
-                    coords, 
-                    colors, 
-                    3.5*f_matrix.sum(0)[index_],                    
-                    15.,
-                    os.path.join(path, med+'_features_brain.png'),
-                    order=index_,
-                    title=None,
-                    max_=100.,
-                    min_=20.,
-                    #display_='ortho'
-                    )
+        sign_matrix = get_signed_connectome(w_matrix, method=method)
+        plot_connectomics(sign_matrix,
+                          5*np.abs(sign_matrix.sum(axis=1))**2, 
+                          save_path=os.path.join(path, directory), 
+                          prename=condition+'_'+method+'_weights_decoding', 
+                          save=True,
+                          colormap=colormap_,
+                          vmin=np.abs(sign_matrix).max()*-1,
+                          vmax=np.abs(sign_matrix).max(),
+                          node_names=names_lr,
+                          node_colors=colors_lr,
+                          node_coords=coords,
+                          node_order=index_,
+                          networks=networks,
+                          threshold=1.2,
+                          title=title+' '+method         
+                          )
     
-    vmax = np.max(np.abs(w_matrix))
+
+    pl.close('all')
+    ##################################################################
+    within_between = dict()
+    for network in np.unique(networks):
+        within_between[network] = list()
+        for m_ in ['between', 'within']:
+            net_, mask_ = network_connections(w_matrix, network, networks, method=m_)
+            value_ = np.nanmean(net_[np.nonzero(net_)])
+            within_between[network].append(np.nan_to_num(value_))
+        
+
+    wb_meditation[med] = within_between
+
+
+###########################
+from matplotlib import colors
+
+_, idxnet = np.unique(networks, return_index=True)
+_, idx = np.unique(colors_lr, return_index=True)
+color_net = dict(zip(networks[np.sort(idxnet)], colors_lr[np.sort(idx)]))
+
+for meditation, connections in wb_meditation.iteritems():
     
-    # w_matrix[w_matrix == 0] = np.nan
+    pl.figure(figsize=(13.2,10), dpi=200)
     
-    f, _ = plot_connectivity_circle_edited(w_matrix[index_][:,index_], 
-                                            names[index_], 
-                                            node_colors=colors[index_],
-                                            node_size=1.5*np.abs(w_matrix).sum(0)[index_]**2.5,
-                                            con_thresh = 1.4,
-                                            title=title_,
-                                            node_angles=circular_layout(names, 
-                                                                        list(names),
-                                                                        ),
-                                            fontsize_title=19,
-                                            fontsize_names=13,
-                                            fontsize_colorbar=13,
-                                            colorbar_size=0.3,
-                                            colormap='bwr',
-                                            #colormap=cm_,
-                                            vmin=-3.,
-                                            vmax=3.,
-                                            fig=pl.figure(figsize=(16,16))
-                                            )
+    keys = np.sort(connections.keys())
+    values = list()
+    for k_, v_ in connections.iteritems():
+        values.append(v_)
+        lines_ = [pl.plot(v_, 'o-', c=color_net[k_], 
+                          markersize=20, linewidth=5, alpha=0.6, 
+                          label=k_)]
+         
+    values = np.array(values)
     
-    f.savefig(os.path.join(path, med+'_weights.png'), facecolor='black')  
-    plot_connectome(w_matrix, 
-                    coords, 
-                    colors, 
-                    4.*np.abs(w_matrix).sum(0)[index_]**2.,
-                    1.4,
-                    os.path.join(path, med+'_weights_brain.png'),
-                    order=index_,
-                    title=None,
-                    max_=3.,
-                    min_=-3.,
-                    cmap=pl.cm.bwr,
-                    #display_='ortho'
-                    )
+    pl.legend()
+    pl.ylabel("Average connection weight")
+    pl.xticks([0,1,1.4], ['Between-Network', 'WIthin-Network',''])
+    pl.title(meditation+' within- and between-networks average weights')
+    pl.savefig(os.path.join(path, directory,meditation+'_within_between.png'),
+               dpi=200)
+    
+
+
+
 
 #### Permutation ###
 

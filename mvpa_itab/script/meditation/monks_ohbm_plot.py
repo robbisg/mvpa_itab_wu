@@ -1,5 +1,7 @@
 from mvpa_itab.conn.io import ConnectivityLoader
-from mvpa_itab.conn.utils import copy_matrix, get_plot_stuff, aggregate_networks
+from mvpa_itab.conn.utils import get_plot_stuff, aggregate_networks,\
+    get_signed_connectome, network_connections
+from mvpa_itab.conn.operations import copy_matrix
 from mvpa_itab.conn.plot import *
 import nibabel as ni
 from scipy.stats.stats import zscore
@@ -24,6 +26,32 @@ def get_feature_selection_matrix(feature_set, n_features, mask):
 
 
 def get_feature_weights_matrix(weights, sets, mask, indices):
+    """
+    Function used to compute the average weight matrix in case of
+    several cross-validation folds and feature selection for each
+    fold.
+    
+    Parameters
+    ----------
+    weights : ndarray shape n_folds x n_selected_features
+        The weights matrix with the shape specified in the signature
+    sets : ndarray shape n_folds x n_selected_features
+        This represents the index in the square matrix of the feature selected 
+        by the algorithm in each cross-validation fold
+    mask : ndarray shape n_roi x n_roi 
+        The mask matrix of the valid ROIs selected. Important: this matrix
+        should be triangular with the lower part set to zero.
+    indices : tuple
+        This is equal to np.nonzero(mask)
+        
+    Returns
+    -------
+    matrix: ndarray n_roi x n_roi
+        It returns the average weights across cross-validation fold in
+        square form.
+    
+    """
+    
     
     weights = weights.squeeze()
     filling_vector = np.zeros(np.count_nonzero(mask))
@@ -243,6 +271,7 @@ def print_connections(matrix, labels, fname):
     
     
 def overlap_atlases():
+    
     overlapping = []
 
     for n, net in enumerate(findlab):
@@ -251,6 +280,8 @@ def overlap_atlases():
             over_roi = np.unique(maskd)[1:]
             print '%s %s: %s %s' % (str(n), str(sub_net), str(over_roi), collections.Counter(maskd[maskd!=0]))
             overlapping.append([n, sub_net, np.unique(maskd)[1:]])
+
+
 
 
 def bottom_up_script(directory, condition):
@@ -279,17 +310,22 @@ def bottom_up_script(directory, condition):
     w_aggregate = aggregate_networks(w_matrix, roi_list.T[-2])
     
     names_lr, colors_lr, index_, coords, networks = get_atlas_info(directory)
-    
     _, idx = np.unique(networks, return_index=True)
+          
+    connections = within_between(w_matrix, networks)
+    fig_ = plot_within_between_weights(connections, 
+                                       condition,
+                                       os.path.join(path, directory))
+    
     
     plot_connectomics(w_aggregate, 
-                      2*np.abs(w_aggregate.sum(axis=1))**2, 
-                      os.path.join(path, directory), 
-                      condition+'_aggregate_weights_regression', 
+                      5*np.abs(w_aggregate.sum(axis=1))**2, 
+                      save_path=os.path.join(path, directory), 
+                      prename=condition+'_aggregate_weights_regression', 
                       save=True,
                       colormap='bwr',
-                      vmin=-10.,
-                      vmax=10.,
+                      vmin=-1*w_aggregate.max(),
+                      vmax=w_aggregate.max(),
                       node_names=np.unique(networks),
                       node_colors=colors_lr[idx],
                       node_coords=coords[idx],
@@ -297,11 +333,64 @@ def bottom_up_script(directory, condition):
                       networks=np.unique(networks)                      
                       )
     
+    plot_connectomics(w_matrix,
+                      5*np.abs(w_matrix.sum(axis=1))**2, 
+                      save_path=os.path.join(path, directory), 
+                      prename=condition+'_weights_regression', 
+                      save=True,
+                      colormap='bwr',
+                      vmin=w_matrix.max()*-1,
+                      vmax=w_matrix.max(),
+                      node_names=names_lr,
+                      node_colors=colors_lr,
+                      node_coords=coords,
+                      node_order=index_,
+                      networks=networks,
+                      threshold=1.4,
+                      title=condition             
+                      )
+    
+    for method in ['positive', 'negative']:
+        aggregate = get_signed_connectome(w_aggregate, method=method)
+        colormap_ = 'bwr'
+    
+        plot_connectomics(aggregate, 
+                          5*np.abs(aggregate.sum(axis=1))**2, 
+                          save_path=os.path.join(path, directory), 
+                          prename=condition+'_'+method+'_aggregate_weights_regression', 
+                          save=True,
+                          colormap=colormap_,
+                          vmin=np.abs(aggregate).max()*-1,
+                          vmax=np.abs(aggregate).max(),
+                          node_names=np.unique(networks),
+                          node_colors=colors_lr[idx],
+                          node_coords=coords[idx],
+                          node_order=np.arange(0, len(idx)),
+                          networks=np.unique(networks),
+                          threshold=1.,
+                          title=condition+' '+method+' aggregate'                  
+                          )
+    
+
     
     
-    
-    
-    
+        sign_matrix = get_signed_connectome(w_matrix, method=method)
+        plot_connectomics(sign_matrix,
+                          5*np.abs(sign_matrix.sum(axis=1))**2, 
+                          save_path=os.path.join(path, directory), 
+                          prename=condition+'_'+method+'_weights_regression', 
+                          save=True,
+                          colormap=colormap_,
+                          vmin=np.abs(sign_matrix).max()*-1,
+                          vmax=np.abs(sign_matrix).max(),
+                          node_names=names_lr,
+                          node_colors=colors_lr,
+                          node_coords=coords,
+                          node_order=index_,
+                          networks=networks,
+                          threshold=1.2,
+                          title=condition+' '+method         
+                          )
     
     
     

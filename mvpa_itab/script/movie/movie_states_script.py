@@ -1,12 +1,14 @@
 from scipy.io import loadmat, savemat
 from scipy.signal import argrelextrema
-from mvpa_itab.conn.utils import copy_matrix, array_to_matrix
+from mvpa_itab.conn.operations import copy_matrix, array_to_matrix
 from scipy.spatial.distance import squareform, pdist, euclidean
 from scipy.signal._peak_finding import argrelmin
 from mvpa_itab.conn.states.states import get_min_speed_arguments,\
     calculate_metrics
 from mvpa_itab.conn.states.utils import *
 from mvpa_itab.conn.states.states import *
+import cPickle as pickle
+import os
 
 
 distance_fname = os.path.join('/media/robbis/DATA/fmri/movie_viviana/',
@@ -60,24 +62,17 @@ for condition in ['MOVIE', 'REST', 'SCRAMBLE']:
     data_, n_roi = get_data(fname % (condition))
     subj_min_speed, subj_speed = get_min_speed_arguments(data_)
     hist_arg = get_extrema_histogram(subj_min_speed, data_.shape[1])
-    X = data_[subj_min_speed]
+    X = data_[subj_min_speed] 
+    
     
     clustering_ = pickle.load(file(label_fname % (condition.lower()), 'r'))
     
     centroid_ = get_centroids(X, clustering_[3])
     dict_centroids[condition.lower()] = centroid_
-
-
-
-
     
+    plot_states_matrices(X, 
+                         clustering_[3], 
+                         '/media/robbis/DATA/fmri/movie_viviana/', 
+                         condition.lower())
 
-     
 
-
-
-        
-    
-    
-    
-    

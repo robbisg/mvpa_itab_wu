@@ -1,6 +1,6 @@
 # pylint: disable=maybe-no-member, method-hidden, undefined-variable
 from mvpa_itab.io.base import load_wu_file_list
-from mvpa_itab.connectivity import *
+from mvpa_itab.conn.connectivity import *
 from nitime.timeseries import TimeSeries
 from memory_profiler import profile
 

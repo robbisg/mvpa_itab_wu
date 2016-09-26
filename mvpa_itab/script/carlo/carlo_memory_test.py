@@ -24,8 +24,8 @@ from scipy.stats import ttest_ind
 from scipy.stats import ttest_1samp
 from numpy.random.mtrand import permutation
 
-#path = '/DATA11/roberto/fmri/memory/'
-path = '/home/robbis/fmri/memory/'
+path = '/DATA11/roberto/fmri/memory/'
+#path = '/home/robbis/fmri/memory/'
 
 
 if __debug__:
@@ -69,7 +69,6 @@ summarizers = [rs.SearchlightSummarizer()]
 savers = [rs.SearchlightSaver()]
 collection = rs.ResultsCollection(conf, path, summarizers)
 
-subjects = subjects[:3]
 
 for subj in subjects:
     
@@ -115,8 +114,6 @@ for subj in subjects:
     
     cv_storage = StoreResults()
 
-    
-    
     clf = LinearCSVMC(C=1)
                 
     # This is used for the sklearn crossvalidation
