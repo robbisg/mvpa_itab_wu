@@ -48,13 +48,15 @@ def kl_criterion(X, labels, previous_labels=None, next_labels=None, precomputed=
     
     n_cluster = len(np.unique(labels))
     
+    """
     if n_cluster <= 1 or previous_labels==None or next_labels==None:
         return 0
+    """
     
     n_prev_clusters = len(np.unique(previous_labels))
     n_next_clusters = len(np.unique(next_labels))
     
-    if n_cluster != n_next_clusters -1 or  n_prev_clusters +1 != n_cluster:
+    if n_cluster != n_next_clusters-1 or n_prev_clusters+1 != n_cluster:
         return 0
     
     M_previous = m(X, previous_labels, precomputed=precomputed)

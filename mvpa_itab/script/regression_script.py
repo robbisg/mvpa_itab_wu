@@ -1,9 +1,9 @@
 import numpy as np
 import scipy as sp
-from mvpa_itab.stats import Correlation, CrossValidation
+from mvpa_itab.stats.base import Correlation, CrossValidation
 from mvpa_itab.conn.io import ConnectivityLoader
 from sklearn.metrics.metrics import mean_squared_error, r2_score
-from mvpa_itab.stats import RegressionPermutation
+from mvpa_itab.stats.base import RegressionPermutation
 from mvpa_itab.measure import correlation
 from mvpa_itab.results import RegressionAnalysis
 

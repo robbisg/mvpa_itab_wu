@@ -205,6 +205,7 @@ def plot_transfer_graph(path, name, results):
     rep.close()  
     plt.close('all')
 
+
 def plot_clusters_graph(path, name, results):
     
     

@@ -439,7 +439,7 @@ def permutation_test(ds, labels, analysis, n_permutation=1000):
     
     null_dist = []
     
-    for i in range(n_permutation):
+    for _ in range(n_permutation):
         p_labels = permutation(labels)
         t_, _ = analysis.run(ds, p_labels)
         

@@ -6,10 +6,11 @@ from mvpa_itab.conn.utils import get_atlas90_coords, get_findlab_coords,\
     get_atlas_info
 import os
 from scipy.stats import zscore
+from numpy.ma.core import masked_array
 
 
 
-def plot_matrix(matrix, roi_names, networks, **kwargs):
+def plot_matrix(matrix, roi_names, networks, threshold=0, zscore=True, **kwargs):
     """
     This function is used to plot connections in square matrix form.
     
@@ -24,6 +25,9 @@ def plot_matrix(matrix, roi_names, networks, **kwargs):
             
     networks : list of p string
             List of names representing the networks subdivision
+            
+    threshold : int
+            Indicates the value of the most important connections
             
     ticks_type : {'networks', 'roi'}, optional
             Indicates if the tick names should be ROI or networks
@@ -49,7 +53,8 @@ def plot_matrix(matrix, roi_names, networks, **kwargs):
     
     _plot_cfg = {'ticks_type':'networks',
                  'ticks_color':get_atlas_info('findlab')[1],
-                 'facecolor':'k'
+                 'facecolor':'k',
+                 'zscore': True
                  }
     
     
@@ -68,13 +73,32 @@ def plot_matrix(matrix, roi_names, networks, **kwargs):
     
     max_value = np.max(np.abs(matrix))
     
-    ax = a.imshow(matrix, 
+    # plot gray values
+    print _plot_cfg['zscore']
+    if _plot_cfg['zscore'] == True:
+        z_matrix = (matrix - matrix.mean())/matrix.std()
+    else:
+        z_matrix = matrix
+    
+    max_value = np.max(np.abs(z_matrix))
+    ax = a.imshow(z_matrix, 
                   interpolation='nearest', 
-                  cmap=plt.cm.bwr,
+                  cmap=plt.cm.RdBu_r,
+                  #cmap='Greys',
+                  alpha=0.5,
                   vmax=max_value,
                   vmin=max_value*-1
                   )
     
+    # plot colored values
+    thresh_matrix = masked_array(z_matrix, (np.abs(z_matrix) < threshold))
+    ax = a.imshow(thresh_matrix,
+                  interpolation='nearest', 
+                  cmap=plt.cm.bwr,
+                  #cmap='gray',
+                  vmax=max_value,
+                  vmin=max_value*-1,
+                  )    
 
     min_ = -0.5
     max_ = len(networks) + 0.5
@@ -285,8 +309,13 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
     
     # get the connections which we are drawing and sort by connection strength
     # this will allow us to draw the strongest connections first
+    
+    # This is to plot in gray the lower connections
+    draw_thresh = con_thresh / 1.5
+    
     con_abs = np.abs(con)
-    con_draw_idx = np.where(con_abs >= con_thresh)[0]
+    con_draw_idx = np.where(con_abs >= draw_thresh)[0]
+    #con_draw_idx = np.where(con_abs >= con_thresh)[0]
 
     con = con[con_draw_idx]
     con_abs = con_abs[con_draw_idx]
@@ -327,7 +356,9 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
     
     # get the colormap
     if isinstance(colormap, string_types):
+        str_cmap = colormap
         colormap = plt.get_cmap(colormap)
+        
 
     # Make figure background the same colors as axes
     if fig is None:
@@ -358,7 +389,8 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
 
     # scale connectivity for colormap (vmin<=>0, vmax<=>1)
     con_val_scaled = (con - vmin) / vrange
-
+    con_thresh_scaled = (con_thresh - vmin) / vrange
+    
     # Finally, we draw the connections
     for pos, (i, j) in enumerate(zip(indices[0], indices[1])):
         # Start point
@@ -375,12 +407,21 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
         codes = [m_path.Path.MOVETO, m_path.Path.CURVE4, m_path.Path.CURVE4,
                  m_path.Path.LINETO]
         path = m_path.Path(verts, codes)
+        
+        if np.abs(con[pos]) <= con_thresh:
+            #colormap = plt.get_cmap('gray')
+            alpha=0.37
+            mult=1
+        else:
+            colormap = plt.get_cmap(str_cmap)
+            alpha=0.8
+            mult=np.abs(con[pos])*2.5
 
         color = colormap(con_val_scaled[pos])
 
         # Actual line
         patch = m_patches.PathPatch(path, fill=False, edgecolor=color,
-                                    linewidth=linewidth, alpha=1., zorder=0)
+                                    linewidth=linewidth**mult, alpha=alpha, zorder=0)
         axes.add_patch(patch)
 
     # Draw ring with colored nodes
@@ -511,7 +552,9 @@ def plot_connectomics(matrix,
                  'facecolor':'black',
                  'dpi':150,
                  'name':'weights',
-                 'title':'Connectome'               
+                 'title':'Connectome',
+                 'filetype':'png',
+                 'zscore': True      
                 }
     
     
@@ -533,7 +576,6 @@ def plot_connectomics(matrix,
     node_colors = colors_lr[index_]
     node_size = node_size[index_]
     
-    
     f, _ = plot_connectivity_circle_edited(matrix, 
                                             names_lr, 
                                             node_colors=node_colors,
@@ -554,7 +596,7 @@ def plot_connectomics(matrix,
                                             )
             
     if save == True:
-        fname = "%s_features_%s.png" % (prename, _plot_cfg['name'])
+        fname = "%s_features_%s.%s" % (prename, _plot_cfg['name'], _plot_cfg['filetype'])
         
         f.savefig(os.path.join(save_path, fname),
                           facecolor=_plot_cfg['facecolor'],
@@ -565,7 +607,10 @@ def plot_connectomics(matrix,
         
         fname = None
         if save == True:
-            fname = "%s_connectome_feature_%s_%s.png" %(prename, _plot_cfg['name'], d_)
+            fname = "%s_connectome_feature_%s_%s.%s" %(prename, 
+                                                       _plot_cfg['name'], 
+                                                       d_,
+                                                       _plot_cfg['filetype'])
             fname = os.path.join(save_path, fname)
             
         plot_connectome(matrix, 
@@ -581,13 +626,16 @@ def plot_connectomics(matrix,
                         min_=_plot_cfg['vmin']
                         )
         
+
+    f = plot_matrix(matrix, _, networks, threshold=_plot_cfg['threshold'],
+                                            zscore=_plot_cfg['zscore'])
     
-    f = plot_matrix(matrix, _, networks)
     if save == True:
-        fname = "%s_matrix_%s.png" %(prename, _plot_cfg['name'])
+        fname = "%s_matrix_%s.%s" %(prename, _plot_cfg['name'], _plot_cfg['filetype'])
         f.savefig(os.path.join(save_path, fname),
                           facecolor=_plot_cfg['facecolor'],
                           dpi=_plot_cfg['dpi'])
+
 
 
 def plot_regression_errors(errors, 

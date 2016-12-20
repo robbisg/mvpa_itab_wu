@@ -3,8 +3,10 @@ import os
 import nibabel as ni
 import numpy as np
 from mvpa_itab.conn.connectivity import glm, get_bold_signals, load_matrices, z_fisher
+from mvpa_itab.conn.operations import copy_matrix
 from nitime.timeseries import TimeSeries
 import itertools
+from scipy.stats.stats import zscore
 
 
 
@@ -261,6 +263,7 @@ def aggregate_networks(matrix, roi_list):
         mask_roi = np.meshgrid(mask1, mask1)[1] * np.meshgrid(mask2, mask2)[0]
         
         value = np.sum(matrix * mask_roi)
+        #value /= np.sum(mask_roi)
         
         aggregate_matrix[x, y] = value
     
@@ -271,8 +274,8 @@ def aggregate_networks(matrix, roi_list):
     for i, n in enumerate(unique_rois):
         
         diag_matrix, _ = network_connections(matrix, n, roi_list)
-        aggregate_matrix[i, i] = np.sum(diag_matrix)
-        
+        aggregate_matrix[i, i] = np.sum(diag_matrix) 
+        # aggregate_matrix[i, i] = np.mean(diag_matrix) 
     
     return aggregate_matrix
         
@@ -312,4 +315,45 @@ def within_between(matrix, networks):
     
     return wb_results        
         
+
+def get_feature_weights_matrix(weights, sets, mask, indices):
+    """
+    Function used to compute the average weight matrix in case of
+    several cross-validation folds and feature selection for each
+    fold.
+    
+    Parameters
+    ----------
+    weights : ndarray shape n_folds x n_selected_features
+        The weights matrix with the shape specified in the signature
+    sets : ndarray shape n_folds x n_selected_features
+        This represents the index in the square matrix of the feature selected 
+        by the algorithm in each cross-validation fold
+    mask : ndarray shape n_roi x n_roi 
+        The mask matrix of the valid ROIs selected. Important: this matrix
+        should be triangular with the lower part set to zero.
+    indices : tuple
+        This is equal to np.nonzero(mask)
         
+    Returns
+    -------
+    matrix: ndarray n_roi x n_roi
+        It returns the average weights across cross-validation fold in
+        square form.
+    
+    """
+    
+    
+    weights = weights.squeeze()
+    filling_vector = np.zeros(np.count_nonzero(mask))
+    counting_vector = np.zeros(np.count_nonzero(mask))
+    
+    for s, w in zip(sets, weights):
+        filling_vector[s] += zscore(w)
+        counting_vector[s] += 1
+        
+    avg_weigths = np.nan_to_num(filling_vector/counting_vector)
+    mask[indices] = avg_weigths    
+    matrix = np.nan_to_num(copy_matrix(mask, diagonal_filler=0))
+    
+    return matrix

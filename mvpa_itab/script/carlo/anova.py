@@ -1,67 +1,94 @@
-import itertools
+import numpy as np
 import nibabel as ni
+import os
+from mvpa_itab.stats.anova import design_matrix, build_contrast, anova_ftest
+from mvpa_itab.io.carlo_utils import load_total_subjects
+import itertools
+     
 
-path = '/media/robbis/DATA/fmri/memory/0_results/balanced_analysis/local/'
-
-levels = [1,3,5]
-conditions = ['memory']#, 'memory']
-
-groups = ['group1', 'group2']
-
-product_iter = itertools.product(conditions, groups, levels)
-
-total_ = []
-design_matrix = []
-n_factors = len(levels) + len(conditions) + len(groups)
-
-for cond_, group_, lev_ in product_iter:
+def analysis(path, 
+             subjects, 
+             file_pattern,
+             factor_index=2,
+             test="zero",
+             **kwargs):
     
-    fname = "%s_%s_evidence_%s_total.nii.gz" % (group_, cond_, str(lev_))
-    print fname
+    default_conf = {
+                    'subject': subjects,
+                    'experiment':['memory', 'evidence'],
+                    'level': [1,3,5],
+                    'ds_num' : [1,2,3,4,5]  ,
+                    'ds_type':['BETA']                  
+                    }
     
-    img_ = ni.load(os.path.join(path, fname))
+    # path = '/home/robbis/mount/fmri/memory/0_results/sl_k_3/'
     
-    total_.append(img_.get_data())
+    default_conf.update(kwargs)
     
-    matrix_ = np.zeros((img_.shape[-1], n_factors))
-    
-    index_cond = np.nonzero(np.array(conditions) == cond_)[0][0]
-    index_group = np.nonzero(np.array(groups) == group_)[0][0] + len(conditions)
-    index_level = np.nonzero(np.array(levels) == lev_)[0][0] + len(conditions) + len(groups)
-    
-    matrix_[:, index_cond] = 1
-    matrix_[:, index_group] = 1
-    matrix_[:, index_level] = 1
-    
-    design_matrix.append(matrix_)
+    #file_pattern="%s_%s_%s_MVPA_evidence_%s_balance_ds_%s_radius_3_searchlight_total_map_mean_demenead.nii.gz"
 
-design_matrix = np.vstack(design_matrix)
-total_matrix = np.concatenate(total_, axis=3)
-
-mask_ = total_matrix.mean(3) > 0.05
-mask_index = np.array(np.nonzero(mask_)).T
-threshold_ = total_matrix[mask_].mean()
-#threshold_ = 0.5
-
-import statsmodels.api as sm
-
-contrast = [[1,0.5,0.5,1,0,0], [1,0.5,0.5,0,1,0],[1,0.5,0.5,0,0,1]]
-#const_terms = [0.5, 0.5, 0.5] # chance level
-const_terms = [threshold_, threshold_, threshold_] 
-
-result_shape = list(img_.shape[:-1]) + [2]
-result_map = np.zeros(result_shape)
-
-for x, y, z in mask_index:
-    res = sm.OLS(total_matrix[x, y, z], design_matrix).fit()
-    f_test = res.f_test((contrast, const_terms))
-    values_ = [f_test.fvalue.squeeze(), f_test.pvalue]
+    data, labels, affine = load_total_subjects(path,
+                                               subjects,
+                                               file_pattern=file_pattern,
+                                               **kwargs)
     
-    result_map[x,y,z] = np.array(values_)
-    
-fname = "_%s_omnibus_threshold_%s.nii.gz" % (cond_, str(threshold_)[:5])
-ni.save(ni.Nifti1Image(result_map, img_.get_affine()),os.path.join(path, fname))
+    mask_ = np.abs(data.mean(3)) > 0.01
+    mask_index = np.array(np.nonzero(mask_)).T
     
     
+    X, factor_labels, factor_num = design_matrix(labels)
+        
+    contrast, const_terms = build_contrast(factor_num, factor_index, test)
+    
+    map_ = anova_ftest(data, X, contrast, const_terms, mask_index)
+    
+    str_join = '_'
+    filetype = file_pattern[file_pattern.find('map'):file_pattern.find('.nii.')]
+    save_fname = "anova_test_%s_%s_%s_%s.nii.gz" % (
+                                                    filetype,
+                                                    str_join.join(default_conf['experiment']),
+                                                    default_conf.keys()[factor_index],
+                                                    test                                             
+                                                    )
 
+    ni.save(ni.Nifti1Image(map_, affine), 
+            os.path.join(path, save_fname))
+    
+    return map_
+    
+################################################
+
+experiments = [#'memory', 
+               'decision']
+stable_file_pattern = "%s_%s_%s_MVPA_evidence_%s_balance_ds_%s_radius_3_searchlight_total_map"
+
+file_patterns = [
+                 #stable_file_pattern+".nii.gz",
+                 #stable_file_pattern+"_mean_demenead.nii.gz",
+                 stable_file_pattern+"_demeaned.nii.gz",
+                 stable_file_pattern+"_mean.nii.gz",                 
+                 ]
+
+
+tests = ["zero", "all"]
+
+confs = itertools.product(experiments, file_patterns, tests)
+path = '/home/robbis/mount/fmri/memory/0_results/sl_k_3/'
+
+maps_ = []
+
+for elements in confs:
+    print elements
+    map_ = analysis(path, 
+                     subjects, 
+                     file_pattern=elements[1],
+                     test=elements[2],
+                     experiment=[elements[0]])
+    
+    maps_.append(map_)
+    
+    
+
+
+    
 

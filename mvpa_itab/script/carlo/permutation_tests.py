@@ -70,7 +70,7 @@ savers = [rs.SearchlightSaver()]
 collection = rs.ResultsCollection(conf, path, summarizers)
 
 
-for subj in subjects:
+#for subj in subjects:
     
     data_type = 'BETA_MVPA'
     conf = read_configuration(path, 'memory.conf', data_type)

@@ -1,6 +1,5 @@
 from mvpa_itab.conn.io import ConnectivityLoader
-from mvpa_itab.conn.utils import get_plot_stuff, aggregate_networks,\
-    get_signed_connectome, network_connections
+from mvpa_itab.conn.utils import *
 from mvpa_itab.conn.operations import copy_matrix
 from mvpa_itab.conn.plot import *
 import nibabel as ni
@@ -25,47 +24,7 @@ def get_feature_selection_matrix(feature_set, n_features, mask):
     return np.nan_to_num(copy_matrix(mask, diagonal_filler=0))
 
 
-def get_feature_weights_matrix(weights, sets, mask, indices):
-    """
-    Function used to compute the average weight matrix in case of
-    several cross-validation folds and feature selection for each
-    fold.
-    
-    Parameters
-    ----------
-    weights : ndarray shape n_folds x n_selected_features
-        The weights matrix with the shape specified in the signature
-    sets : ndarray shape n_folds x n_selected_features
-        This represents the index in the square matrix of the feature selected 
-        by the algorithm in each cross-validation fold
-    mask : ndarray shape n_roi x n_roi 
-        The mask matrix of the valid ROIs selected. Important: this matrix
-        should be triangular with the lower part set to zero.
-    indices : tuple
-        This is equal to np.nonzero(mask)
-        
-    Returns
-    -------
-    matrix: ndarray n_roi x n_roi
-        It returns the average weights across cross-validation fold in
-        square form.
-    
-    """
-    
-    
-    weights = weights.squeeze()
-    filling_vector = np.zeros(np.count_nonzero(mask))
-    counting_vector = np.zeros(np.count_nonzero(mask))
-    
-    for s, w in zip(sets, weights):
-        filling_vector[s] += zscore(w)
-        counting_vector[s] += 1
-        
-    avg_weigths = np.nan_to_num(filling_vector/counting_vector)
-    mask[indices] = avg_weigths    
-    matrix = np.nan_to_num(copy_matrix(mask, diagonal_filler=0))
-    
-    return matrix
+
 
 
 
@@ -78,10 +37,6 @@ def get_node_size(matrix, absolute=True):
     return matrix.sum(axis=0)
 
 
-
-
-  
-    
     
 def load_results(path, directory, condition, result_type='values'):
     
@@ -302,8 +257,10 @@ def bottom_up_script(directory, condition):
     mask_indices = np.nonzero(mask_)
     n_features = np.count_nonzero(mask_)
     
-    w_matrix = get_feature_weights_matrix(values_['weights_'], 
-                                          values_['sets_'], 
+    w_matrix = get_feature_weights_matrix(values_['weights_'], # Regression
+                                          #values_['features'], # Decoding
+                                          values_['sets_'],  # Regression
+                                          #values_['weights'], # Decoding
                                           mask_, 
                                           mask_indices)
     
@@ -321,7 +278,7 @@ def bottom_up_script(directory, condition):
     plot_connectomics(w_aggregate, 
                       5*np.abs(w_aggregate.sum(axis=1))**2, 
                       save_path=os.path.join(path, directory), 
-                      prename=condition+'_aggregate_weights_regression', 
+                      prename=condition+'_aggregate_weights_regression_new', 
                       save=True,
                       colormap='bwr',
                       vmin=-1*w_aggregate.max(),
@@ -330,13 +287,14 @@ def bottom_up_script(directory, condition):
                       node_colors=colors_lr[idx],
                       node_coords=coords[idx],
                       node_order=np.arange(0, len(idx)),
-                      networks=np.unique(networks)                      
+                      networks=np.unique(networks),
+                      threshold=2                 
                       )
     
     plot_connectomics(w_matrix,
-                      5*np.abs(w_matrix.sum(axis=1))**2, 
+                      20+15*np.abs(w_matrix.sum(axis=1))**1.5, 
                       save_path=os.path.join(path, directory), 
-                      prename=condition+'_weights_regression', 
+                      prename=condition+'_weights_regression_new', 
                       save=True,
                       colormap='bwr',
                       vmin=w_matrix.max()*-1,
@@ -346,9 +304,10 @@ def bottom_up_script(directory, condition):
                       node_coords=coords,
                       node_order=index_,
                       networks=networks,
-                      threshold=1.4,
+                      threshold=1.62,
                       title=condition             
                       )
+    pl.close('all')
     
     for method in ['positive', 'negative']:
         aggregate = get_signed_connectome(w_aggregate, method=method)
@@ -389,8 +348,71 @@ def bottom_up_script(directory, condition):
                           node_order=index_,
                           networks=networks,
                           threshold=1.2,
-                          title=condition+' '+method         
+                          title=condition+' '+method     
                           )
     
+
+def write_correlation_matrices(directory, condition):
+    subjects = np.loadtxt('/media/robbis/DATA/fmri/monks/attributes_struct.txt',
+                      dtype=np.str)
+    
+    roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
+                          delimiter=',',
+                          dtype=np.str)
     
     
+    path = '/media/robbis/DATA/fmri/monks/0_results/'
+    conn = ConnectivityLoader(path, subjects, directory, roi_list)
+    nan_mask = conn.get_results(['Samatha', 'Vipassana'])
+    #nan_mask = conn.get_results(['Rest'])
+    ds = conn.get_dataset()
+    mask_ = np.float_(~np.bool_(nan_mask))
+    mask_ = np.triu(mask_, k=1)
+    mask_indices = np.nonzero(mask_)
+    
+    ds_ = ds[np.logical_and(ds.targets == condition, ds.sa.groups == 'E')]
+    
+    array_ = ds_.samples.mean(0)
+    
+    mask_[mask_indices] = array_    
+    matrix = np.nan_to_num(copy_matrix(mask_, diagonal_filler=0))
+    
+    names_lr, colors_lr, index_, coords, networks = get_atlas_info('findlab')
+    
+    plot_connectomics(matrix,
+                          20+8*np.abs(matrix.sum(axis=1))**2, 
+                          save_path=os.path.join(path, directory), 
+                          prename=condition+'_correlation', 
+                          save=True,
+                          colormap='bwr',
+                          vmin=np.abs(matrix).max()*-1,
+                          vmax=np.abs(matrix).max(),
+                          node_names=names_lr,
+                          node_colors=colors_lr,
+                          node_coords=coords,
+                          node_order=index_,
+                          networks=networks,
+                          threshold=0.5,
+                          title=condition+' Correlation',
+                          zscore=False,       
+                          )
+    
+    w_aggregate = aggregate_networks(matrix, roi_list.T[-2])
+    _, idx = np.unique(networks, return_index=True)
+    
+    plot_connectomics(w_aggregate, 
+                      5*np.abs(w_aggregate.sum(axis=1))**2, 
+                      save_path=os.path.join(path, directory), 
+                      prename=condition+'_aggregate_correlation', 
+                      save=True,
+                      colormap='bwr',
+                      vmin=-1*w_aggregate.max(),
+                      vmax=w_aggregate.max(),
+                      node_names=np.unique(networks),
+                      node_colors=colors_lr[idx],
+                      node_coords=coords[idx],
+                      node_order=np.arange(0, len(idx)),
+                      networks=np.unique(networks),
+                      threshold=4,
+                      zscore=False                
+                      )

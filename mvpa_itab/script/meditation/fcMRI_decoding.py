@@ -1,21 +1,26 @@
-from scipy.io import savemat
 import numpy as np
 import os
-from mvpa_itab.connectivity import load_matrices, z_fisher, plot_matrix
+
 from nitime.analysis import SeedCorrelationAnalyzer
 from nitime.timeseries import TimeSeries
-from scipy.io import loadmat
+
+from scipy.io import loadmat, savemat
 from scipy.stats import ttest_ind
 from scipy.stats import zscore as sscore
+
 from mvpa_itab.io.base import load_dataset
-from mvpa_itab.conn.io import load_fcmri_dataset, copy_matrix,\
-    ConnectivityLoader
-from mvpa2.clfs.svm import LinearCSVMC
-from mvpa2.mappers.zscore import zscore
-from mvpa_itab.conn.plot import get_plot_stuff, get_atlas_info,\
-    plot_connectivity_circle_edited, plot_connectome
-from ubuntu_sso.networkstate.networkstates import NetworkState
-#from scipy.stats.stats import zscore
+from mvpa2.suite import *
+
+from mvpa_itab.conn.io import load_fcmri_dataset,ConnectivityLoader
+from mvpa_itab.conn.operations import copy_matrix, array_to_matrix
+from mvpa_itab.conn.connectivity import load_matrices, z_fisher
+from mvpa_itab.conn.plot import get_atlas_info, plot_connectome, \
+                plot_connectivity_circle_edited, plot_connectomics
+from mvpa_itab.conn.utils import aggregate_networks, get_signed_connectome,\
+    network_connections
+from sklearn.svm.classes import SVC
+
+import cPickle as pickle
 
 path = '/media/robbis/DATA/fmri/monks/0_results/'
 
@@ -69,18 +74,19 @@ for r in results_dir:
 file_ = open(os.path.join('/media/robbis/DATA/fmri/monks/', '0_results', 'results_decoding_new.txt'), 'w')
 line_ = ""
 results_dir = ['20140513_163451_connectivity_fmri']
+#results_dir = ['20151030_141350_connectivity_filtered_first_no_gsr_findlab_fmri']
 
 for r in results_dir:
     print '··········· '+r+' ·············'
     conn = ConnectivityLoader(path, subjects, r, roi_list)
     nan_mask = conn.get_results(['Samatha', 'Vipassana'])
-    
+    #nan_mask = conn.get_results(['Rest'])
     ds = conn.get_dataset()
     '''
     fx = mean_group_sample(['subjects', 'meditation'])
     ds = ds.get_mapped(fx)  
     '''
-    clf = LinearCSVMC(C=10)
+    clf = LinearCSVMC(C=1)
     # clf = RbfCSVMC()
     ds.targets = ds.sa.groups
     
@@ -107,7 +113,7 @@ for r in results_dir:
     feature_selected = dict()
     feature_weights = dict()
     
-    for med in ['Samatha','Vipassana']:
+    for med in ['Samatha', 'Vipassana']:
         #print '----------%s-------------' % (med)
         results[med] = []
         feature_selected[med] = np.zeros_like(ds.samples[0])
@@ -155,6 +161,16 @@ file_.close()
 directory = r
 save_path = path
 wb_meditation = dict()
+
+feature_selected = pickle.load(open(os.path.join(path, 
+                                                 r, 
+                                                 'feature_selected_500_ds_balancing_final.obj'),
+                                    'r'))
+feature_weights = pickle.load(open(os.path.join(path, 
+                                                r, 
+                                                'feature_weights_500_ds_balancing_final.obj'),
+                                   'r'))
+
 for med, l_ in zip(['Samatha','Vipassana'], ['(FA)', '(OM)']):
     
     f_array = feature_selected[med].copy()
@@ -193,7 +209,7 @@ for med, l_ in zip(['Samatha','Vipassana'], ['(FA)', '(OM)']):
                       5*np.abs(w_aggregate.sum(axis=1))**2, 
                       save_path=os.path.join(path, directory), 
                       prename=condition+'_aggregate_weights_decoding', 
-                      save=True,
+                      save=False,
                       colormap='bwr',
                       vmin=-1*w_aggregate.max(),
                       vmax=w_aggregate.max(),
@@ -209,7 +225,7 @@ for med, l_ in zip(['Samatha','Vipassana'], ['(FA)', '(OM)']):
                       5*np.abs(w_matrix.sum(axis=1))**2, 
                       save_path=os.path.join(path, directory), 
                       prename=condition+'_weights_decoding', 
-                      save=True,
+                      save=False,
                       colormap='bwr',
                       vmin=w_matrix.max()*-1,
                       vmax=w_matrix.max(),
@@ -302,7 +318,7 @@ for meditation, connections in wb_meditation.iteritems():
     
     pl.legend()
     pl.ylabel("Average connection weight")
-    pl.xticks([0,1,1.4], ['Between-Network', 'WIthin-Network',''])
+    pl.xticks([0,1,1.4], ['Between-Network', 'Within-Network',''])
     pl.title(meditation+' within- and between-networks average weights')
     pl.savefig(os.path.join(path, directory,meditation+'_within_between.png'),
                dpi=200)
@@ -313,20 +329,21 @@ for meditation, connections in wb_meditation.iteritems():
 
 #### Permutation ###
 
+
 r = ''
 
-conn = ConnectivityTest(path, subjects, r, roi_list)
-conn.get_results(['Samatha', 'Vipassana'])
+conn = ConnectivityLoader(path, subjects, r, roi_list)
+conn.get_results(['Rest'])
 
 ds = conn.get_dataset()
 '''
 fx = mean_group_sample(['subjects', 'meditation'])
 ds = ds.get_mapped(fx)  
 '''
-#clf = LinearCSVMC(C=10)
+clf = LinearCSVMC(C=1) # C=10
 
-skclf = SVC(C=10, kernel='linear', class_weight='balanced')
-clf = SKLLearnerAdapter(skclf)   
+#skclf = SVC(C=10, kernel='linear', class_weight='balanced')
+#clf = SKLLearnerAdapter(skclf)   
 
 
 ds.targets = ds.sa.groups
@@ -346,25 +363,25 @@ results_weight = dict()
 
 n_permutations = 2000
  
-for med in ['Samatha','Vipassana']:
+for med in ['Rest']:
     #print '----------%s-------------' % (med)
     results_weight[med] = []
     
     ds_med = ds[ds.sa.meditation == med]
     #zscore(ds_med, chunks_attr='subjects')  
-    '''
+    
     balancer = Balancer(count=1, apply_selection=True)#, limit='subjects')
     gen = balancer.generate(ds_med)
     ds_ = gen.next()
     for i in range(n_permutations):
         #print '---------'
-        ds_.targets = permutation(ds_.targets)
+        ds_.targets = np.random.permutation(ds_.targets)
         err = cv(ds_)
         results_weight[med].append(1 - np.mean(err))
-    '''    
+       
         #print cv.ca.stats
-    err = cv(ds_med)
-    print cv.ca.stats
+    #err = cv(ds_med)
+    #print cv.ca.stats
         
                
         

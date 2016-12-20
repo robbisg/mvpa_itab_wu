@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats.stats import zscore
-from mvpa_itab.stats import Correlation
+from mvpa_itab.stats.base import Correlation
 from mvpa_itab.measure import ranking_correlation
 from sklearn.cross_validation import ShuffleSplit
 from sklearn.svm.classes import SVR
@@ -75,7 +75,7 @@ class RegressionAnalysisPipeline(Pipeline):
         filter  (e.g. {'meditation':'Samatha', 'groups':'E'})
             -- filter_keywords were used to build the filter
                 e.g. meditation: Vipassana will overwrite the filter
-        fs_algorithm  (e.g. mvpa_itab.stats.Correlation)
+        fs_algorithm  (e.g. mvpa_itab.stats.base.Correlation)
         fs_ranking_fx (e.g. mvpa_itab.measures.ranking_correlation)
         cv_schema (e.g. ShuffleSplit(num_exp_subjects, n_iter=cv_repetitions, test_size=cv_fraction)
         learner (e.g. SVR(kernel='linear', C=1))

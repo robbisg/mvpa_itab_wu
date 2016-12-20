@@ -235,7 +235,7 @@ group1 = ['110929angque',
  '120126andspo',]
 
 tasks = ['memory', 'decision']
-evidences = [1,3,5]
+evidences = [1, 3, 5]
 result = dict()
 keys_ = ['group1', 'group2']
 ds_list = [1]
@@ -256,7 +256,7 @@ for t_ in tasks:
             subj_map = []
             
             if t_ == 'decision':
-                ds_list = [1,2,3,4,5]
+                ds_list = [1, 2, 3, 4, 5]
             else:
                 ds_list = [1]
 

@@ -1,9 +1,9 @@
 import numpy as np
-from mvpa_itab.stats import CrossValidation
+from mvpa_itab.stats.base import CrossValidation
 from scipy.stats.stats import zscore
 from mvpa_itab.conn.io import ConnectivityLoader
 import os
-from mvpa_itab.stats import Correlation
+from mvpa_itab.stats.base import Correlation
 from mvpa_itab.measure import ranking_correlation
 from sklearn.cross_validation import ShuffleSplit
 from sklearn.svm.classes import SVR

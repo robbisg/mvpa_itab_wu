@@ -5,7 +5,7 @@ import logging
 from scipy.stats import ttest_1samp
 import pickle
 from scipy.stats.stats import zscore
-from mvpa_itab.stats import Correlation
+from mvpa_itab.stats.base import Correlation
         
 
 
