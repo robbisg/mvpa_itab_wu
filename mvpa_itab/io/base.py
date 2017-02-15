@@ -367,18 +367,14 @@ def load_mask(path, subj, **kwargs):
 def load_mask_wu(path, subj, **kwargs):
     
 
-    mask_area = ['total']
-    
-    for arg in kwargs:
-        if (arg == 'mask_area'):
-            mask_area = kwargs[arg].split(',')
-  
-    #Mask issues    
+    mask_area = ['total']   
     roi_folder = '1_single_ROIs'
     isScaled = False
     sub_dir = ['none']
     
     for arg in kwargs:
+        if (arg == 'mask_area'):
+            mask_area = kwargs[arg].split(',')
         if (arg == 'roi_folder'):
             roi_folder = kwargs[arg]
         if (arg == 'coords'): #To be implemented

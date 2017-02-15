@@ -557,7 +557,13 @@ def signal_detection_measures(confusion_):
     
     return result
     
-def subjects_merged_ds(path, subjects, conf_file, task, extra_sa=None, **kwargs):
+def subjects_merged_ds(path, 
+                       subjects, 
+                       conf_file, 
+                       task, 
+                       extra_sa=None, 
+                       subject_file=None, 
+                       **kwargs):
     """
     extra_sa: dict or None, sample attributes added to the final dataset, they should be
     the same length as the subjects.
@@ -565,11 +571,19 @@ def subjects_merged_ds(path, subjects, conf_file, task, extra_sa=None, **kwargs)
     """
     
     conf = read_configuration(path, conf_file, task)
-   
-    for arg in kwargs:
-        conf[arg] = kwargs[arg]
+           
+    conf.update(kwargs)
     
     data_path = conf['data_path']
+
+    if subject_file != None:
+        subject_array = np.genfromtxt(subject_file, 
+                                      delimiter=',', 
+                                      dtype=np.string_)
+        
+        subjects = subject_array[1:,0]
+        extra_sa = {a[0]:a[1:] for a in subject_array.T}
+    
     
     i = 0
 
