@@ -19,7 +19,7 @@ subjects = ['110929angque',
              '111020adefer',
              '111020mardep',
              '111027ilepac',
-              '111123marcai',
+             '111123marcai',
               '111123roblan',
               '111129mirgra',
               '111202cincal',
@@ -43,9 +43,10 @@ mask = ni.Nifti1Image(np.int_(masks_ > 0.5)[...,:np.newaxis], img.get_affine())
 
 # Load data
 path = '/media/robbis/DATA/fmri/memory/0_results/permutation/'
-pattern = "%s_permutation_3_memory_3_float32.nii.gz"
+path = '/home/robbis/fmri/memory/0_results/permutation/'
+pattern = "%s_permutation_3_memory_3_float32_demeaned.nii.gz"
 
-img_list = [ni.load(os.path.join(path, pattern %(s))).get_data() for s in subjects]
+img_list = [ni.load(os.path.join(path, pattern %(s))) for s in subjects]
 
 ds = fmri_dataset(img_list, chunks=np.repeat(range(len(subjects)), 100), mask=mask)
 
@@ -61,22 +62,43 @@ thr = clthr._thrmap
 # I blob è una mappa media di ogni soggetto
 task_list = ['memory', 'decision']
 evidence_list = ['1', '3', '5']
-path_blob = '/media/robbis/DATA/fmri/memory/0_results/balanced_analysis/local'
+#path_blob = '/media/robbis/DATA/fmri/memory/0_results/balanced_analysis/local'
+path_blob = '/home/robbis/fmri/memory/0_results/sl_k_3/'
+
 file_blob = "total_%s_evidence_%s_total.nii.gz"
 
+file_pattern = "%s_%s_%s_MVPA_evidence_%s_balance_ds_%s_radius_3_searchlight_total_map_mean_demenead.nii.gz"
+
+
 for task, evidence in product(task_list, evidence_list):
-    filename = os.path.join(path_blob, file_blob % (task, evidence))                     
-    blob = fmri_dataset(ni.load(filename), mask=mask)
-    blob = blob[:len(subjects)]
+    
+    _, _, _, img_list = load_total_subjects(path_blob, 
+                                            subject=subjects, 
+                                            experiment=[task],
+                                            level=[str(evidence)],
+                                            file_pattern=file_pattern,
+                                            )
+    
+    
+    #filename = os.path.join(path_blob, file_blob % (task, evidence))                     
+    #blob = fmri_dataset(ni.load(img_list), mask=mask)
+    
+    blob = fmri_dataset(img_list, mask=mask)
+    
+    #blob = blob[:len(subjects)]
     res = clthr(blob)
     results = np.zeros_like(res.samples.squeeze())
     cluster = res.fa.clusters_featurewise_thresh
+    
     for cluster_label in np.unique(cluster)[1:]:
         results[cluster == cluster_label] = res.a.clusterstats[cluster_label-1]['prob_raw']
     
     results_map = ds.mapper.reverse1(results)
     output_name = "total_%s_evidence_%s_total_permutation_cluster.nii.gz" % (task, evidence)
-    ni.save(ni.Nifti1Image(results_map, img.get_affine()), os.path.join(path_blob, output_name))
+    ni.save(ni.Nifti1Image(results_map, mask.get_affine()), os.path.join(path_blob, output_name))
+
+
+
 
 for i in ['1','3','5']:
     img_ = ni.load(os.path.join(path_blob, "total_memory_evidence_%s_total.nii.gz" % i))
@@ -107,11 +129,6 @@ for i, s in enumerate(subjects):
     save_pattern_ = permutation_fname % (s)
     
     ni.save(demeaned_img, path+save_pattern_)
-    
-    
-    
-    
-    
     
     
     

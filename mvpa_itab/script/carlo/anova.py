@@ -66,11 +66,12 @@ file_patterns = [
                  #stable_file_pattern+".nii.gz",
                  #stable_file_pattern+"_mean_demenead.nii.gz",
                  stable_file_pattern+"_demeaned.nii.gz",
-                 stable_file_pattern+"_mean.nii.gz",                 
+                 #stable_file_pattern+"_mean.nii.gz",                 
                  ]
 
 
-tests = ["zero", "all"]
+tests = [#"zero", 
+         "all"]
 
 confs = itertools.product(experiments, file_patterns, tests)
 path = '/home/robbis/mount/fmri/memory/0_results/sl_k_3/'
@@ -83,7 +84,8 @@ for elements in confs:
                      subjects, 
                      file_pattern=elements[1],
                      test=elements[2],
-                     experiment=[elements[0]])
+                     experiment=[elements[0]],
+                     ds_num=[1,2,3])
     
     maps_.append(map_)
     

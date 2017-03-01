@@ -189,5 +189,42 @@ class RegressionMeasure(Measure):
 
 
 
+class GroupWisePartitioner(Partitioner):
+    
+    def __init__(self, attr_task='task', **kwargs):
+        
+        Partitioner.__init__(self, **kwargs)
+        
+        self.__attr_task = attr_task
+        
+    
+    def get_partition_specs(self, ds):
+        #uniqueattr = ds.sa[self.__attr].unique()
+        uniquetask = ds.sa[self.__attr_task].unique
+        
+        listattr = []
+        for task in uniquetask:
+            targets = ds[ds.sa[self.__attr_task].value == task].uniquetargets
+            listattr.append(targets)                  
+        print listattr
+        rule = self._get_partition_specs(listattr)
+        
+        return rule
+        
+    def _get_partition_specs(self, listattr):
+        
+        prod = itertools.product(*listattr)
+        
+        return [
+                (['3','4'],['1'],['2']),
+                (['3','4'],['2'],['1']),
+                (['1'],['2'],['3','4']),
+                (['2'],['1'],['3','4']),
+                
+                (['1','2'],['3'],['4']),
+                (['1','2'],['4'],['3']),
+                (['3'],['4'],['1','2']),
+                (['4'],['3'],['1','2']),
+                ]
 
-
+    

@@ -43,6 +43,7 @@ def get_time():
         
     return datetime    
 
+
 #@profile
 def load_dataset(path, subj, folder, **kwargs):
     ''' Load file given filename, the 
@@ -433,6 +434,11 @@ def load_mask_wu(path, subj, **kwargs):
                       ((m[:].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('nii.gz') != -1) or
                       ((m[:].find(m_ar) != -1 or m[-15:].find(m_ar) !=-1) and m.find('hdr') != -1)]
       
+    
+    
+    
+    
+    
     logger.debug(' '.join(mask_list))
     logger.info('Mask searched in '+mask_path+' Mask(s) found: '+str(len(mask_list)))
     
@@ -493,9 +499,9 @@ def load_mask_juelich(**kwargs):
 
     mask = ni.Nifti1Image(data, img.get_affine())
 
-    
     return mask    
-    
+
+
 def load_attributes (path, task, subj, **kwargs):
     ## Should return attr and a code to check if loading has been exploited #####
     
@@ -595,9 +601,9 @@ def modify_conc_list(path, subj, conc_filelist, extension=''):
     return new_list
 
 
+
 def read_file(filename):
-    
-    
+     
     filename_list = []
     with open(filename, 'r') as fileholder:
         for name in fileholder:
@@ -606,6 +612,7 @@ def read_file(filename):
     logger.debug(' '.join(filename_list))
         
     return filename_list
+
 
 
 def read_conc(path, subj, conc_file_patt, sub_dir=['']):
@@ -650,7 +657,6 @@ def read_conc(path, subj, conc_file_patt, sub_dir=['']):
         
     logger.debug('Number of files in conc file is '+str(n_files))
     
-    
     #Read conc file
     i = 0
     filename_list = []
@@ -663,6 +669,7 @@ def read_conc(path, subj, conc_file_patt, sub_dir=['']):
     conc_file.close()
     logger.debug('\n'.join(filename_list))
     return filename_list
+
 
 
 def read_remote_configuration(path):
@@ -682,6 +689,7 @@ def read_remote_configuration(path):
     return dict(configuration) 
 
     logger.info('Reading remote config file '+os.path.join(path,'remote.conf'))
+
 
 
 #@profile
@@ -713,6 +721,7 @@ def read_configuration (path, experiment, section):
             logger.debug(item)
     
     return dict(configuration)   
+
 
 
 def save_results(path, results, configuration):

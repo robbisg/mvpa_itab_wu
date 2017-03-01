@@ -104,9 +104,30 @@ for k, m in metrics_.iteritems():
 
 metrics_ = dict(filtered_metrics)
 
-
+selected_keys = ['kendalltau',
+                 'correlation',
+                 'braycurtis',
+                 'jaccard',
+                 'mean_squared_error',
+                 'r2_score']
+values_ = [metrics_[k] for k in selected_keys]
 
 def build_path_dict(path, **kwargs):
+    """
+    Input like
+    kwargs = {'level1':['3_trial_sheer', '2_trial_zoom', '1_trial'], 
+              'level2':['offset_0_param_9', 
+                        'offset_1_param_9',
+                        'offset_2_param_9',
+                        'offset_3_param_9',
+                        'offset_4_param_9',
+                        'offset_5_param_9']}
+    path = '/home/robbis/development/svn/mutual/trunk/result/MARZO16/'
+    
+    returns:
+        a dictionary with all possibilities between level1 dirs and level2 dirs
+    """     
+    
     
     levels = []
     for k, v in kwargs.iteritems():
@@ -122,7 +143,29 @@ def build_path_dict(path, **kwargs):
         possibilities_[key_] = value_
         
     return possibilities_
-        
+
+
+path_dict = build_path_dict(path, **kwargs)
+path_dict.update({'LF': '/home/robbis/phantoms/Coregistration/Comparison/LF116/'})
+
+images_ = dict()
+for k, path in path_dict.iteritems():
+        file_list = os.listdir(path)
+        file_list.sort()
+        images_[k] = [np.array(Image.open(os.path.join(path, f))) for f in file_list]
+        images_[k] = np.array(images_[k])
+
+
+selected_keys = ['kendalltau',
+                 'correlation',
+                 'braycurtis',
+                 'jaccard',
+                 'mean_squared_error',
+                 'r2_score']
+
+
+selected_metrics = [metrics_[k] for k in selected_keys]
+dirs_ = ['1_trial','2_trial', '3_trial']
 list_metrics = []
 for m, i in zip(selected_keys, selected_metrics):
     list_ = [[],[],[]]
@@ -135,7 +178,15 @@ for m, i in zip(selected_keys, selected_metrics):
                     value = v
                 list_[j].append(value)
     list_metrics.append(list_)
+    
+mutual = np.array([[0.916632,0.915068,0.916718],
+                   [0.916551,0.915684,0.917098],
+                   [0.916832,0.915901,0.916693],
+                   [0.917053,0.915852,0.917052],
+                   [0.916621,0.916179,0.916621],
+                   [0.916604,0.91509,0.916316]]).T
 
+list_metrics.append(1/(mutual-0.0058))
 
 x = np.arange(6)
 selected_keys = ['kendalltau',
@@ -143,17 +194,42 @@ selected_keys = ['kendalltau',
                  'braycurtis',
                  'jaccard',
                  'mean_squared_error',
-                 'r2_score']
+                 'r2_score',
+                 'nmi']
+
+graph_title = ['Kendall Tau',
+               'Correlation distance',
+               'Bray-Curtis distance',
+               'Jaccard correlation',
+               'Mean Squared Error',
+               'R2 score',
+               'Normalized Mutual Information']
+
 labels = ['rigid', 'zoom', 'shear']
+colors = ['blue', 'red', 'green']
 markers = ['o', 's', '^']
 
+
+metrics_sel = np.array(list_metrics)
+fig = pl.figure(figsize=(23,12), dpi=150)
+
 for i, metric in enumerate(selected_keys):
-    pl.figure()
+    ax = fig.add_subplot(2,4,i+1)
     series = metrics_sel[i]
+    lines = []
     for j, y in enumerate(series):
-        pl.plot(x, y, lw=2.5, alpha=0.5, marker=markers[j], label=labels[j])
-    pl.title(metric)
-    pl.legend()
+        l = ax.plot(x, y, lw=2.5, alpha=0.8, markersize=12, marker=markers[j], label=labels[j], color=colors[j])
+        ax.hlines(y.mean(), x[0], x[-1], alpha=0.7, linestyles='dashed', color=colors[j])
+        lines.append(l[0])
+    ax.set_title(graph_title[i])
+    ax.ticklabel_format(useOffset=False)
+    ax.set_xlabel("Offset in z-direction")
+    ax.legend()
+#ax = fig.add_subplot(2,4,8)
+#leg = pl.legend(lines, labels, loc=2)
+#ax.add_artist(leg)
+fig.tight_layout()
+fig.savefig("/home/robbis/Dropbox/PhD/rg_papers/megmri_paper/"+str(i)+"_"+metric+".png", dpi=150)
     
 
 mutual = np.array([[0.916632,0.915068,0.916718],
@@ -161,7 +237,37 @@ mutual = np.array([[0.916632,0.915068,0.916718],
                    [0.916832,0.915901,0.916693],
                    [0.917053,0.915852,0.917052],
                    [0.916621,0.916179,0.916621],
-                   [0.916604,0.91509,0.916316]]).T
+                   [0.916604,0.915090,0.916316]]).T
+                   
+                   
+################   PHANTOM   ##########################
+values = np.array([0.922231, 0.909037, 0.917880])-0.005
+parameters = [6,9,12]           
+
+fig = pl.figure(dpi=150)
+pl.plot(parameters, 1/values, lw=2.5, alpha=0.8, markersize=12, marker='o')
+pl.title("NMI values for 6, 9, 12 parameter fits")
+pl.xticks(parameters, ("Rigid", "Zoom", "Shear"))
+pl.xlabel("Transformation type")
+pl.ylabel("Normalized Mutual Information")
+fig.tight_layout()
+fig.savefig("/home/robbis/Dropbox/PhD/rg_papers/megmri_paper/phantom_literal.png", dpi=150)
+
+###############    AALTO  #########################
+values = 100/np.array([87.68, 87.71, 87.63, 87.63, 87.56, 87.61])
+parameters = range(6)
+
+fig = pl.figure(dpi=150)
+pl.plot(parameters, values, lw=2.5, alpha=0.8, markersize=12, marker='o')
+pl.title("NMI values for different y-direction offsets")
+#pl.xticks(parameters, ("Rigid", "Zoom", "Shear"))
+pl.xlabel("Offset in y-direction")
+pl.ylabel("Normalized Mutual Information")
+pl.ticklabel_format(useOffset=False)
+fig.tight_layout()
+fig.savefig("/home/robbis/Dropbox/PhD/rg_papers/megmri_paper/aalto.png", dpi=150)
+
+
 
 ############### converti file tif ################
 path_ = '/home/robbis/phantoms/TIFF/PHANTOM_2015/HF_N/'
@@ -244,3 +350,20 @@ for i in [6, 9, 12]:
     print command
     os.system(command)
   
+
+#############################################
+path = '/home/robbis/phantoms/Coregistration/Comparison/FSL/'
+lista_file = os.listdir(path)
+
+for f in lista_file:
+    input_ = input_ = os.path.join(path, f)
+    output_ = os.path.join(path,'%s_cp.tif' %(f[:-4]))
+    convert_ = 'tiffcp -r 1 -c none %s %s' % (input_, output_)
+    print convert_
+    os.system(convert_)
+
+
+
+
+
+

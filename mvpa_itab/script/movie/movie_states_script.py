@@ -3,12 +3,13 @@ from scipy.signal import argrelextrema
 from mvpa_itab.conn.operations import copy_matrix, array_to_matrix
 from scipy.spatial.distance import squareform, pdist, euclidean, correlation
 from scipy.signal._peak_finding import argrelmin
-from mvpa_itab.conn.states.utils import plot_dynamics, plot_frequencies, plot_metrics, \
+from mvpa_itab.conn.states.plot import plot_dynamics, plot_frequencies, plot_metrics, \
                                     plot_states_matrices, get_positions
-from mvpa_itab.conn.states.states import get_centroids, fit_states, cluster_state, \
+from mvpa_itab.conn.states.utils import get_centroids, fit_states, cluster_state, \
                                 calculate_metrics, get_data, get_min_speed_arguments, \
                                 get_extrema_histogram, fit_centroids,\
-    get_subsampling_method
+                                get_subsampling_measure
+
 import cPickle as pickle
 import os
 import numpy as np
@@ -42,6 +43,7 @@ for cond in conditions:
                                                                                             filetype), 
                                                    ),
                                   'w'))
+    
     
     plot_states_matrices(X, 
                          clustering_[3],
@@ -131,7 +133,6 @@ for condition in conditions:
     hist_arg = get_extrema_histogram(subj_min_speed, data_.shape[1])
     X = data_[subj_min_speed] 
     
-    
     clustering_ = pickle.load(file(label_fname % (condition.lower()), 'r'))
     
     centroid_ = get_centroids(X, clustering_[3]) # Five centroids
@@ -153,8 +154,8 @@ configuration = {'path':'/media/robbis/DATA/fmri/movie_viviana/',
                  }
 
 
-filetypes = ['masked', 'original']
-method = ['speed', 'variance']
+filetypes = ['masked']
+method = ['variance']
 conditions = ['movie', 'scramble', 'rest']
 
 X_centers = dict()
@@ -165,7 +166,7 @@ for p in prod:
     
     data_fname = os.path.join(configuration['path'], p[0], configuration['fname'])
     data_, _ = get_data(data_fname % str.upper(p[2]))
-    subj_min_speed, subj_speed = get_subsampling_method(p[1])(data_)
+    subj_min_speed, subj_speed = get_subsampling_measure(p[1])(data_)
 
     X = data_[subj_min_speed]
         
@@ -182,14 +183,18 @@ for p in prod:
     X_centers[path_cluster] = []
     clustering_ = pickle.load(file(path_file, 'r'))
     
-    for i in np.arange(max_k-2):
+    for i in [5]:#np.arange(max_k):
 
-        X_centers[path_cluster].append(get_centroids(X, clustering_[i]))
+        X_centers[path_cluster].append(get_centroids(X, clustering_[i-2]))
         
     
 ##########################################################
-filetypes = ['masked', 'original']
-method = ['speed', 'variance']
+
+def sum_index(k):
+    return int(np.sum([n for n in np.arange(2,k)]))
+
+filetypes = ['masked']
+method = ['variance']
 conditions = ['movie', 'scramble', 'rest']
 prod = itertools.product(filetypes, method)
 
@@ -208,7 +213,7 @@ for p in prod:
     
     XX = np.array(XX)
     
-    for n_cluster in np.arange(2,7):
+    for n_cluster in [5]:#np.arange(2,7):
         
         index1 = sum_index(n_cluster)
         index2 = sum_index(n_cluster+1)
@@ -220,40 +225,15 @@ for p in prod:
         pos = mds.fit_transform(np.vstack(X_k))
         
         color = np.zeros((pos[:,0].shape[0], 3))
-        color[:X_k.shape[1],0] = 1 # Red
-        color[X_k.shape[1]:2*X_k.shape[1],2] = 1 # Green
-        color[2*X_k.shape[1]:,1] = 1 # Blue
+        color[:X_k.shape[1],0] = 1 # Red - Movie
+        color[2*X_k.shape[1]:,1] = 1 # Green - Rest
+        color[X_k.shape[1]:2*X_k.shape[1],2] = 1 # Blue - Scramble
+        
         pl.figure(figsize=(10,8))
         pl.scatter(pos[:,0], pos[:,1], c=color, s=120)
         for i, (x,y) in enumerate(pos):
             pl.annotate(int(i%n_cluster)+1, (x+0.1, y+.1))
-        figname = "mds_%02d.png" % (n_cluster)
+        figname = "mds_%02d_new.png" % (n_cluster)
         pl.savefig(os.path.join(configuration['path'], p[0], p[1], figname))
         
     
-    
-def sum_index(k):
-    return int(np.sum([n for n in np.arange(2,k)]))
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-
-

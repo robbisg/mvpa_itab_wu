@@ -1,9 +1,11 @@
 from sklearn.cluster import KMeans
-from sklearn.manifold import MDS
+from sklearn import metrics
 import numpy as np
 import scipy
 from scipy.spatial.distance import pdist, squareform, euclidean
+import logging
 
+logger = logging.getLogger(__name__)
 
 def ch_criterion(X, labels):
     
@@ -152,7 +154,7 @@ def explained_variance(X, labels):
         group_avg = X[cluster_mask].mean()
         n_group = np.count_nonzero(cluster_mask)
         
-        group_var = n_group * np.power((group_avg - great_avg), 2)/(k_ - 1)
+        group_var = n_group * np.power((group_avg - great_avg), 2) / (k_ - 1)
         
         explained_variance_ += group_var
         
@@ -180,6 +182,70 @@ def global_explained_variance(X, labels):
     return numerator_/denominator_
 
 
+
 def get_triu_array_index(i, j, n_row):
     return (n_row*i+j)-np.sum([(s+1) for s in range(i+1)])
+
+
+
+
+def calculate_metrics(X, 
+                      clustering_labels, 
+                      metrics_kwargs=None):
+    
+    default_metrics = {'Silhouette': metrics.silhouette_score,
+                       'Calinski-Harabasz': ch_criterion, 
+                       'Krzanowski-Lai': kl_criterion,
+                       'Global Explained Variance':global_explained_variance,
+                       #'Gap': gap,
+                        }
+    
+    if metrics_kwargs != None:
+        default_metrics.update(metrics_kwargs)
+    
+    metrics_ = []
+    k_step = np.zeros(len(clustering_labels), dtype=np.int8)
+    
+    for i, label in enumerate(clustering_labels):
+        
+        k = len(np.unique(label))
+        k_step[i] = k
+        
+        logger.info('Calculating metrics for k: %s' %(str(k)))
+        
+        metric_list = []
+        
+        for metric_name, metric_function in default_metrics.items():
+            
+            logger.info(" - Calculating %s" %(metric_name))
+            
+            if metric_name == 'Krzanowski-Lai':
+                if i == len(clustering_labels) - 1:
+                    prev_labels = clustering_labels[i-1]
+                    next_labels = np.arange(0, label.shape[0])
+                elif k == 2:
+                    prev_labels = np.zeros_like(label)
+                    next_labels = clustering_labels[i+1]
+                else:   
+                    prev_labels = clustering_labels[i-1]
+                    next_labels = clustering_labels[i+1]
+                    
+                m_ = metric_function(X,
+                                     label,
+                                     previous_labels=prev_labels,
+                                     next_labels=next_labels,
+                                     precomputed=False)
+                
+            else:
+                m_ = metric_function(X, label)
+                
+            
+            metric_list.append(m_)
+            
+        
+        metrics_.append(metric_list)
+    
+    
+    return np.array(metrics_), k_step, default_metrics.keys()
+
 

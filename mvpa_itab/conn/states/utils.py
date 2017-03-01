@@ -1,23 +1,16 @@
-import numpy as np
-import scipy
 import os
 import cPickle as pickle
+import numpy as np
+from scipy.spatial.distance import euclidean
 
-from sklearn import metrics
+from scipy.io import loadmat
 from sklearn.cluster import KMeans
-from sklearn.manifold import MDS
-
-from scipy.spatial.distance import pdist, squareform, euclidean
-from scipy.io import loadmat, savemat
-
 from nitime.timeseries import TimeSeries
 from nitime.analysis import SpectralAnalyzer
 from mvpa_itab.similarity.analysis import SeedAnalyzer
-from mvpa_itab.conn.states.states_metrics import *
-
-from scipy.signal import argrelextrema, argrelmin
-
-
+from mvpa_itab.conn.states.base import cluster_state
+import logging
+logger = logging.getLogger(__name__)
 
 def get_data(filename):
     """
@@ -41,6 +34,7 @@ def get_data(filename):
     """
     
     #filename = '/media/robbis/DATA/fmri/movie_viviana/mat_corr_sub_REST.mat'
+    logger.info("Loading %s" %(filename))
     data = loadmat(filename)
     data = np.array(data['data'], dtype=np.float16)
     n_roi = data.shape[-1]
@@ -50,29 +44,14 @@ def get_data(filename):
     return data, n_roi
 
 
-def get_max_variance_arguments(data):
-    
-    stdev_data = data.std(axis=2)
-    arg_maxima = argrelextrema(stdev_data, np.greater, axis=1)
-    
-    return arg_maxima, stdev_data
-    
 
+def filter_data(data, method='demean'):
+    
+    mean = np.mean(data, axis=2)
+    data -= mean
+    
+    return
 
-def get_min_speed_arguments(data):
-    
-    subj_speed = []
-    for i in range(data.shape[0]):
-        distance_ = squareform(pdist(data[i], 'euclidean'))
-        
-        speed_ = [distance_[i, i+1] for i in range(distance_.shape[0]-1)]
-        subj_speed.append(np.array(speed_))
-    
-    subj_speed = np.vstack(subj_speed)
-    subj_min_speed = argrelmin(np.array(subj_speed), axis=1)
-    
-    return subj_min_speed, subj_speed
-    
 
 
 def get_centroids(X, labels):
@@ -98,6 +77,24 @@ def get_centroids(X, labels):
 
 
 def fit_centroids(X, centroids):
+    """
+    Function used to fit centroids to original data. 
+    Given centroids it fits them to each subject data.
+    
+    Parameters
+    ----------
+    X : n_samples x n_timepoints x n_features array
+        The full dataset used for clustering
+    
+    centroids : n_states x n_features array
+        The centroids for each state.
+        
+        
+    Returns
+    -------
+    centroids : n_samples x n_timepoints shaped array
+        The list of most similar state for each subject and each timepoint. 
+    """
     
     k = centroids.shape[0]
     
@@ -183,7 +180,7 @@ def get_state_frequencies(state_dynamics, method='spectrum_fourier'):
         S = SpectralAnalyzer(ts)
         try:
             result = getattr(S, method)
-        except AttributeError, err:
+        except AttributeError, _:
             result = S.spectrum_fourier
         
         results.append(result)
@@ -192,212 +189,91 @@ def get_state_frequencies(state_dynamics, method='spectrum_fourier'):
 
 
 
-def get_state_probability():
-    return
-
-
-
-def calculate_metrics(X, 
-                      clustering_labels, 
-                      metrics_kwargs=None):
-    
-    default_metrics = {'Silhouette': metrics.silhouette_score,
-                       'Calinski-Harabasz': ch_criterion, 
-                       'Krzanowski-Lai': kl_criterion,
-                       #'Explained Variance':explained_variance,
-                       #'Gap': gap,
-                        }
-    if metrics_kwargs != None:
-        default_metrics.update(metrics_kwargs)
-    
-    metrics_ = []
-    k_step = np.zeros(len(clustering_labels), dtype=np.int8)
-    
-    for i, label in enumerate(clustering_labels):
-        
-        k = len(np.unique(label))
-        k_step[i] = k
-        
-        print '----- '+str(k)+' -------'
-        
-        metric_list = []
-        
-        for metric_name, metric_function in default_metrics.items():
-            if metric_name == 'Krzanowski-Lai':
-                if i == len(clustering_labels) - 1:
-                    prev_labels = clustering_labels[i-1]
-                    next_labels = np.arange(0, label.shape[0])
-                elif k == 2:
-                    prev_labels = np.zeros_like(label)
-                    next_labels = clustering_labels[i+1]
-                else:   
-                    prev_labels = clustering_labels[i-1]
-                    next_labels = clustering_labels[i+1]
-                    
-                m_ = metric_function(X,
-                                     label,
-                                     previous_labels=prev_labels,
-                                     next_labels=next_labels,
-                                     precomputed=False)
-                
-            else:
-                m_ = metric_function(X, label)
-                
-            
-            metric_list.append(m_)
-            
-        
-        metrics_.append(metric_list)
-    
-    
-    return np.array(metrics_), k_step, default_metrics.keys()
-
-
-
-def cluster_state(data, max_k=30, method='speed'):
-    
+def get_transition_matrix(group_fitted_timecourse):
     """
-    if method != 'speed':
-    ### Variance ###
-        arg_maxima, stdev_data = get_max_variance_arguments(data)
-        hist_arg = get_extrema_histogram(arg_maxima, data.shape[1])
-        X = data[arg_maxima]
-    else:
-    ### Speed ###
-        subj_min_speed, subj_speed = get_min_speed_arguments(data)
-        hist_arg = get_extrema_histogram(subj_min_speed, data.shape[1])
-        X = data[subj_min_speed]
-    """
-    
-    method = get_subsampling_method(method)
-    arg_, sub_data = method(data)
-    hist_arg = get_extrema_histogram(arg_, data.shape[1])
-    X = data[arg_]
-    
-    clustering_ = []
-    
-    k_steps = range(2,max_k)
-    
-    for k in k_steps:
-        print '----- '+str(k)+' -------'
-        km = KMeans(n_clusters=k).fit(X)
-        labels = km.labels_
-        clustering_.append(labels)
-        
-    return X, clustering_
-
-
-
-def get_extrema_histogram(arg_extrema, n_timepoints):
-    
-    hist_arg = np.zeros(n_timepoints)
-    n_subjects = len(np.unique(arg_extrema[0]))
-    
-    for i in range(n_subjects):
-        sub_max_arg = arg_extrema[1][arg_extrema[0] == i]
-        hist_arg[sub_max_arg] += 1
-        
-    return hist_arg
-
-
-def get_subsampling_method(method):
-    
-    method_mapping = {
-                      'speed': get_min_speed_arguments,
-                      'variance': get_max_variance_arguments
-                      }
-    
-    
-    return method_mapping[method]
-
-
-
-def analysis(**kwargs):
-    """
-    Method to fast analyze states from matrices.
-  
+    Extract the probability transition matrix given the
+    fitted timecourse for each subject.
+    This is the output of fit_centroids function
     
     Parameters
     ----------
-    kwargs : dictionary of several parameters
-    
-        path : string of the data path
-        filetype : string ('masked', 'original')
-                if you want to use masked matrix or full rank.
-        fname : string. pattern of the mat file in input
-            default ("mat_corr_sub_%s.mat")
-        conditions : list of string of data conditions. 
-                should cope with file pattern specified in fname.
-        method : string ('speed', 'variance')
-                Method used to subsample data.
-        max_k : integer (default = 15).
-                The maximum number of cluster to use
-        state_res_fname : pattern of the output file 
-            (default "clustering_labels_%s_maxk_%s_%s_%s.pyobj")
-                File used to save labels after clustering.
+    group_fitted_timecourse :   n_subjects x n_timepoints array
+                                The state dynamics output from fit_centroids
+                                function.
+                        
     
     
+    Returns
+    -------
+    transition_p : n_states x n_states matrix,
+                   The probabilities of transition from x state to y state, stored
+                    in matrix[x,y]. The syntax is matrix[starting_state, ending_state].
     """
-    from mvpa_itab.conn.states.utils import plot_metrics, plot_states_matrices
     
-    configuration = {'path':'/media/robbis/DATA/fmri/movie_viviana/',
-                     'filetype' : 'masked',
-                     'fname': 'mat_corr_sub_%s.mat',
-                     'conditions' : ['movie', 'scramble', 'rest'],
-                     'state_res_fname' : "clustering_labels_%s_maxk_%s_%s_%s.pyobj",
-                     'max_k':15,
-                     'method':'speed'                 
-                     }
-    
-    configuration.update(kwargs)
-    
-    conditions = configuration['conditions']
-    max_k = configuration['max_k']
-    method = configuration['method']
-    filetype = configuration['filetype']
+    n_states = group_fitted_timecourse.max()
+    transitions = np.zeros((n_states+1, n_states+1))
+    for fitted_timecourse in group_fitted_timecourse:
+        for i, state in enumerate(fitted_timecourse):
+            if (i+1) < len(fitted_timecourse):
+                transitions[state, fitted_timecourse[i+1]] += 1
     
     
-    for cond in conditions:
+    return transitions   
+
+
+def get_state_duration(group_fitted_timecourse):
+    """
+    Extract the average of state duration given the
+    fitted timecourse for each subject.
+    This is the output of fit_centroids function
     
-        path = os.path.join(configuration['path'], configuration['filetype'])
-        
-        data_, n_roi = get_data(os.path.join(path,"mat_corr_sub_%s.mat" % (str.upper(cond))))
-        
-        X, clustering_ = cluster_state(data_, max_k, method)
-        
-        metrics_, k_step, metrics_keys = calculate_metrics(X, clustering_)
-        
-        
-        fig = plot_metrics(metrics_, metrics_keys, k_step)
-        
-        
-        directory = os.path.join(path, method, cond)
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-            
-        state_res_fname = configuration['state_res_fname']
-        pickle.dump(clustering_, file(os.path.join(directory, 
-                                                   state_res_fname %(cond,
-                                                                    str(max_k),
-                                                                    method,
-                                                                    filetype), 
-                                                       ),
-                                      'w'))
+    Parameters
+    ----------
+    group_fitted_timecourse :   n_subjects x n_timepoints array
+                                The state dynamics output from fit_centroids
+                                function.
+                        
     
-        fig_fname = os.path.join(directory, "metrics.png")
-        fig.savefig(fig_fname)
+    
+    Returns
+    -------
+    subj_state_duration : nsubjects x n_states matrix,
+                   The duration of each state for each subject/session.
+    mean_state_duration : nstates array
+                   The average duration for each state.
+    """        
+    
+    counter = 0
+    subj_state_duration = []
+    mean_subject_duration = []
+    
+    for _, fitted_tc in enumerate(group_fitted_timecourse):
+        state_duration = []
+        for i, state in enumerate(fitted_tc):
+            if (i+1) < len(fitted_tc):
+                if state == fitted_tc[i+1]:
+                    counter += 1
+                else:
+                    counter += 1
+                    state_duration.append([state+1, np.float(counter)])
+                    counter = 0
         
-        for i, cl in enumerate(clustering_):
-            if not os.path.exists(os.path.join(directory,str(i+2))):
-                os.makedirs(os.path.join(directory,str(i+2)))
-            plot_states_matrices(X, 
-                                 cl,
-                                 os.path.join(directory,str(i+2)),
-                                 cond)
-        
-        
-        
-        
-        
+        subj_state_duration.append(state_duration)
+        state_duration = np.array(state_duration)
+        mean_subject_duration.append([[i+1, state_duration[state_duration[:,0]==(i+1)].mean(0)[1]]
+                                       for i in range(5)])
+    
+    subj_state_duration = np.array(subj_state_duration)
+    mean_subject_duration = np.array(mean_subject_duration)
+    
+    mean_subject_duration[:,:,1][np.isnan(mean_subject_duration[:,:,1])] = 0
+    
+    return subj_state_duration, mean_subject_duration
+
+
+
+
+
+       
         
         
