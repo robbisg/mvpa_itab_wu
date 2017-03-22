@@ -8,7 +8,7 @@ from sklearn.manifold.mds import MDS
 def plot_states_matrices(X, 
                          labels,
                          node_number=[6,5,8,10,4,5,7], 
-                         node_networks = ['DAN','VAN','SMN','VIS','AUD','LAN','DMN'],
+                         node_networks=['DAN','VAN','SMN','VIS','AUD','LAN','DMN'],
                          use_centroid=False,
                          save_fig=True,
                          save_path="/media/robbis/DATA/fmri/movie_viviana",
@@ -53,9 +53,97 @@ def plot_states_matrices(X,
             fname = "%s_state_%s.png" % (str(save_name_condition), str(i+1))
             pl.savefig(os.path.join(save_path, fname))
         
-        #return fig
+        pl.close('all')
+        return fig
+
+
+def plot_center_matrix(X, clustering, n_cluster=5, **kwargs):
+    
+    
+    configuration = {
+                     'node_number':[6,5,8,10,4,5,7],
+                     'node_networks':['DAN','VAN','SMN','VIS','AUD','LAN','DMN'],
+                     'save_fig':True,
+                     'save_path':"/media/robbis/DATA/fmri/movie_viviana",
+                     'save_name_condition':None
+                     
+                     }
+    
+    
+    configuration.update(**kwargs)
+    
+    node_number = configuration['node_number']
+    node_networks = configuration['node_networks']
+    
+    position = [sum(node_number[:i+1]) for i in range(len(node_number))]
+    position_label = [-0.5+position[i]-node_number[i]/2. for i in range(len(node_number))]
+    
+    matrix_indices = np.arange(n_cluster**2).reshape(n_cluster, n_cluster) + 1
+    
+    fig = pl.figure(figsize=(25,20))
+    for i in range(n_cluster-1):
+        centers = get_centroids(X, clustering[i])
+        for j, matrix in enumerate(centers):
+            pos = matrix_indices[j,i+1]
+            ax = fig.add_subplot(n_cluster, n_cluster, pos)
+            matrix = copy_matrix(array_to_matrix(matrix), diagonal_filler=0)
+            total_nodes = matrix.shape[0]
+            ax.imshow(matrix, interpolation='nearest', vmin=0)
+            for name, n_nodes in zip(node_networks, position):
+                ax.vlines(n_nodes-0.5, -0.5, total_nodes-0.5)
+                ax.hlines(n_nodes-0.5, -0.5, total_nodes-0.5)
+            ax.set_xticks(position_label)
+            ax.set_xticklabels(node_networks)
+            ax.set_yticks(position_label)
+            ax.set_yticklabels(node_networks)
+            
+            
+    return fig
+
+
+
+def plot_condition_centers(X, labels, **kwargs):
+    
+    
+    configuration = {
+                     'node_number':[6,5,8,10,4,5,7],
+                     'node_networks':['DAN','VAN','SMN','VIS','AUD','LAN','DMN'],
+                     'save_fig':True,
+                     'save_path':"/media/robbis/DATA/fmri/movie_viviana",
+                     'save_name_condition':None,
+                     'vmax':1                     
+                     }
+    
+    
+    configuration.update(**kwargs)
+    vmax = configuration['vmax']
+    node_number = configuration['node_number']
+    node_networks = configuration['node_networks']
+    centroids = get_centroids(X, labels)
+    position = [sum(node_number[:i+1]) for i in range(len(node_number))]
+    position_label = [-0.5+position[i]-node_number[i]/2. for i in range(len(node_number))]
+    
+    n_rows = np.floor(np.sqrt(len(np.unique(labels))))
+    n_cols = np.ceil(len(np.unique(labels))/n_rows)
+    
+    fig = pl.figure(figsize=(16,13))
+    for j, matrix in enumerate(centroids):
+        ax = fig.add_subplot(n_rows, n_cols, j+1)
+        matrix = copy_matrix(array_to_matrix(matrix), diagonal_filler=0)
+        total_nodes = matrix.shape[0]
+        ax.imshow(matrix, interpolation='nearest', vmin=0, vmax=vmax)
+        for _, n_nodes in zip(node_networks, position):
+            ax.vlines(n_nodes-0.5, -0.5, total_nodes-0.5)
+            ax.hlines(n_nodes-0.5, -0.5, total_nodes-0.5)
+        ax.set_xticks(position_label)
+        ax.set_xticklabels(node_networks, rotation=45)
+        ax.set_yticks(position_label)
+        ax.set_yticklabels(node_networks)
         
-   
+    return fig
+
+
+
     
 def plot_metrics(metrics_, metric_names, k_step):
     """
@@ -68,8 +156,10 @@ def plot_metrics(metrics_, metric_names, k_step):
         ax = fig.add_subplot(int(n_rows), 2, i+1)
         ax.plot(k_step, m, '-o')
         ax.set_title(metric_names[i])
+        ax.set_xticks(k_step)
+        ax.set_xticklabels(k_step)
         
-    #pl.show()
+    pl.close('all')
     return fig
     
 
@@ -164,5 +254,6 @@ def plot_positions(dict_centroids, **kwargs):
         pl.savefig(fname)
         
     return fig
+
 
 

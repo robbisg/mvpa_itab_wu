@@ -3,7 +3,7 @@ import cPickle as pickle
 import numpy as np
 from scipy.spatial.distance import euclidean
 
-from scipy.io import loadmat
+from scipy.io import loadmat, savemat
 from sklearn.cluster import KMeans
 from nitime.timeseries import TimeSeries
 from nitime.analysis import SpectralAnalyzer
@@ -42,6 +42,16 @@ def get_data(filename):
     data = data[:,:,ix,iy]
     
     return data, n_roi
+
+
+
+def save_data(X, key, filename):
+    logger.info("Saving %s data: %s" %(key, filename))
+    savemat(filename, {key: X})
+    
+    return
+
+
 
 
 

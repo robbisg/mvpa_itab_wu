@@ -2,35 +2,44 @@ from sklearn.cluster import KMeans
 from sklearn import metrics
 import numpy as np
 import scipy
-from scipy.spatial.distance import pdist, squareform, euclidean
+from scipy.spatial.distance import pdist, squareform, euclidean, correlation
 import logging
 
 logger = logging.getLogger(__name__)
 
-def ch_criterion(X, labels):
-    
-    k = len(np.unique(labels))
+
+
+def get_k(labels):
+    return len(np.unique(labels))
+
+def get_centers(X, labels):
+    return np.array([X[labels == l].mean(0) for l in np.unique(labels)])
+
+
+def ch_criterion(X, labels, distance=euclidean):
+        
+    k = get_k(labels)
     n = X.shape[0]
     
-    b = bgss(X, labels)
-    w = wgss(X, labels)
+    b = bgss(X, labels, distance)
+    w = wgss(X, labels, distance)
     
     return (n - k)/(k - 1) * b / w
 
 
-def bgss(X, labels):
+def bgss(X, labels, distance=euclidean):
     
     ds_mean = X.mean(0)
     ss = 0
     for i in np.unique(labels):
         cluster_data = X[labels == i]
-        ss += (euclidean(cluster_data.mean(0), ds_mean) ** 2) * cluster_data.shape[0]
+        ss += (distance(cluster_data.mean(0), ds_mean) ** 2) * cluster_data.shape[0]
         
     return ss
 
 
 
-def wgss(X, labels):
+def wgss(X, labels, distance=euclidean):
     
     ss = 0
     for i in np.unique(labels):
@@ -38,7 +47,7 @@ def wgss(X, labels):
         cluster_mean = cluster_data.mean(0)
         css = 0
         for x in cluster_data:
-            css += euclidean(x, cluster_mean) ** 2
+            css += distance(x, cluster_mean) ** 2
         
         ss += css
         
@@ -48,7 +57,7 @@ def wgss(X, labels):
 
 def kl_criterion(X, labels, previous_labels=None, next_labels=None, precomputed=True):
     
-    n_cluster = len(np.unique(labels))
+    n_cluster = get_k(labels)
     
     """
     if n_cluster <= 1 or previous_labels==None or next_labels==None:
@@ -97,7 +106,7 @@ def W(X, labels, precomputed=True):
 
 
 def m(X, labels, precomputed=True):
-    n_cluster = len(np.unique(labels))
+    n_cluster = get_k(labels)
     return W(X, labels, precomputed=precomputed) * np.power(n_cluster, 2./X.shape[1])
 
     
@@ -123,7 +132,7 @@ def gap(X, labels, nrefs=20, refs=None):
     else:
         rands = refs
     
-    k = len(np.unique(labels))
+    k = get_k(labels)
     kml = labels
     kmc = np.array([X[labels == l].mean(0) for l in np.unique(labels)])
 
@@ -145,7 +154,7 @@ def gap(X, labels, nrefs=20, refs=None):
 def explained_variance(X, labels):
     
     explained_variance_ = 0
-    k_ = np.unique(labels).shape[0]
+    k_ = get_k(labels)
     great_avg = X.mean()
     
     for i in np.unique(labels):
@@ -164,10 +173,11 @@ def explained_variance(X, labels):
 
 def global_explained_variance(X, labels):
     
+    # Get the centroids for each cluster
     centroids = np.array([X[labels == l].mean(0) for l in np.unique(labels)])
     
+    # Compute the global power
     global_conn_power = X.std(axis=1)
-    
     denominator_ = np.sum(global_conn_power**2)
     
     numerator_ = 0
@@ -175,11 +185,30 @@ def global_explained_variance(X, labels):
     for i, conn_pwr in enumerate(global_conn_power):
         
         k_map = centroids[labels[i]]
-        corr_ = scipy.stats.pearsonr(X[i], k_map)[0]
+        corr_ = 0.5*(scipy.stats.pearsonr(X[i], k_map)[0] +1)
         
         numerator_ += np.power((conn_pwr * corr_), 2)
         
     return numerator_/denominator_
+
+
+
+
+def cross_validation_index(X, labels):
+    
+    n_maps = get_k(labels)
+    n_points = X.shape[0]
+    
+    centroids = np.array([X[labels == l].mean(0) for l in np.unique(labels)])
+    
+    sum_ = 0
+    for i, u in enumerate(X):
+        sum_ += euclidean(u, u)**2 - np.dot(centroids[labels[i]], u) ** 2
+        
+    
+    cv_criterion = sum_/(n_points**2 - 1) * ((n_points - 1)/(n_points - n_maps - 1))**2
+    
+    return cv_criterion
 
 
 
@@ -189,15 +218,46 @@ def get_triu_array_index(i, j, n_row):
 
 
 
+def index_i(X, labels):
+    
+    k = get_k(labels)
+    if k==2:
+        return 0
+    
+    centroids = get_centers(X, labels)
+    center = X.mean(0)
+    
+    ek = 0.
+    e1 = 0.
+    for i, x in enumerate(X):
+        
+        ek += euclidean(x, centroids[labels[i]])
+        e1 += euclidean(x, center)
+        
+    
+    pair_dist = pdist(np.vstack(centroids), 'correlation')
+    
+    dk = pair_dist.max()
+    mk = pair_dist.min()
+
+    i_ = (1./k * np.float(e1)/ek * dk * mk)**2
+
+    return i_        
+             
+
+
+
 def calculate_metrics(X, 
                       clustering_labels, 
                       metrics_kwargs=None):
     
     default_metrics = {'Silhouette': metrics.silhouette_score,
-                       'Calinski-Harabasz': ch_criterion, 
                        'Krzanowski-Lai': kl_criterion,
                        'Global Explained Variance':global_explained_variance,
-                       #'Gap': gap,
+                       #'Within Group Sum of Squares': wgss,
+                       #'Explained Variance':explained_variance,
+                       'Index I':index_i,
+                       #"Cross-validation":cross_validation_index
                         }
     
     if metrics_kwargs != None:

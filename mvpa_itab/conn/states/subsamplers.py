@@ -31,7 +31,8 @@ def get_subsampler(subsampler_type):
     mapper = {'variance': VarianceSubsampler(),
               'speed' : SpeedSubsampler(),
               'variance+mean':VarianceSubsampler(prefilter=MeanThresholder()),
-              'speed+mean':SpeedSubsampler(prefilter=MeanThresholder())              
+              'speed+mean':SpeedSubsampler(prefilter=MeanThresholder()),
+              'variance+1std': VarianceSubsampler(prefilter=MeanThresholder(1)),  
               }
     
     return mapper[subsampler_type]
@@ -124,10 +125,19 @@ class VarianceSubsampler(Subsampler):
 
 
 class MeanThresholder(object):
+    
+    def __init__(self, std=0):
+        self.std = 1
 
     def fit(self, measure):
+        
+        if self.std != 0:
+            std = self.std * np.std(measure != 0, axis=1)
+        else:
+            std = 1 
+                
         mean_measure = np.sum(measure, axis=1)/np.sum(measure != 0, axis=1)
-        threshold_measure = measure * (measure > mean_measure[...,None])                                        
+        threshold_measure = measure * (measure > std * mean_measure[...,None])                                        
         
         return threshold_measure
         
