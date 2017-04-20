@@ -190,21 +190,14 @@ def preprocess_dataset(ds, type_, **kwargs):
     warnings.warn("This function doesn't normalize features \
                     and/or samples. See normalize_dataset.")
     
-    mean = False
-    normalization = 'feature'
+
     target = None
     label_name = None
     for arg in kwargs:
-        if (arg == 'mean_samples'):
-            mean = kwargs[arg]
         if (arg == 'label_included'):
             label_included = kwargs[arg].split(',')
         if (arg == 'label_dropped'):
             label_dropped = kwargs[arg] 
-        if (arg == 'img_dim'):
-            img_dim = int(kwargs[arg])
-        if (arg == 'normalization'):
-            normalization = str(kwargs[arg])
         if (arg == 'target'):
             target = str(kwargs[arg])
             
@@ -349,7 +342,7 @@ def spatial(ds, **kwargs):
     error_ = cvte(ds)
     
     
-    logger.info(cvte.ca.stats)
+    logger.debug(cvte.ca.stats)
     #print error_.samples
 
     #Plot permutations

@@ -29,11 +29,10 @@ def analysis(path, subject_file='subjects.csv', **kwargs):
     rois = [roi for roi in rois if roi.find('nii.gz') != -1]
 
     
-    
     default_config = {
                       #'targets': ['decision', 'memory'],
                       'mask_label__evidence': [1, 3, 5],
-                      'mask_area': rois[:2],                 
+                      'mask_area': rois,                 
                       'normalization': ['feature','sample','both'],
                       #'balance__count': [50],
                       'chunks':['adaptive', 5]
@@ -46,7 +45,7 @@ def analysis(path, subject_file='subjects.csv', **kwargs):
     subjects = np.loadtxt(os.path.join(path,'subjects.csv'),
                           dtype=np.str, 
                           delimiter=',')
-    subjects_ = subjects[1:3,0]
+    subjects_ = subjects[1:,0]
     
     
     config = {
@@ -60,12 +59,11 @@ def analysis(path, subject_file='subjects.csv', **kwargs):
     for conf in configuration_generator:
 
         config.update(conf)
-
-        analysis_type = "%s_%s_%s" % (conf['target'],
-                                      conf['mask_label__evidence'],
-                                      conf['normalization'])
+        analysis_type = "%s_%s_%s" % (config['target'],
+                                      config['mask_label__evidence'],
+                                      config['normalization'])
         
-        res = _test_spatial(path, subjects_, 'memory.conf', 'BETA_MVPA', analysis_type=analysis_type, **conf)
+        res = _test_spatial(path, subjects_, 'memory.conf', 'BETA_MVPA', analysis_type=analysis_type, **config)
         
     
     

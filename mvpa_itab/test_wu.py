@@ -124,8 +124,6 @@ def _test_spatial(path, subjects, conf_file, type_, **kwargs):
     
     data_path = conf['data_path']
         
-
-    
     summarizers = [rs.DecodingSummarizer()]
     savers = [rs.DecodingSaver()]
     result = rs.ResultsCollection(conf, path, summarizers)
@@ -149,7 +147,7 @@ def _test_spatial(path, subjects, conf_file, type_, **kwargs):
             
             ds_ = normalize_dataset(ds_, **conf)
             
-            logger.info(ds_.summary())
+            logger.debug(ds_.summary())
             
             r = spatial(ds_, **conf)
             total_results[subj_] = r
