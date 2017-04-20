@@ -353,7 +353,7 @@ def global_signal_regression(timeserie, regressor):
         
     X = np.expand_dims(regressor, axis=1)
     glm_dist = GeneralLinearModel(X)
-    glm_dist.fit(Y)
+    glm_dist.transform(Y)
     beta_dist = glm_dist.get_beta()
         
     r_signal = np.dot(X, beta_dist)
@@ -388,7 +388,7 @@ def glm(image_ts, regressors):
         
 
     glm_dist = GeneralLinearModel(X)
-    glm_dist.fit(Y)
+    glm_dist.transform(Y)
     
     beta = glm_dist.get_beta()
     

@@ -64,10 +64,10 @@ def plot_transfer_graph_prob_fitted(path, name, analysis_folder):
             s = UnivariateSpline(xx, yy, s=5)
             ys = s(xx)
             try:
-                ridge.fit(np.vander(xx, 7), yy)
+                ridge.transform(np.vander(xx, 7), yy)
                 y_fit = ridge.predict(np.vander(xx, 7))
             except LinAlgError,err:
-                ridge.fit(np.vander(xx, 9), yy)
+                ridge.transform(np.vander(xx, 9), yy)
                 y_fit = ridge.predict(np.vander(xx, 9))
             
             data_sm[lab[c]].append(ys)
@@ -123,10 +123,10 @@ def plot_transfer_graph_fitted(path, name, analysis_folder):
         xx = np.linspace(0, len(v), len(v))
         
         try:
-            ridge.fit(np.vander(xx, 12), yy)
+            ridge.transform(np.vander(xx, 12), yy)
             y_fit = ridge.predict(np.vander(xx, 12))
         except LinAlgError,err:
-            ridge.fit(np.vander(xx, 9), yy)
+            ridge.transform(np.vander(xx, 9), yy)
             y_fit = ridge.predict(np.vander(xx, 9))
         
         a.plot(y_fit)

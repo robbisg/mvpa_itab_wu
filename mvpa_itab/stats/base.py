@@ -262,7 +262,7 @@ class SKLRegressionWrapper(object):
         
     def train(self, X, y):
         
-        self.algorithm.fit(X, y)
+        self.algorithm.transform(X, y)
         self.is_trained = True
         return
         
@@ -322,8 +322,8 @@ class CrossValidation(object):
             
             X_test = X[test_index]
             
-            # We suppose only scikit-learn fit algorithms are passed!
-            y_predict = self.algorithm.fit(X_train, y_train).predict(X_test)
+            # We suppose only scikit-learn transform algorithms are passed!
+            y_predict = self.algorithm.transform(X_train, y_train).predict(X_test)
             
             errors = []
             for error_ in self.errorfx:

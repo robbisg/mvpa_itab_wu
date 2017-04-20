@@ -140,7 +140,7 @@ def gap(X, labels, nrefs=20, refs=None):
 
     refdisps = scipy.zeros((rands.shape[2],))
     for j in range(rands.shape[2]):
-        km = KMeans(n_clusters=k).fit(rands[:,:,j])
+        km = KMeans(n_clusters=k).transform(rands[:,:,j])
         kml = km.labels_
         kmc = km.cluster_centers_
         refdisps[j] = sum([euclidean(rands[m,:,j], kmc[kml[m],:]) for m in range(shape[0])])

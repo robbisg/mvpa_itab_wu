@@ -185,14 +185,14 @@ def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.95):
         print true_ex.shape
         
         try:
-            #cov_ = MinCovDet().fit(true_ex)
-            cov_ = LedoitWolf().fit(true_ex)
-            #cov_ = EmpiricalCovariance().fit(true_ex)
-            #cov_ = GraphLasso(alpha=0.5).fit(true_ex)
-            #cov_ = OAS(alpha=0.1).fit(true_ex)
+            #cov_ = MinCovDet().transform(true_ex)
+            cov_ = LedoitWolf().transform(true_ex)
+            #cov_ = EmpiricalCovariance().transform(true_ex)
+            #cov_ = GraphLasso(alpha=0.5).transform(true_ex)
+            #cov_ = OAS(alpha=0.1).transform(true_ex)
         except MemoryError, err:
             print 'Method is LedoitWolf'
-            cov_ = LedoitWolf(block_size = 15000).fit(true_ex)
+            cov_ = LedoitWolf(block_size = 15000).transform(true_ex)
 
         example_dist[label]['i_cov'] = cov_.precision_
         print 'Inverted covariance estimated...'
@@ -319,14 +319,14 @@ def similarity_measure_correlation (ds_tar, ds_src, results, p_value):
         try:
             print 'Method is Correlation...'
             #print true_ex[:np.int(true_ex.shape[0]/3),:].shape
-            #cov_ = MinCovDet().fit(true_ex)
-            #cov_ = LedoitWolf().fit(true_ex)
-            #cov_ = EmpiricalCovariance().fit(true_ex)
-            #cov_ = GraphLasso(alpha=0.5).fit(true_ex)
-            #cov_ = OAS(alpha=0.1).fit(true_ex)
+            #cov_ = MinCovDet().transform(true_ex)
+            #cov_ = LedoitWolf().transform(true_ex)
+            #cov_ = EmpiricalCovariance().transform(true_ex)
+            #cov_ = GraphLasso(alpha=0.5).transform(true_ex)
+            #cov_ = OAS(alpha=0.1).transform(true_ex)
         except MemoryError, err:
             print 'Method is LedoitWolf'
-            cov_ = LedoitWolf(block_size = 15000).fit(true_ex)
+            cov_ = LedoitWolf(block_size = 15000).transform(true_ex)
             
             
         #example_dist[label]['i_cov'] = scipy.linalg.inv(cov_)

@@ -17,14 +17,14 @@ def get_filter(filter_type):
 
 class Filter(object):
     
-    def fit(self, data):
+    def transform(self, data):
         raise NotImplementedError()
     
     
 
 class NormalizerFilter(Filter):
     
-    def fit(self, data):
+    def transform(self, data):
         """
         Implement a sample-wise demeaning.
         """                
@@ -33,26 +33,26 @@ class NormalizerFilter(Filter):
 
 class MatrixNormalizationFilter(Filter):
     
-    def fit(self, data):
+    def transform(self, data):
         return data - data.mean(1).mean(0)
     
 
 class SubjectWiseNormalizationFilter(Filter):
     
-    def fit(self, data):
+    def transform(self, data):
         return data - data.mean(1)[:, None, :]
 
 
 class ZFisherFilter(Filter):
     
-    def fit(self, data):
+    def transform(self, data):
         return z_fisher(data)
 
 
 
 class NoneFilter(Filter):
     
-    def fit(self, data):
+    def transform(self, data):
         return data
     
     

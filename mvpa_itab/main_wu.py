@@ -31,6 +31,7 @@ from mvpa_itab import timewise
 import numpy as np
 import matplotlib.pyplot as plt
 import logging
+import warnings
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,9 @@ class StoreResults(object):
     def __call__(self, data, node, result):
         self.storage.append(node.measure.ca.predictions),
 
-def balance_dataset(ds, label, sort=True, **kwargs):
+
+def balance_dataset_timewise(ds, label, sort=True, **kwargs):
+    
     
     ################ To be changed ######################
     m_fixation = ds.targets == 'fixation'
@@ -74,6 +77,7 @@ def balance_dataset(ds, label, sort=True, **kwargs):
     ds.a.events = find_events(targets = ds.targets, chunks = ds.chunks)
     
     return ds
+
 
 def build_events_ds(ds, new_duration, **kwargs):
     """
@@ -180,8 +184,16 @@ def preprocess_dataset(ds, type_, **kwargs):
     
     
     """
+    warnings.warn("Deprecated: This is going to be\
+                   substituted with pipelines.", DeprecationWarning)
+    
+    warnings.warn("This function doesn't normalize features \
+                    and/or samples. See normalize_dataset.")
+    
     mean = False
     normalization = 'feature'
+    target = None
+    label_name = None
     for arg in kwargs:
         if (arg == 'mean_samples'):
             mean = kwargs[arg]
@@ -193,8 +205,17 @@ def preprocess_dataset(ds, type_, **kwargs):
             img_dim = int(kwargs[arg])
         if (arg == 'normalization'):
             normalization = str(kwargs[arg])
+        if (arg == 'target'):
+            target = str(kwargs[arg])
+            
+        if (arg.find('mask_label') != -1):
+            label_name = arg[arg.find('__')+2:]
+            label_value = str(kwargs[arg])
                 
     
+    if target != None:
+        ds.targets = ds.sa[target].value
+        
     logger.info('Dataset preprocessing: Detrending...')
     if len(np.unique(ds.sa['file'])) != 1:
         poly_detrend(ds, polyord = 1, chunks_attr = 'file')
@@ -207,8 +228,76 @@ def preprocess_dataset(ds, type_, **kwargs):
     if  label_included != ['all']:
         ds = ds[np.array([l in label_included for l in ds.sa.targets],
                           dtype='bool')]
+    
+    
+    if label_name != None:       
+        ds = ds[np.equal(ds.sa[label_name].value, int(label_value))]
         
-               
+    
+    return ds
+
+
+def balance_dataset(**kwargs):
+    
+    default_args = {
+                    'amount':'equal', 
+                    'attr':'targets', 
+                    'count':10, 
+                    'limit':None,
+                    'apply_selection': True
+                    }
+    
+    for arg in kwargs:
+        if (arg.find('balancer') != -1):
+            key = arg[arg.find('__')+2:]
+            default_args[key] = kwargs[arg]
+    
+    balancer = Balancer(**default_args)
+     
+    return balancer
+    
+
+
+
+def normalize_dataset(ds, **kwargs):
+    
+    import collections
+    import fractions
+    
+    mean = False
+    normalization = 'feature'
+    chunk_number = None
+    
+    for arg in kwargs:
+        if (arg == 'mean_samples'):
+            mean = kwargs[arg]
+        if (arg == 'img_dim'):
+            img_dim = int(kwargs[arg])
+        if (arg == 'normalization'):
+            normalization = str(kwargs[arg])
+        if (arg == 'chunk_number'):
+            chunk_number = kwargs[arg]
+        
+    n_targets = np.array([value for value in collections.Counter(ds.targets).values()]).min()
+    
+    if chunk_number == 'adaptive':
+        n_chunks = np.max([fractions.gcd(n_targets, i) for i in np.arange(2, 10)])
+        if n_chunks == 1:
+            n_chunks = 4
+    elif isinstance(chunk_number, int):
+        n_chunks = int(chunk_number)
+        
+    if chunk_number != None:
+        argsort = np.argsort(ds.targets)
+        chunks = []
+        for _ in ds.uniquetargets:
+            chunk = np.linspace(0, n_chunks, n_targets, endpoint=False, dtype=np.int)
+            chunks.append(chunk)
+        
+        
+        ds.chunks[argsort] = np.hstack(chunks)
+        
+    
     if str(mean) == 'True':
         logger.info('Dataset preprocessing: Averaging samples...')
         avg_mapper = mean_group_sample(['event_num']) 
@@ -221,8 +310,9 @@ def preprocess_dataset(ds, type_, **kwargs):
             zscore(ds, chunks_attr='file')
         zscore(ds)#, param_est=('targets', ['fixation']))
     
+    
     if normalization == 'sample' or normalization == 'both':
-        #Normalizing image-wise
+        # Normalizing image-wise
         logger.info('Dataset preprocessing: Normalization sample-wise...')
         ds.samples -= np.mean(ds, axis=1)[:, None]
         ds.samples /= np.std(ds, axis=1)[:, None]
@@ -230,11 +320,13 @@ def preprocess_dataset(ds, type_, **kwargs):
         ds.samples[np.isnan(ds.samples)] = 0
     
     
+    # Find event related stuff
     ds.a.events = find_events(#event= ds.sa.event_num, 
                               chunks = ds.sa.chunks, 
                               targets = ds.sa.targets)
     
     return ds
+
 
 
 def spatial(ds, **kwargs):
@@ -246,7 +338,6 @@ def spatial(ds, **kwargs):
             clf_type = kwargs[arg]
         if arg == 'enable_results':
             enable_results = kwargs[arg].split(',')
-        
         if arg == 'permutations':
             permutations = int(kwargs[arg])
     
@@ -258,7 +349,7 @@ def spatial(ds, **kwargs):
     error_ = cvte(ds)
     
     
-    print cvte.ca.stats    
+    logger.info(cvte.ca.stats)
     #print error_.samples
 
     #Plot permutations
@@ -279,9 +370,8 @@ def spatial(ds, **kwargs):
     
     predictions_ds = fclf.predict(ds)
     
-    '''
-    If classifier didn't have sensitivity
-    '''
+
+    # If classifier didn't have sensitivity
     try:
         sensana = fclf.get_sensitivity_analyzer()
     except Exception, err:
@@ -382,6 +472,7 @@ def searchlight(ds, **kwargs):
                      'radius': radius})
     
     return d_result
+
 
 def spatiotemporal(ds, **kwargs):
       
@@ -765,7 +856,7 @@ def inertia_clustering_analysis(ds, max_clusters=13):
     #max_clusters = 13#+2 = 15
     for i in np.arange(max_clusters)+2:
         kmeans = KMeans(init='k-means++', n_clusters=i, n_init=10)
-        kmeans.fit(ds.samples)
+        kmeans.transform(ds.samples)
         inertia_val = np.append(inertia_val, kmeans.inertia_)
 
     f = plt.figure()

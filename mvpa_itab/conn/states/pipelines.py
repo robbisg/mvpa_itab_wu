@@ -76,19 +76,16 @@ def analysis(**kwargs):
         
         data_, n_roi = get_data(os.path.join(path, "mat_corr_sub_%s.mat" % (str.upper(cond))))
         
-        data_ = data_filter.fit(data_)
+        data_ = data_filter.transform(data_)
             
-        subsampler = get_subsampler(method)
-        
-        X = subsampler.fit(data_).subsample(data_)
-        
+        X = get_subsampler(method).fit_transform(data_)
+                
         X, clustering_ = cluster_state(X, range(2, max_k))
         
         metrics_, k_step, metrics_keys = calculate_metrics(X, clustering_)
         
         
         fig = plot_metrics(metrics_, metrics_keys, k_step)
-        
         
         directory = os.path.join(path, method, filter_type, cond)
         if not os.path.exists(directory):

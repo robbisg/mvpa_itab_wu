@@ -17,7 +17,7 @@ def analysis(path,
                     'subject': subjects,
                     'experiment':['memory', 'evidence'],
                     'level': [1,3,5],
-                    'ds_num' : [1,2,3,4,5]  ,
+                    'ds_num' : [1,2,3,4,5],
                     'ds_type':['BETA']                  
                     }
     
@@ -35,6 +35,8 @@ def analysis(path,
     mask_ = np.abs(data.mean(3)) > 0.01
     mask_index = np.array(np.nonzero(mask_)).T
     
+    mask_ = ni.load('/media/robbis/DATA/fmri/memory/mask_intersection.nii.gz')
+    mask_index = np.array(np.nonzero(mask_.get_data())).T
     
     X, factor_labels, factor_num = design_matrix(labels)
         

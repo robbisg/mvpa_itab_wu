@@ -4,17 +4,21 @@
 #     See the file license.txt for copying permission.
 ########################################################
 
-from main_wu import *
-from io import *
-from io.base import *
+from mvpa_itab.main_wu import *
+from mvpa_itab.io import *
+from mvpa_itab.io.base import *
 from mvpa2.clfs.transerror import ConfusionMatrix
 import os
 import copy
 from mvpa_itab.similarity.cross_decoding import *
 from mvpa2.suite import vstack, Sphere, Searchlight, IndexQueryEngine, Splitter
 import mvpa_itab.results as rs
+from mvpa_itab.similarity.partitioner import TargetCombinationPartitioner
+from mvpa_itab.preprocessing import get_preprocessing
+
 
 logger = logging.getLogger(__name__)
+    
     
 def test_spatiotemporal(path, subjects, conf_file, type_, **kwargs):
     
@@ -42,7 +46,7 @@ def test_spatiotemporal(path, subjects, conf_file, type_, **kwargs):
         if 'balance' in locals() and balance == True:
             if conf['label_included'] == 'all' and \
                 conf['label_dropped'] == 'none':
-                ds = balance_dataset(ds, 'fixation')
+                ds = balance_dataset_timewise(ds, 'fixation')
         
         r = spatiotemporal(ds, **conf)
         
@@ -51,26 +55,31 @@ def test_spatiotemporal(path, subjects, conf_file, type_, **kwargs):
 
     conf['classes'] = np.unique(ds.targets)
     
-    save_results(path, total_results, conf)
+    #save_results(path, total_results, conf)
     
     return total_results
 
+
+
 def test_spatial(path, subjects, conf_file, type_, **kwargs):
     
-    
-    conf = read_configuration(path, conf_file, type_)
+    #conf = read_configuration(path, conf_file, type_)
+    conf = read_json_configuration(path, conf_file, type_)
     
     for arg in kwargs:
         conf[arg] = kwargs[arg]
     
     total_results = dict()
     
-    data_path = conf['data_path']
+    #data_path = conf['data_path']
+    data_path = conf['path']['data_path']
         
     conf['analysis_type'] = 'spatial'
     conf['analysis_task'] = type_
     
-    result = rs.DecodingResults(path, conf)
+    summarizers = [rs.DecodingSummarizer()]
+    savers = [rs.DecodingSaver()]
+    result = rs.ResultsCollection(conf, path, summarizers)
     
     for subj in subjects:
         print '------'
@@ -80,14 +89,74 @@ def test_spatial(path, subjects, conf_file, type_, **kwargs):
             print err
             continue
         
-        ds = preprocess_dataset(ds, type_, **conf)
-        
+        #ds = preprocess_dataset(ds, type_, **conf)
+        ds = get_preprocessing(**conf).run(ds)
+                
         r = spatial(ds, **conf)
         total_results[subj] = r
         
-        subj_result = rs.DecodingSubjectResult(subj, r)
+        subj_result = rs.SubjectResult(subj, r, savers)
         
-        result.aggregate(subj_result)
+        result.add(subj_result)
+        
+    #result.save()
+    result.summarize()
+
+    conf['classes'] = np.unique(ds.targets)  
+    #save_results()
+    #save_results(path, total_results, conf)
+    
+    return total_results, subj_result
+
+
+
+def _test_spatial(path, subjects, conf_file, type_, **kwargs):
+    warnings.warn("Deprecated use test_spatial.", DeprecationWarning)
+    
+    conf = read_configuration(path, conf_file, type_)
+    conf['analysis_type'] = 'spatial'
+    conf['analysis_task'] = type_
+    
+    for arg in kwargs:
+        conf[arg] = kwargs[arg]
+    
+    total_results = dict()
+    
+    data_path = conf['data_path']
+        
+
+    
+    summarizers = [rs.DecodingSummarizer()]
+    savers = [rs.DecodingSaver()]
+    result = rs.ResultsCollection(conf, path, summarizers)
+    
+    for subj in subjects:
+        print '------'
+        try:
+            ds = load_dataset(data_path, subj, type_, **conf)
+        except Exception, err:
+            print err
+            continue
+        
+        
+        ds = preprocess_dataset(ds, type_, **conf)
+        
+        balancer = balance_dataset(**conf)
+        
+        for i, ds_ in enumerate(balancer.generate(ds)):
+            logger.info("Balanced dataset n. %d" % (i+1))
+            subj_ = "%s_%03d" % (subj, i+1)
+            
+            ds_ = normalize_dataset(ds_, **conf)
+            
+            logger.info(ds_.summary())
+            
+            r = spatial(ds_, **conf)
+            total_results[subj_] = r
+        
+            subj_result = rs.SubjectResult(subj_, r, savers)
+        
+            result.add(subj_result)
         
     #result.save()
     result.summarize()
@@ -135,7 +204,7 @@ def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs
         
         if conf_src['label_included'] == 'all' and \
                 conf_src['label_dropped'] != 'fixation':
-                ds_src = balance_dataset(ds_src, 'fixation')
+                ds_src = balance_dataset_timewise(ds_src, 'fixation')
         
         r = clustering_analysis(ds_src, ds_tar, analysis, **kwargs)
         
@@ -146,7 +215,7 @@ def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs
     conf_src['analysis_func'] = analysis.func_name
     conf_src['classes'] = np.unique(ds_src.targets)
     
-    save_results(path, total_results, conf_src)
+    #save_results(path, total_results, conf_src)
 
     return total_results
 
@@ -253,7 +322,7 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
         if conf_src['label_included'] == 'all' and \
            conf_src['label_dropped'] != 'fixation':
                 print 'Balancing dataset...'
-                ds_src = balance_dataset(ds_src, 'fixation')        
+                ds_src = balance_dataset_timewise(ds_src, 'fixation')        
         
         # Make cross-decoding
         r = transfer_learning(ds_src, ds_tar, analysis, **conf_src)
@@ -325,6 +394,7 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
     return [total_results, r['ds_src'], r['ds_tar'], mahala_data]
 
 
+
 def test_searchlight(path, subjects, conf_file, type_, **kwargs):
     
     
@@ -367,12 +437,13 @@ def test_searchlight(path, subjects, conf_file, type_, **kwargs):
     
     return result, r, subj_result
 
+
 def test_searchlight_similarity(path,
                                 subjects, 
                                 conf_file, 
                                 type, 
                                 dim=4,
-                                measure=CorrelationMeasure(),
+                                measure=CorrelationThresholdMeasure(),
                                 partitioner=TargetCombinationPartitioner(attr='targets'),
                                 **kwargs):
     
@@ -786,7 +857,7 @@ def _group_transfer_learning(path, subjects, analysis,  conf_file, source='task'
             if conf_src['label_included'] == 'all' and \
                conf_src['label_dropped'] != 'fixation':
                     print 'Balancing dataset...'
-                    ds_src = balance_dataset(ds_src, 'fixation')       
+                    ds_src = balance_dataset_timewise(ds_src, 'fixation')       
                     
              
             

@@ -4,11 +4,27 @@ import nibabel as ni
 import numpy as np
 import os
 from sklearn.preprocessing.label import LabelEncoder
+from theano.tensor.nnet.tests.test_conv3d2d import ndimage
 
 
 def design_matrix(sample_labels):
+    """
+    Parameters
+    ---------
+    sample_labels: 
+        a numpy matrix, for each sample a vector with condition
+        which we would like to model.
+        
     
-    factors_dict = []
+    Returns
+    -------
+    X: the design matrix.
+    factor_labels: the labels of the design-matrix columns
+    factor_num : number of factors for each condition
+    
+    """
+        
+    factor_num = []
     n_factors = 0
     
     for i in range(sample_labels.shape[1]):
@@ -19,14 +35,14 @@ def design_matrix(sample_labels):
             label_factors = len(unique_labels)
         
         n_factors+=label_factors
-        factors_dict.append(label_factors)
+        factor_num.append(label_factors)
     
     X = np.zeros((sample_labels.shape[0], n_factors))
     
     lb = LabelEncoder()
     factor_labels = []
     offset = 0
-    for i, factor in enumerate(factors_dict):
+    for i, factor in enumerate(factor_num):
         if factor == 0:
             continue
         index = lb.fit_transform(sample_labels.T[i])
@@ -37,7 +53,7 @@ def design_matrix(sample_labels):
         
         offset+=factor
     
-    return X, np.hstack(factor_labels), factors_dict
+    return X, np.hstack(factor_labels), factor_num
 
 
 
@@ -86,7 +102,7 @@ def anova_ftest(data, design_matrix, contrast, const_term, mask_index):
     result_map = np.zeros(result_shape)
     
     for x, y, z in mask_index:
-        res = sm.OLS(data[x, y, z], design_matrix).fit()
+        res = sm.OLS(data[x, y, z], design_matrix).transform()
         f_test = res.f_test((contrast, const_term))
         values_ = [f_test.fvalue.squeeze(), 1-f_test.pvalue]
         
@@ -105,3 +121,38 @@ def get_value(row, n_factor, comparison_type):
         c[row:row+2] = np.array([1, -1])
         
     return c
+
+
+
+
+def get_rois(p_image, p_threshold, cluster_voxels_threshold, fill_holes=False):
+    
+    p_corrected = p_image.copy()
+    p_corrected[p_corrected <= p_threshold] = 0
+    
+    label_im, n_labels = ndimage.label(p_corrected)
+    
+    output_img = np.zeros_like(label_im)
+    j = 1
+    for i in range(n_labels)[1:]:
+        roi_mask = label_im == i
+        
+        if np.count_nonzero(roi_mask) <= cluster_voxels_threshold:
+            output_img[roi_mask] = 0
+        else:
+            filled = roi_mask * j
+            if fill_holes:
+                filled = ndimage.binary_fill_holes(roi_mask).astype(int)
+                filled *= j
+                
+            j += 1
+            output_img += filled
+    
+    return output_img
+                
+            
+            
+        
+
+
+

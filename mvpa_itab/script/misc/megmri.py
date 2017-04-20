@@ -192,7 +192,7 @@ x = np.arange(6)
 selected_keys = ['kendalltau',
                  'correlation',
                  'braycurtis',
-                 'jaccard',
+                 'jaccard_similarity_score',
                  'mean_squared_error',
                  'r2_score',
                  'nmi']
@@ -352,6 +352,42 @@ for i in [6, 9, 12]:
   
 
 #############################################
+    
+file_name = '/home/robbis/development/svn/mutual/trunk/fileList/listaLF_phantom_37ave.txt'
+
+off_x = np.arange(3)
+off_y = np.arange(3)
+off_z = np.arange(6)
+params = np.array([6, 9, 12])
+
+prod = itertools.product(off_x, off_y, off_z, params)
+
+for off in prod:
+    path = '/home/robbis/development/svn/mutual/trunk/result/los_alamos/'
+    fname = 'brain_offset_%s%s%s_%02d' % (str(off[0]),
+                                                 str(off[1]),
+                                                 str(off[2]),
+                                                 off[3])
+    directory = os.path.join(path,fname)
+    command = 'mkdir -p %s' % (directory)
+    print command
+    os.system(command)
+    
+    
+    out_name = os.path.join(directory, fname)
+    command = './Mutual.x %s %s %s %s %s > %s.txt' % ('foo', str(off[3]), str(off[0]), str(off[1]), str(off[2]), out_name)
+    print command
+    os.system(command)
+    
+    command = 'mv result/*.tif %s' % (directory)
+    print command
+    os.system(command)
+    
+    
+    
+  
+
+#############################################
 path = '/home/robbis/phantoms/Coregistration/Comparison/FSL/'
 lista_file = os.listdir(path)
 
@@ -363,7 +399,28 @@ for f in lista_file:
     os.system(convert_)
 
 
+################################################
+histogram_init = np.genfromtxt("/home/robbis/phantoms/Coregistration/paper-material/histogram_final.txt")
+histogram_fina = np.genfromtxt("/home/robbis/phantoms/Coregistration/paper-material/histogram_001.txt")
 
+histogram_fina[histogram_fina==0] = 1
+histogram_init[histogram_init==0] = 1
 
+histogram_fina = np.log10(histogram_fina)
+histogram_init = np.log10(histogram_init)
 
+gray_level = 150
+
+metrics_ = []
+
+selected_functions = {name:fx for name,fx in dict_functions.iteritems() if name in selected_keys}
+for name, fx in selected_functions.iteritems():
+    try:
+        m = fx(histogram_fina[:gray_level, :gray_level].flatten(), 
+               histogram_init[:gray_level, :gray_level].flatten())
+    except Exception, err:
+        print name, err
+        continue
+        
+    metrics_.append((name, m))
 

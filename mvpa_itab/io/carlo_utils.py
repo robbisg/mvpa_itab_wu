@@ -3,6 +3,53 @@ import itertools
 import numpy as np
 import nibabel as ni
 
+
+
+def load_group(path, experiment, level):
+    
+    file_pattern = "sl_group_%s_evidence_%s_demeaned.nii.gz" % (str(experiment), str(level))
+    file_path = os.path.join(path, 'group_sl', 'subject_wise', file_pattern)
+    
+    img = ni.load(file_path)
+    
+    if len(img.shape) == 3:
+        n_volumes = 1
+    else:
+        n_volumes = img.get_data().shape[-1]
+        
+    labels = []
+    group = 1
+    for i in range(n_volumes):
+        
+        if i>=12:
+            group = 2
+        
+        labels.append([group, experiment, level, i+1])
+    
+    return img, labels, img.get_affine()
+
+
+
+def load_group_total(path, experiment, level=[1,2,3]):
+    
+    total_data = []
+    total_labels = []
+    img_list = []
+    
+    for l in level:
+        img, labels, affine = load_group(path, experiment, l)
+
+        total_data.append(img.get_data())
+        total_labels.append(labels)
+        img_list.append(img)
+        
+    total_data = np.rollaxis(np.array(total_data), 0, 4)
+    reshape_ = list(total_data.shape[:3]) + [-1]
+        
+    return np.array(total_data).reshape(reshape_), np.vstack(total_labels), affine, img_list    
+
+
+
 def load_subject_cross_validation(path, 
                                   subject, 
                                   experiment, 
@@ -10,6 +57,12 @@ def load_subject_cross_validation(path,
                                   ds_num=1, 
                                   ds_type="BETA",
                                   **kwargs):
+    
+    
+    """
+    Loads the 
+    
+    """
     """
     path = "/media/robbis/DATA/fmri/memory/0_results/balanced_analysis/local/"
     subject = "120112jaclau"
@@ -34,10 +87,8 @@ def load_subject_cross_validation(path,
     
     
     img = ni.load(file_path)
-    #data = img.get_data() 
-    data = img
     
-    if len(data.shape) == 3:
+    if len(img.shape) == 3:
         n_volumes = 1
     else:
         n_volumes = img.get_data().shape[-1]
@@ -47,7 +98,8 @@ def load_subject_cross_validation(path,
     for i in range(n_volumes):
         labels.append([subject, experiment, level, ds_num, i+1])
     
-    return data, labels, img.get_affine()
+    return img, labels, img.get_affine()
+
 
 
 def load_total_subjects(path, subject, **kwargs):

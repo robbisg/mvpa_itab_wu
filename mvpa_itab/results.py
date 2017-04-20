@@ -6,14 +6,16 @@ from scipy.stats import ttest_1samp
 import pickle
 from scipy.stats.stats import zscore
 from mvpa_itab.stats.base import Correlation
-        
+import logging 
 
+logger = logging.getLogger(__name__)
 
 class SubjectResult(object):
     
     def __init__(self, name, result_dict, savers=None):
         self.name = name
         for k, v in result_dict.items():
+            logger.debug("Setting %s" % (k))
             setattr(self, '_'+str(k), v)
         if savers != None:
             self.savers = savers
@@ -42,6 +44,7 @@ class ResultsCollection(object):
         self._mask = conf['mask_area']
         self._task = conf['analysis_task']
         self._analysis = conf['analysis_type']
+        self._conf = conf
         
         self.analysis_path = path
         dir_ = '_'.join([datetime, self._analysis, self._mask, self._task])
@@ -79,7 +82,14 @@ class ResultsCollection(object):
         for summarizer in self.summarizers:
             for item in self.collection:
                 summarizer.aggregate(item)
-            summarizer.summarize(self.path)   
+            summarizer.summarize(self.path)
+        
+        import json
+        json.dump(self._conf, 
+                  file(os.path.join(self.path, 'configuration.json'), 'w'), 
+                  indent=-1,
+                  sort_keys=True)
+        
 
 
 
@@ -347,18 +357,23 @@ class DecodingSaver(Saver):
         stats = result._stats
         fname = "%s_stats.txt" % result.name
         file_ = open(os.path.join(path,fname), 'w')
-        p_value = result._perm_pvalue
         file_.write(str(stats))
+        """
+        p_value = result._perm_pvalue
         file_.write('\n\np-values for each fold \n')
         for v in p_value:
             file_.write(str(v)+'\n')
         
         file_.write('\n\nMean each fold p-value: '+str(p_value.mean()))
-        
+        """
         file_.close()
         
         for obj_name in self._object_attributes:
-            obj = getattr(result, '_'+obj_name)
+            try:
+                obj = getattr(result, '_'+obj_name)
+            except AttributeError, err:
+                logger.error(err)
+                continue
             if obj_name == 'classifier':
                 obj = obj.ca
             fname = "%s_%s.pyobj" % (result.name, obj_name)          

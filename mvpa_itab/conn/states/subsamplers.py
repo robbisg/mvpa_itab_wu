@@ -49,10 +49,10 @@ class Subsampler(object):
 
     
     def fit(self, data):
-        return NotImplemented()
+        return self
     
     
-    def subsample(self, data):
+    def transform(self, data):
         
         #Check if it has been fitted
                 
@@ -66,12 +66,15 @@ class Subsampler(object):
         X = data[arg]
         
         return X
+    
+    def fit_transform(self, data):
+        self.transform(data).transform(data)
 
 
 
 class NoneThresholder(object):
     
-    def fit(self, measure):
+    def transform(self, measure):
         return measure 
 
 

@@ -114,8 +114,8 @@ class RegressionAnalysis(Analysis):
             X_test = X[test_index][:,fset_]
             #print X_test.shape
             
-            # We suppose only scikit-learn fit algorithms are passed!
-            y_predict = self.learner.fit(X_train, y_train).predict(X_test)
+            # We suppose only scikit-learn transform algorithms are passed!
+            y_predict = self.learner.transform(X_train, y_train).predict(X_test)
             
             errors = []
             for error_ in self.error_fx:

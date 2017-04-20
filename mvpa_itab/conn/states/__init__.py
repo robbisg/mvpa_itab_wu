@@ -11,7 +11,7 @@ def test_metrics():
     clustering_ = []
     for k in range(2,11):
         
-        km = KMeans(n_clusters=k).fit(X)
+        km = KMeans(n_clusters=k).transform(X)
         labels = km.labels_
         clustering_.append(labels)
         

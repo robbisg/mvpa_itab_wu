@@ -34,9 +34,12 @@ logger = logging.getLogger(__name__)
 
 def get_partitioner(split_attr='group_split'):
     
+    splitter = Splitter(attr='partitions', attr_values=(2,3))
+    
     if split_attr == 'group_split':
     
         splitrule = [
+                    # (leave, training, testing)
                     (['3','4'],['1'],['2']),
                     (['3','4'],['2'],['1']),
                     (['1'],['2'],['3','4']),
@@ -56,8 +59,13 @@ def get_partitioner(split_attr='group_split'):
         partitioner = MemoryGroupSubjectPartitioner(group_attr='group_split', 
                                                     subject_attr=split_attr,
                                                     attr=split_attr)
+    
+    elif split_attr == 'group':
+        
+        partitioner = NFoldPartitioner(attr=split_attr)
+        splitter = Splitter(attr='partitions')
                 
-    return partitioner
+    return partitioner, splitter
 
 
 def experiment_conf(task_, ev):
@@ -76,6 +84,30 @@ def experiment_conf(task_, ev):
         conf['count'] = 1
         
     return conf
+
+
+class SubjectWiseError(BinaryFxNode):
+    
+    def __init__(self, fx, space, subj_space, **kwargs):
+        
+        self.subj_space = subj_space
+        BinaryFxNode.__init__(self, fx, space, **kwargs)
+    
+    def __call__(self, ds, _call_kwargs={}):     
+        
+        error_ = []
+        subjects = np.unique(ds.sa[self.subj_space])
+        for subj in subjects:
+            subject_mask = ds.sa[self.subj_space].value == subj
+            predictions = ds.samples[subject_mask].squeeze()
+            targets = ds.sa.targets[subject_mask]
+            err = self.fx(predictions, targets)
+            error_.append(err)
+             
+        
+        return Dataset(np.array(error_))
+        
+
 
 
 def analysis(**kwargs):
@@ -127,12 +159,13 @@ def analysis(**kwargs):
     res = [] 
     result_dict = dict()
     
-    partitioner = get_partitioner(default_conf['split_attr'])
+    partitioner, splitter = get_partitioner(default_conf['split_attr'])
 
     for task_ in tasks:
         for ev in evidences:
             
             print '---------------------------------'
+            partitioner, splitter = get_partitioner(default_conf['split_attr'])
             
             ev = str(ev)
             
@@ -152,7 +185,7 @@ def analysis(**kwargs):
     
             balanc = Balancer(count=count_, 
                               apply_selection=True, 
-                              limit='group_split')
+                              limit='group')
             
             gen = balanc.generate(ds)
             
@@ -178,15 +211,21 @@ def analysis(**kwargs):
                 splitrule = partitioner.get_partition_specs(ds_)
                 
                 for ii, rule in enumerate(splitrule):
-                
+                    ## Remove
+                    if ii == 0:
+                        continue
+                    
+                    print rule
                     partitioner = CustomPartitioner(splitrule=[rule],
                                                     attr=default_conf['split_attr']                                                
                                                     )
                 
                     cvte = CrossValidation(clf,
                                            partitioner,
-                                           splitter=Splitter(attr='partitions', attr_values=(2,3)),
-                                           enable_ca=['stats', 'probabilities'])
+                                           splitter=splitter,
+                                           enable_ca=['stats', 'probabilities'],
+                                           errorfx=SubjectWiseError(mean_mismatch_error, 'group', 'subject')
+                                           )
                 
                     sl = sphere_searchlight(cvte, radius=3, space = 'voxel_indices')
                     

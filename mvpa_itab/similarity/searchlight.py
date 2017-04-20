@@ -29,24 +29,61 @@ class SimilarityMeasure(Measure):
         self.params = {}
 
 
-class MahalanobisMeasure(SimilarityMeasure):
+class MahalanobisThresholdMeasure(SimilarityMeasure):
+    """
+    This class is used to run Mahalanobis similarity in a Searchlight analysis.
+    """
     
     def __init__(self, p=0.05, method=sklearn.covariance.EmpiricalCovariance):
+        """
+        Parameters
+        ---------
+        p: float number indicating the level of mahalanobis distance where 
+            count similar volumes.
+        
+        method: scikit covariance matrix estimator. It is used to
+                compute the covariance matrix of the training samples
+                
+        """
         
         SimilarityMeasure.__init__(self)
-        #self.space = 'targets'
+        self.method = method
         self.p = p
         
         
     def train(self, ds):
+        """
+        Function used to train the measure. 
+        It calculates the inverse of the covariance matrix and the mean 
+        of the ds sample distribution.
+        
+        Parameters
+        ----------
+        ds: pymvpa dataset the dataset to be used for the mahalanobis parameter estimation
+        
+        """
         
         super(MahalanobisMeasure, self).train(ds)
-        self.params['icov'] = self.method().fit(ds.samples).precision_
+        self.params['icov'] = self.method().transform(ds.samples).precision_
         self.is_trained = True
         
     
     def _call(self, ds):
-          
+        """
+        The method use a dataset and computes the mahalanobis distance from the trained 
+        distribution.
+        It uses the pvalue as a threshold to calculate how many volumes are 
+        mahalanobis-distant from the training distribution.
+        
+        Parameters
+        ----------
+        ds: pymvpa dataset. Testing dataset
+        
+        Returns
+        -------
+        dataset: a dataset with the number of volumes with a m-distance below the threshold
+        """
+        
         distances = []
         
         mean_ = self.params['mean']
@@ -67,14 +104,16 @@ class MahalanobisMeasure(SimilarityMeasure):
     
 
 
-class CorrelationMeasure(Measure):
+class CorrelationThresholdMeasure(Measure):
 
+    
     def __init__(self, p=0.05):
         
         Measure.__init__(self)
         #self.space = 'targets'
         self.p = p
-
+    
+    
     def _call(self, ds):
           
         distances = []
@@ -100,66 +139,6 @@ class CorrelationMeasure(Measure):
         #space = self.get_space()
         return Dataset(np.array([value]))
 
-   
-    
-class TargetCombinationPartitioner(Partitioner):
-    
-    def __init__(self, attr_task='task', **kwargs):
-        
-        Partitioner.__init__(self, **kwargs)
-        
-        self.__attr_task = attr_task
-        
-    
-    def get_partition_specs(self, ds):
-        #uniqueattr = ds.sa[self.__attr].unique()
-        uniquetask = ds.sa[self.__attr_task].unique
-        
-        listattr = []
-        for task in uniquetask:
-            targets = ds[ds.sa[self.__attr_task].value == task].uniquetargets
-            listattr.append(targets)                  
-        print listattr
-        rule = self._get_partition_specs(listattr)
-        
-        return rule
-        
-    def _get_partition_specs(self, listattr):
-        
-        prod = itertools.product(*listattr)
-        
-        return [('None', [item[0]], [item[1]])  for item in prod]
-
-
-
-class SubjectGroupPartitioner(Partitioner):
-    
-    def __init__(self, attr_task='task', **kwargs):
-        
-        Partitioner.__init__(self, **kwargs)
-        
-        self.__attr_task = attr_task
-        
-    
-    def get_partition_specs(self, ds):
-        #uniqueattr = ds.sa[self.__attr].unique()
-        uniquetask = ds.sa[self.__attr_task].unique
-        
-        listattr = []
-        for task in uniquetask:
-            targets = ds[ds.sa[self.__attr_task].value == task].uniquetargets
-            listattr.append(targets)                  
-        print listattr
-        rule = self._get_partition_specs(listattr)
-        
-        return rule
-        
-    def _get_partition_specs(self, listattr):
-        
-        prod = itertools.product(*listattr)
-        
-        return [('None', [item[0]], [item[1]])  for item in prod]
-
 
 
 class RegressionMeasure(Measure):
@@ -171,10 +150,12 @@ class RegressionMeasure(Measure):
         self.trainer = trainer
         self.fx = error_fx
         self.mse = sklm.mean_squared_error
-        
+    
+     
     def train(self, ds):
         Measure.train(self, ds)
-        self.trainer.fit(ds.samples, ds.targets)
+        self.trainer.transform(ds.samples, ds.targets)
+
 
     def _call(self, ds):
           
@@ -185,46 +166,4 @@ class RegressionMeasure(Measure):
         
         #space = self.get_space()
         return Dataset(np.array([err_, mse_]))
-    
-
-
-
-class GroupWisePartitioner(Partitioner):
-    
-    def __init__(self, attr_task='task', **kwargs):
-        
-        Partitioner.__init__(self, **kwargs)
-        
-        self.__attr_task = attr_task
-        
-    
-    def get_partition_specs(self, ds):
-        #uniqueattr = ds.sa[self.__attr].unique()
-        uniquetask = ds.sa[self.__attr_task].unique
-        
-        listattr = []
-        for task in uniquetask:
-            targets = ds[ds.sa[self.__attr_task].value == task].uniquetargets
-            listattr.append(targets)                  
-        print listattr
-        rule = self._get_partition_specs(listattr)
-        
-        return rule
-        
-    def _get_partition_specs(self, listattr):
-        
-        prod = itertools.product(*listattr)
-        
-        return [
-                (['3','4'],['1'],['2']),
-                (['3','4'],['2'],['1']),
-                (['1'],['2'],['3','4']),
-                (['2'],['1'],['3','4']),
-                
-                (['1','2'],['3'],['4']),
-                (['1','2'],['4'],['3']),
-                (['3'],['4'],['1','2']),
-                (['4'],['3'],['1','2']),
-                ]
-
     

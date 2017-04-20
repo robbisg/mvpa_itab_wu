@@ -182,6 +182,8 @@ def fidl2txt (fidlPath, outPath):
     
     outFile.close()
             
+            
+            
 def fidl2txt_2(fidlPath, outPath, runs=12., vol_run=248, stim_tr=4, offset_tr=2):
     '''
     Fidl file event to text utility.

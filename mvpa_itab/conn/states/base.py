@@ -16,7 +16,7 @@ def clustering(X, n_cluster):
     Returns the labels
     """
     
-    km = KMeans(n_clusters=n_cluster).fit(X)
+    km = KMeans(n_clusters=n_cluster).transform(X)
     return km.labels_
 
 

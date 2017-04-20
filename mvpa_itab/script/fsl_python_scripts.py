@@ -449,6 +449,7 @@ for d in dlist[:]:
             #print command
     fname.close()
     print 'sh '+os.path.join(path, d, script_filename)
+
 ###### Anatomical registration to fMRI ##############
 
 for d in dlist:

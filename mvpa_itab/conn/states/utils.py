@@ -88,7 +88,7 @@ def get_centroids(X, labels):
 
 def fit_centroids(X, centroids):
     """
-    Function used to fit centroids to original data. 
+    Function used to transform centroids to original data. 
     Given centroids it fits them to each subject data.
     
     Parameters
@@ -112,7 +112,7 @@ def fit_centroids(X, centroids):
     
     for subj in X:
         km = KMeans(n_clusters=k,
-                    init=centroids).fit(subj)
+                    init=centroids).transform(subj)
                     
         results_.append(km.labels_)
         
