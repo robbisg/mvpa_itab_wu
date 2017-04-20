@@ -415,7 +415,7 @@ def spatial(ds, **kwargs):
     classifier = fclf
     
     allowed_keys = ['map', 'sensitivities', 'stats', 
-                    'mapper', 'classifier', 'ds', 
+                    'mapper', 'classifier', 'ds_src', 
                     'pvalue' , 'p']
     allowed_results = [l_maps, res_sens, cvte.ca.stats, 
                        ds.a.mapper, classifier, ds, 

@@ -376,6 +376,11 @@ class DecodingSaver(Saver):
                 continue
             if obj_name == 'classifier':
                 obj = obj.ca
+            if obj_name == 'ds_src':
+                fname = "%s_ds_stats.txt" % result.name
+                file_ = open(os.path.join(path, fname), 'w')
+                file_.write(str(obj.summary()))
+                file_.close()
             fname = "%s_%s.pyobj" % (result.name, obj_name)          
             file_ = open(os.path.join(path,fname), 'w')
             pickle.dump(obj, file_)
