@@ -125,7 +125,7 @@ def _test_spatial(path, subjects, conf_file, type_, **kwargs):
     data_path = conf['data_path']
         
     summarizers = [rs.DecodingSummarizer()]
-    savers = [rs.DecodingSaver()]
+    savers = [rs.DecodingSaver(conf['saver__fields'])]
     result = rs.ResultsCollection(conf, path, summarizers)
     
     for subj in subjects:

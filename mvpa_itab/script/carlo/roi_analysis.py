@@ -52,7 +52,8 @@ def analysis(path, subject_file='subjects.csv', **kwargs):
               'target':'decision',
               'balancer__count':50,
               'chunk_number':5,
-              'normalization':'feature'
+              'normalization':'feature',
+              'saver__fields':['classifier', 'stats']
               }
     
     

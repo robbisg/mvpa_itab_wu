@@ -279,7 +279,8 @@ class CrossDecodingSummarizer(Summarizer):
   
 class Saver(object):
     
-    def __init__(self):
+    def __init__(self, fields=None):
+        self._fields = fields
         return
     
     def save(self, path, result):
@@ -289,7 +290,11 @@ class Saver(object):
 
 class CrossDecodingSaver(Saver):
     
-    _fields = ['confusion_target', 'confusion_total']
+    # _fields = ['confusion_target', 'confusion_total']
+    
+    def __init__(self, fields=['confusion_target', 'confusion_total']):
+        return Saver.__init__(self, fields=fields)
+            
             
                 
     def save(self, path, result):
@@ -334,7 +339,10 @@ class SearchlightSaver(Saver):
 
 class DecodingSaver(Saver):
     
-    _object_attributes = ['classifier', 'mapper', 'ds_src', 'stats'] 
+    # _object_attributes = ['classifier', 'mapper', 'ds_src', 'stats']
+    
+    def __init__(self, fields=['classifier', 'mapper', 'ds_src', 'stats']):
+        return Saver.__init__(self, fields=fields)
     
     def save(self, path, result):
         
@@ -368,7 +376,7 @@ class DecodingSaver(Saver):
         """
         file_.close()
         
-        for obj_name in self._object_attributes:
+        for obj_name in self._fields:
             try:
                 obj = getattr(result, '_'+obj_name)
             except AttributeError, err:
@@ -389,7 +397,10 @@ class DecodingSaver(Saver):
 
 class SimilaritySaver(Saver):
     
-    _values = ['distances', 'pvalues']
+    # _values = ['distances', 'pvalues']
+    
+    def __init__(self, fields=['distances', 'pvalues']):
+        return Saver.__init__(self, fields=fields)
       
             
     def save(self, path, result):
@@ -436,7 +447,7 @@ class SimilaritySaver(Saver):
                 
                 occurrence_ = [lab, tar, str(num)]
                                 
-                for i, key_ in enumerate(self._values):
+                for i, key_ in enumerate(self._fields):
                     
                     key_data = crossd_data[key_]
                     
@@ -533,14 +544,17 @@ class SimilaritySaver(Saver):
 
 class SignalDetectionSaver(Saver):
     
-    _indexes = ['beta', 'c', 'd_prime']
+    # _indexes = ['beta', 'c', 'd_prime']
+    
+    def __init__(self, fields=['beta', 'c', 'd_prime']):
+        return Saver.__init__(self, fields=fields)
        
     def save(self, path, result):
         
         fname = '%s_signal_detection_indexes.txt' % (result.name)
         file_ = open(os.path.join(path, fname), 'w')
         
-        for key_ in self._indexes:
+        for key_ in self._fields:
             file_.write(key_+','+str(getattr(result, '_'+key_)))
             file_.write("\n")
         
