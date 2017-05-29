@@ -9,6 +9,9 @@ from mvpa_itab.measure import correlation
 from mvpa_itab.regression.base import ConnectivityDataLoader, FeatureSelectionIterator, \
                                         RegressionAnalysis, PermutationAnalysis
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Pipeline(object):
     
@@ -42,6 +45,8 @@ class Pipeline(object):
             
     def __str__(self, *args, **kwargs):
         self.__name__
+
+
 
 class RegressionAnalysisPipeline(Pipeline):
     
@@ -84,13 +89,16 @@ class RegressionAnalysisPipeline(Pipeline):
         n_permutations (e.g. 1000)
         """
         self._configuration = dict()
+        
         for arg in self._default_fields:
             setattr(self, arg, self._default_fields[arg])
             self._configuration[arg] = self._default_fields[arg]
+        
         for arg in kwargs:
             setattr(self, arg, kwargs[arg])
             self._configuration[arg] = kwargs[arg]
             
+        logger.debug(self.y_field)
         
         return self
 
@@ -113,15 +121,18 @@ class RegressionAnalysisPipeline(Pipeline):
         
         self.results = []
         self.loader = ConnectivityDataLoader()
+        logger.debug(self.y_field)
         self.X, self.y = self.loader.setup_analysis(self.path, 
-                              self.roi_list, 
-                              self.directory, 
-                              self.condition_list, 
-                              self.subjects).filter(self.filter_).get_data()
+                                                    self.roi_list, 
+                                                    self.directory, 
+                                                    self.condition_list, 
+                                                    self.subjects).filter(self.filter_).get_data(y_field=self.y_field)
 
         
         X = self.X
         y = self.y
+        
+        logger.debug(X.shape, y.shape)
         
         X = zscore(X, axis=1) # Sample-wise
         y = zscore(np.float_(y))
@@ -132,8 +143,11 @@ class RegressionAnalysisPipeline(Pipeline):
         self.reg = RegressionAnalysis().setup_analysis(self.cv_schema, 
                                                   self.learner, 
                                                   self.error_fx)
-        #Speedup stuff
-        schema = ShuffleSplit(12, n_iter=1, test_size=0.25)
+        # Speedup stuff
+        schema = ShuffleSplit(12, 
+                              n_iter=1, 
+                              test_size=0.25)
+        
         self.perm_reg = RegressionAnalysis().setup_analysis(schema, 
                                                   self.learner, 
                                                   self.error_fx)
@@ -144,7 +158,7 @@ class RegressionAnalysisPipeline(Pipeline):
         
 
         
-        for i,set_ in enumerate(self.fs):
+        for i, set_ in enumerate(self.fs):
             
             if i > 78:
                 X_ = X[:,set_]
@@ -207,12 +221,17 @@ class FeaturePermutationRegression(RegressionAnalysisPipeline):
     
     def run(self):
         
+        logger.debug(self.filter_)
+        
         self.loader = ConnectivityDataLoader()
         self.X, self.y = self.loader.setup_analysis(self.path, 
                               self.roi_list, 
                               self.directory, 
                               self.condition_list, 
-                              self.subjects).filter(self.filter_).get_data()
+                              self.subjects).filter(self.filter_).get_data(y_field=self.y_field)
+                              
+        logger.debug(self.X.shape)
+        logger.debug(self.y)
         
         X = self.X
         y = self.y
@@ -221,17 +240,17 @@ class FeaturePermutationRegression(RegressionAnalysisPipeline):
         y = zscore(np.float_(y))       
         
         self.fs = FeatureSelectionIterator().setup_analysis(self.fs_algorithm, 
-                          self.fs_ranking_fx)
+                                                            self.fs_ranking_fx)
         
         
         self.reg = RegressionAnalysis().setup_analysis(self.cv_schema, 
-                                                  self.learner, 
-                                                  self.error_fx,
-                                                  feature_selection=self.fs)
+                                                       self.learner, 
+                                                       self.error_fx,
+                                                       feature_selection=self.fs)
         
         self.perm = PermutationAnalysis().setup_analysis(self.reg, 
-                                                    n_permutation=self.n_permutations,
-                                                    dimension='labels')
+                                                         n_permutation=self.n_permutations,
+                                                         dimension='labels')
         
         self.results = []
 

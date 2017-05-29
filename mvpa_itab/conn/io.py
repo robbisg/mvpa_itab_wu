@@ -11,6 +11,8 @@ from mvpa2.datasets.base import Dataset, dataset_wizard
 from mvpa_itab.conn.connectivity import load_matrices, z_fisher, glm, get_bold_signals
 from mvpa_itab.conn.operations import flatten_correlation_matrix
 
+import logging
+logger = logging.getLogger(__name__)
 
 
 def load_fcmri_dataset(data, subjects, conditions, group, level, n_run=3):
@@ -33,8 +35,9 @@ def load_fcmri_dataset(data, subjects, conditions, group, level, n_run=3):
     ds = dataset_wizard(np.array(samples), targets=attributes.T[0], chunks=attributes.T[1])
     ds.sa['run'] = attributes.T[2]
     ds.sa['group'] = attributes.T[3]
-    ds.sa['meditation'] = attributes.T[0]
     ds.sa['level'] = np.int_(attributes.T[4])
+    ds.sa['meditation'] = attributes.T[0]
+
     return ds
     
 
@@ -136,6 +139,8 @@ def load_correlation_matrix(path, pattern_):
     
     return conn_data
 
+
+
 def load_correlation(path, filepattern, format, dictionary):
     """
     path: where to find the file?
@@ -146,6 +151,8 @@ def load_correlation(path, filepattern, format, dictionary):
     # To be implemented
     
     return
+
+
 
 class CorrelationLoader(object):
         
@@ -187,6 +194,7 @@ class CorrelationLoader(object):
         return np.array(result)   
         
 
+
 class RegressionDataset(object):
     
     
@@ -223,7 +231,8 @@ class RegressionDataset(object):
                                 group=self.group[group_mask])
         return rds
     
-    
+
+
 class ConnectivityLoader(object):
     
     def __init__(self, path, subjects, res_dir, roi_list):
@@ -291,6 +300,7 @@ class ConnectivityLoader(object):
         self.nan_mask = nan_mask
         return self.nan_mask
 
+
     def store_details(self, roi_mask):
         
         fields = dict()
@@ -302,6 +312,7 @@ class ConnectivityLoader(object):
         #self.networks = self.roi_list[roi_mask].T[-2]
         
         return fields
+
 
     def get_dataset(self):
         
@@ -339,16 +350,21 @@ class ConnectivityLoader(object):
         ds_info = np.vstack(ds_info)
         
         
-        self.ds = dataset_wizard(ds_data, targets=ds_labels, chunks=np.int_(ds_info.T[4]))
+        self.ds = dataset_wizard(ds_data, targets=ds_labels, chunks=np.int_(ds_info.T[5]))
         self.ds.sa['subjects'] = ds_info.T[0]
         self.ds.sa['groups'] = ds_info.T[1]
-        self.ds.sa['expertise'] = ds_info.T[3]
         self.ds.sa['chunks_1'] = ds_info.T[2]
-        self.ds.sa['chunks_2'] = ds_info.T[4]
+        self.ds.sa['expertise'] = ds_info.T[3]
+        self.ds.sa['age'] = ds_info.T[4]
+        self.ds.sa['chunks_2'] = ds_info.T[5]
         self.ds.sa['meditation'] = ds_labels
+        
+        logger.debug(ds_info.T[4])
+        logger.debug(self.ds.sa.keys())
         
         return self.ds
               
+
 
 class ConnectivityPreprocessing(object):
     

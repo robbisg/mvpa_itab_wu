@@ -7,6 +7,7 @@ from sklearn.covariance import EmpiricalCovariance, LedoitWolf, MinCovDet, \
                         GraphLasso, ShrunkCovariance
 from mvpa2.clfs.transerror import ConfusionMatrix
 
+
 def similarity_measure(ds_tar, ds_src, results, p_value=0.05, method='mahalanobis'):
     
     if method == 'mahalanobis':
@@ -15,6 +16,7 @@ def similarity_measure(ds_tar, ds_src, results, p_value=0.05, method='mahalanobi
         return similarity_measure_euclidean (ds_tar, ds_src, results, p_value)
     elif method == 'correlation':
         return similarity_measure_correlation (ds_tar, ds_src, results, p_value)
+
 
 def similarity_measure_euclidean (ds_tar, ds_src, results, p_value):
     

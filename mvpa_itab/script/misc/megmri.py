@@ -355,15 +355,16 @@ for i in [6, 9, 12]:
     
 file_name = '/home/robbis/development/svn/mutual/trunk/fileList/listaLF_phantom_37ave.txt'
 
-off_x = np.arange(3)
-off_y = np.arange(3)
-off_z = np.arange(6)
+off_x = [1]#np.arange(1)
+off_y = np.arange(4)
+off_z = np.arange(5)
 params = np.array([6, 9, 12])
+#params = np.array([12])
 
 prod = itertools.product(off_x, off_y, off_z, params)
 
 for off in prod:
-    path = '/home/robbis/development/svn/mutual/trunk/result/los_alamos/'
+    path = '/home/robbis/development/svn/mutual/trunk/result/aalto_params/'
     fname = 'brain_offset_%s%s%s_%02d' % (str(off[0]),
                                                  str(off[1]),
                                                  str(off[2]),
@@ -382,6 +383,34 @@ for off in prod:
     command = 'mv result/*.tif %s' % (directory)
     print command
     os.system(command)
+    
+############################################    
+off_x = np.arange(2)
+off_y = np.arange(4)
+off_z = np.arange(5)
+params = np.array([6,9,12])
+
+prod = itertools.product(params, off_x, off_y, off_z)
+
+results = np.zeros((2,4,5,3))
+
+for off in prod:
+    path = '/home/robbis/development/svn/mutual/trunk/result/aalto_params/'
+    fname = 'brain_offset_%s%s%s_%02d' % (str(off[1]),
+                                          str(off[2]),
+                                          str(off[3]),
+                                          off[0]
+                                          )
+    
+    fp = file(os.path.join(path, fname, fname+'.txt'), 'r')
+    lines = fp.readlines()
+    value3_ = lines[-3]
+    value56_ = lines[-56]
+    try:
+        results[off[1], off[2], off[3], (off[0]/3-2)] = np.float(value3_)
+    except Exception, exc:
+        results[off[1], off[2], off[3], (off[0]/3-2)] = np.float(value56_)
+        continue
     
     
     
@@ -423,4 +452,282 @@ for name, fx in selected_functions.iteritems():
         continue
         
     metrics_.append((name, m))
+
+##############################################################
+from matplotlib import colors
+pl.rcParams.update({'font.size': 20})
+
+fname = "histogram_final.txt"
+#fname = "histogram_001.txt"
+
+img = np.genfromtxt("/home/robbis/phantoms/Coregistration/paper-material/"+fname)
+img[img==0] = 1
+norm = colors.LogNorm()
+
+pl.imshow(img, norm=norm, vmax=100, origin='lower', cmap=pl.cm.nipy_spectral, interpolation='bilinear')
+
+pl.savefig("/home/robbis/phantoms/Coregistration/paper-material/"+fname[:-4]+".png", dpi=300)
+
+##############################################################
+
+def get_offset(px, x):
+    if px == x-1:
+        return 0.25
+    elif px == 0:
+        return -0.25
+    return 0
+
+def get_axis_offset(offset):
+    if offset > 0:
+        off_b, off_e = offset, 0
+    elif offset < 0:
+        off_b, off_e = 0, offset
+        
+    else:
+        off_b, off_e = 0.25*0.5, -0.25*0.5
+        
+    return off_b, off_e
+
+
+def plot_projection(fig,
+                    index,
+                    projection,
+                    py,
+                    y,
+                    y_label,
+                    px,
+                    x,
+                    x_label,
+                    min_=0,
+                    max_=1,
+                    interpolation="bicubic"
+                    
+                    ):
+    ax = fig.add_subplot(2,2,index)
+    cax = ax.imshow(projection.T, interpolation=interpolation, cmap=pl.cm.jet, vmin=min_, vmax=max_)
+        
+    offset = get_offset(py, y)
+    ax.hlines(py+offset, 0-0.5, x-0.5)
+    ax.set_yticklabels(np.arange(y))
+    ax.set_yticks(np.arange(y)+offset)
+    ax.set_ylabel("Offset on %s direction" % (y_label))
+    off_b, off_e = get_axis_offset(offset)
+    ax.set_ylim(y-0.5+2*off_e, 0-0.5+2*off_b)
+    print y-0.5+off_e, 0-0.5+off_b
+    
+        
+    offset = get_offset(px, x)
+    ax.vlines(px+offset, 0-0.5, y-0.5)
+    ax.set_xticklabels(np.arange(x))
+    ax.set_xticks(np.arange(x)+offset)
+    ax.set_xlabel("Offset on %s direction" % (x_label))
+    off_b, off_e = get_axis_offset(offset)
+    ax.set_xlim(0-0.5+2*off_b, x-0.5+2*off_e)
+    print x-0.5+off_e, 0-0.5+off_b
+    
+
+
+
+path_la = "/home/robbis/development/svn/mutual/trunk/result/los_alamos/results_x-y-z-par_numpy_array.npz"
+results_xyz = np.load(path_la)
+results_xyz = results_xyz['arr_0']
+
+xyz = 1/results_xyz[...,1]
+xyz = np.rollaxis(xyz, 2, 0)
+
+def norm(x, a=1.105, b=1.085):
+
+    max_ = x.max()
+    min_ = x.min()
+     
+    c = ((b-a)*(x-min_))/(max_-min_)+a
+    return c
+
+xyz_norm = norm(xyz, a=1.142, b=1.138)
+
+max_ = xyz_norm.max()
+min_ = xyz_norm.min()
+
+shape_ = xyz_norm.shape
+
+px, py, pz = [1,1,0]
+
+
+
+x_ = shape_[0]-1
+y_ = shape_[1]
+z_ = shape_[2]
+
+""" LOS ALAMOS
+fig = pl.figure(figsize=(12,7))
+
+plot_projection(fig, 1, xyz_norm[:,py,:], pz, z_, "z", px, x_, "x", min_=min_, max_=max_)
+plot_projection(fig, 2, xyz_norm[px,:,:], pz, z_, "z", py, y_, "y", min_=min_, max_=max_)  
+plot_projection(fig, 3, xyz_norm[:,:,pz], py, y_, "y", px, x_, "x", min_=min_, max_=max_)
+"""
+
+fig = pl.figure(figsize=(10,13))
+
+plot_projection(fig, 1, xyz_norm[:4,py,:], px, x_, "x", pz, z_, "z", min_=min_, max_=max_)
+plot_projection(fig, 2, xyz_norm[pz,:,:], px, x_, "x", py, y_, "y", min_=min_, max_=max_)  
+plot_projection(fig, 3, xyz_norm[:4,:,px], py, y_, "y", pz, z_, "z", min_=min_, max_=max_)
+pl.tight_layout()
+
+pl.savefig("/home/robbis/windows-vbox/aalto_2.png", dpi=150)
+
+
+
+#######################################################
+path = "/home/robbis/development/svn/mutual/trunk/result/los_alamos/brain_offset_000_06/"
+path = "/home/robbis/development/svn/mutual/trunk/2015/offset_z_0/"
+img_list = os.listdir(path)
+pre_  = [i for i in img_list if i.find("1_") != -1]
+post_ = [i for i in img_list if i.find("2_") != -1]
+
+pre_.sort()
+post_.sort()
+
+pre_stack = []
+post_stack = []
+
+for i, img in enumerate(pre_):
+    fname_pre = os.path.join(path, img)
+    fname_post = os.path.join(path, post_[i])
+    im_pre = Image.open(fname_pre)
+    im_post = Image.open(fname_post)
+    pre_stack.append(np.asanyarray(im_pre))
+    post_stack.append(np.asanyarray(im_post))
+    
+post_stack = np.dstack(post_stack)
+pre_stack = np.dstack(pre_stack)
+
+mat = {}
+mat['hf'] = post_stack
+mat['lf'] = pre_stack
+
+#####################################################################
+
+from sklearn.mixture import GaussianMixture
+from scipy import ndimage
+
+
+def plot_log_histogram(img, means_=None, interp=None, vmax=None):
+    from matplotlib import colors
+    pl.figure()
+    img[img==0] = 1
+    norm = colors.LogNorm()
+
+    pl.imshow(img, 
+              norm=norm, 
+              vmax=vmax, 
+              origin='lower', 
+              cmap=pl.cm.nipy_spectral, 
+              interpolation=interp
+              )
+    pl.colorbar()
+    if means_ != None:
+        pl.scatter(means_[:,0],
+                   means_[:,1],
+                   s=100,
+                   c='red')
+    
+
+
+def make_histogram(img1, img2, n_bin=256):
+    histogram = np.zeros((n_bin, n_bin))
+    for x, y in zip(img1, img2):
+        histogram[x,y] += 1
+        
+    return histogram
+
+
+def get_images(tiff_list):
+    images = []
+    for i, img in enumerate(tiff_list):
+        img_ = Image.open(img)
+        images.append(np.asanyarray(img_))
+        
+    return np.dstack(images)
+
+
+def get_file_list(path, pattern, end=None):
+    import glob
+    flist = glob.glob(os.path.join(path, pattern))
+    flist.sort()
+    if end == None:
+        end=len(flist)
+    
+    return flist[:end]
+    
+
+def reverse_histogram(histogram):
+    data = []
+    lenx, leny = histogram.shape
+    
+    for i in range(lenx):
+        for j in range(leny):
+            n_elem = np.int(np.rint(histogram[i,j]))
+            if n_elem > 1:
+                datum = np.zeros((n_elem, 2))
+                datum[:,:] = i, j
+            
+                data.append(datum)
+    
+    return np.vstack(data)
+
+
+
+hf_init = get_file_list("/home/robbis/development/svn/mutual/trunk/pre", "*.tif", 6)
+hf_final = get_file_list("/home/robbis/development/svn/mutual/trunk/result", "2_*.tif", 6)
+lf = get_file_list("/home/robbis/development/svn/mutual/trunk/result", "1_*.tif")
+
+hf_init_img = get_images(hf_init)
+hf_final_img = get_images(hf_final)
+lf = get_images(lf)
+
+
+hf_i_flat = hf_init_img.flatten()
+hf_f_flat = hf_final_img.flatten()
+lf_flat = lf.flatten()
+
+
+histo_init = make_histogram(lf_flat, hf_i_flat)
+histo_final = make_histogram(lf_flat, hf_f_flat)
+
+sm_final = ndimage.gaussian_filter(histo_final, sigma=1.)
+sm_init = ndimage.gaussian_filter(histo_init, sigma=1.)
+
+sm_init[sm_init == 0] = 1
+sm_final[sm_final == 0] = 1
+init = reverse_histogram(np.log10(sm_init))
+final = reverse_histogram(np.log10(sm_final))
+
+
+#init = np.vstack((lf_flat, hf_i_flat)).T
+#final = np.vstack((lf_flat, hf_f_flat)).T
+
+m_init = np.array([[  0.,   0.],
+                   [ 54.,  10.],
+                   [ 80.,  75.]])
+
+gmm = GaussianMixture(n_components=3, means_init=m_init)
+
+gmm.fit(init)
+means_i = gmm.means_
+cov_i = gmm.covariances_
+
+m_final = np.array([[  0.,   0.],
+                   [ 42.,  17.],
+                   [ 80.,  75.]])
+gmm = GaussianMixture(n_components=3, means_init=m_final)
+gmm.fit(final)
+means_f = gmm.means_
+cov_f = gmm.covariances_
+
+plot_log_histogram(histo_init, means_i, vmax=100, interp="bicubic")
+pl.scatter(m_init[:,0], m_init[:,1], s=100, marker="^")
+plot_log_histogram(histo_final, means_f, vmax=100, interp="bicubic")
+pl.scatter(m_final[:,0], m_final[:,1], s=100, marker="^")
+
+
 

@@ -49,6 +49,48 @@ def load_group_total(path, experiment, level=[1,2,3]):
     return np.array(total_data).reshape(reshape_), np.vstack(total_labels), affine, img_list    
 
 
+def load_beta_subjects(path, subjects, **kwargs):
+    
+    default_conf = {
+                    'subjects': ['110929angque','110929anngio','111004edolat'],
+                    'roi':['L_FFA.nii', 'L_PPA.nii'],
+                    'encoding': ["F", "L"],
+                    'level' : ["1","2","3"],              
+                    }
+    
+    default_conf.update(kwargs)
+    default_conf['subjects'] = subjects
+    conf_product = itertools.product(*default_conf.values())
+    
+    
+    total_data = []
+    total_labels = []
+    img_list = []
+    
+    key_dict = dict(zip(default_conf.keys(), range(len(default_conf.keys()))))
+    print key_dict
+    print default_conf
+    
+    for elements in conf_product:
+        
+        subject = elements[key_dict['subjects']]
+        roi = elements[key_dict['roi']]
+        level = elements[key_dict['level']]
+        encoding = elements[key_dict['encoding']]        
+
+        data, labels, affine = load_data_beta(path, subject, roi, encoding, level)
+
+        total_data.append(data.get_data())
+        total_labels.append(labels)
+        img_list.append(data)
+    
+    total_data = np.rollaxis(np.array(total_data), 0, 4)
+    reshape_ = list(total_data.shape[:3]) + [-1]
+        
+    return np.array(total_data).reshape(reshape_), np.vstack(total_labels), affine, img_list
+
+
+
 
 def load_subject_cross_validation(path, 
                                   subject, 
@@ -97,6 +139,41 @@ def load_subject_cross_validation(path,
     labels = []
     for i in range(n_volumes):
         labels.append([subject, experiment, level, ds_num, i+1])
+    
+    return img, labels, img.get_affine()
+
+
+
+def load_data_beta(path, subject, roi, encoding, level, **kwargs):
+    
+    
+    default_conf = {'file_pattern': \
+                    "beta_%s_%s%sC_%s.nii.gz",
+                    'dir_pattern': ""
+                    }
+    
+    default_conf.update(kwargs)
+    
+    file_pattern = default_conf['file_pattern']
+    dir_pattern = default_conf['dir_pattern']
+    
+    file_path = os.path.join(path,
+                             dir_pattern,
+                             file_pattern % (roi, encoding, level, subject),
+                             )
+
+
+    img = ni.load(file_path)
+    
+    if len(img.shape) == 3:
+        n_volumes = 1
+    else:
+        n_volumes = img.get_data().shape[-1]
+    
+    
+    labels = []
+    for i in range(n_volumes):
+        labels.append([subject, roi, encoding, level])
     
     return img, labels, img.get_affine()
 

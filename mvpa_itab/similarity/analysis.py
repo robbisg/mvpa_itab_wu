@@ -4,9 +4,9 @@ from nitime.analysis import SeedCorrelationAnalyzer, BaseAnalyzer
 from scipy.spatial.distance import euclidean
 from nitime import descriptors as desc
 from numpy.random.mtrand import permutation
-import matplotlib.pyplot as pl
 
 import sys
+
 
 class SeedAnalyzer(BaseAnalyzer):
     
@@ -58,6 +58,7 @@ class SeedAnalyzer(BaseAnalyzer):
         return Cxy.squeeze()
 
 
+
 class SeedCorrelationAnalyzerWrapper(SeedCorrelationAnalyzer, SeedAnalyzer):
     
     def __init__(self, seed_time_series=None, target_time_series=None):
@@ -69,6 +70,7 @@ class SeedCorrelationAnalyzerWrapper(SeedCorrelationAnalyzer, SeedAnalyzer):
     def measure(self):
         
         return self.corrcoef
+
 
 
 class SeedSimilarityAnalysis(object):

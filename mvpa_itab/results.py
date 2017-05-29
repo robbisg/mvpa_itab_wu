@@ -8,7 +8,9 @@ from scipy.stats.stats import zscore
 from mvpa_itab.stats.base import Correlation
 import logging 
 
+
 logger = logging.getLogger(__name__)
+
 
 class SubjectResult(object):
     
@@ -133,6 +135,7 @@ class SearchlightSummarizer(Summarizer):
         Summarizer.__init__(self)
         self._total_map = []        
         self._p_value = p
+
 
     def aggregate(self, result):
         
@@ -561,13 +564,17 @@ class SignalDetectionSaver(Saver):
         file_.close()
 
 
+
 def make_dir(path):
     """ Make dir unix command wrapper """
     command = 'mkdir '+os.path.join(path)
     os.system(command)
-        
+    
+    
 def save_image(filename, image):
     return  
+
+
 
 def get_time():
     """Get the current timewise and returns a string (fmt: yymmdd_hhmmss)"""

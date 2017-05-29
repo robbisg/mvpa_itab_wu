@@ -4,16 +4,26 @@ import nibabel as ni
 import numpy as np
 import os
 from sklearn.preprocessing.label import LabelEncoder
-from theano.tensor.nnet.tests.test_conv3d2d import ndimage
+from sklearn.utils.extmath import cartesian
 
 
-def design_matrix(sample_labels):
+def design_matrix(sample_labels, interaction_indices=None):
     """
     Parameters
     ---------
     sample_labels: 
-        a numpy matrix, for each sample a vector with condition
+        a numpy matrix, for each sample a vector with the conditions
         which we would like to model.
+        cols represent the type of conditions we want to model,
+        row represent a combination of conditions that are represented by the row-variable.
+        if we have a 2x3 design we build this matrix:
+        [[0,0],
+         [0,1],
+         [0,2],
+         [1,0],
+         [1,1],
+         [1,2]]
+        
         
     
     Returns
@@ -37,6 +47,13 @@ def design_matrix(sample_labels):
         n_factors+=label_factors
         factor_num.append(label_factors)
     
+    n_interactions = 0
+    if interaction_indices != None:
+        interaction_factors = np.array(factor_num)[[interaction_indices]]
+        n_interactions = np.prod(interaction_factors)
+        Xint = np.zeros((sample_labels.shape[0], n_interactions))
+    
+    
     X = np.zeros((sample_labels.shape[0], n_factors))
     
     lb = LabelEncoder()
@@ -51,8 +68,33 @@ def design_matrix(sample_labels):
         
         factor_labels.append(lb.classes_)
         
-        offset+=factor
+        offset += factor
     
+    if interaction_indices != None:
+        interaction_product = [np.arange(v).tolist() for v in interaction_factors]
+        interaction_gen = cartesian(interaction_product)
+        
+        # This is buggy!!
+        Xint = np.zeros((sample_labels.shape[0], n_interactions))
+        offset = interaction_indices[0] * np.sum(factor_num[:interaction_indices[0]])
+        offset = np.int(offset)
+        for i, int_indices in enumerate(interaction_gen):
+            
+            index1 = offset + int_indices[0]
+            index2 = offset + int_indices[1] + factor_num[interaction_indices[0]]
+            
+            Xint[:,i] = X[:,index1] * X[:,index2]
+            
+            factor1 = interaction_indices[0]
+            factor2 = interaction_indices[1]
+
+            new_label = factor_labels[factor1][int_indices[0]] + "_" + \
+                        factor_labels[factor2][int_indices[1]]
+                        
+            factor_labels.append(new_label)
+        
+        X = np.hstack((X, Xint))
+        
     return X, np.hstack(factor_labels), factor_num
 
 
@@ -91,7 +133,7 @@ def build_contrast(factor_num, factor_to_test, comparison_type="zero", const_val
         
     const_array = np.zeros(rows)
     const_array[:] = const_value
-        
+    
     return np.vstack(contrast), const_array
 
 
@@ -100,14 +142,21 @@ def anova_ftest(data, design_matrix, contrast, const_term, mask_index):
     
     result_shape = list(data.shape[:-1]) + [2]
     result_map = np.zeros(result_shape)
-    
+    failed = 0
     for x, y, z in mask_index:
-        res = sm.OLS(data[x, y, z], design_matrix).transform()
-        f_test = res.f_test((contrast, const_term))
-        values_ = [f_test.fvalue.squeeze(), 1-f_test.pvalue]
+        
+        res = sm.OLS(data[x, y, z], design_matrix).fit()
+        try:
+            f_test = res.f_test(contrast)
+        except Exception, e:
+            failed += 1
+            continue
+        values_ = [f_test.fvalue.squeeze(), 1 - f_test.pvalue]
         
         result_map[x,y,z] = np.array(values_)
-        
+    
+    print failed
+      
     return result_map
 
 

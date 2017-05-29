@@ -28,6 +28,8 @@ from scipy.stats.stats import ttest_ind
 
 from sklearn.decomposition import PCA
 
+import logging
+logger = logging.getLogger(__name__)
 
 #@profile
 def analyze_connectivity(imagelist, path_roi, roi_names, ts_param, **kwargs):
@@ -111,6 +113,7 @@ def create_similarity_files(path, subjects, target_label, source_label):
                 np.savetxt(os.path.join(path_save, '_'.join(['similarity',cond,time,s,'.txt'])), data_a, 
                            fmt='%4.4f', delimiter=',')
     np.savetxt(os.path.join(path_save, 'roi_labels.txt'), roi_a, fmt='%s')                      
+
 
 
 def bold_convolution(bold_timeseries, duration, win_func=boxcar):
@@ -488,11 +491,12 @@ def load_matrices(path, condition):
     subjects = os.listdir(path)
     
     subjects = [s for s in subjects if s.find('configuration') == -1 \
-                and s.find('.') == -1]
+                and s.find('.') == -1 ]
+    subjects = [s for s in subjects if s.find("expertise") == -1]
     
-    
+    logger.debug(path)
     result = []
-    
+    logger.debug(subjects)
     for c in condition:
 
         s_list = []
@@ -505,7 +509,7 @@ def load_matrices(path, condition):
             filel = [f for f in filel if f.find(c) != -1]
             c_list = []
             for f in filel:
-
+                logger.debug(s+" "+f)
                 matrix = np.loadtxt(os.path.join(sub_path, f))
                 
                 c_list.append(matrix)

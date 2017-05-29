@@ -10,6 +10,11 @@ from sklearn.svm.classes import SVR
 from sklearn.metrics.regression import mean_squared_error, r2_score
 from mvpa_itab.measure import correlation
 from mvpa_itab.utils import progress
+from tqdm import *
+
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class Analysis(object):
@@ -35,6 +40,7 @@ class ConnectivityDataLoader(Analysis):
         self.subjects = subjects
         
         conn = ConnectivityLoader(path, self.subjects, self.directory, roi_list)
+        logger.debug(self.conditions)
         conn.get_results(self.conditions)
         self.ds = conn.get_dataset()
         
@@ -42,8 +48,10 @@ class ConnectivityDataLoader(Analysis):
 
     
     def filter(self, filter_, operation='and'):
-        """Filter is a dictionary the key is the sample attribute the value is the value
-        to filter, if the dictionary has more than one item a logical and is performed"""
+        """Filter is a dictionary the key is the sample attribute 
+        the value is the value
+        to filter, if the dictionary has more than one item a 
+        logical and is performed"""
         
         if operation == 'and':
             func = np.logical_and
@@ -53,16 +61,24 @@ class ConnectivityDataLoader(Analysis):
             mask = np.zeros_like(self.ds.targets, dtype=np.bool)
             
         for k, v in filter_.items():
+            logger.debug(mask)
+            logger.debug(k)
+            logger.debug(v)
             mask = func(mask, self.ds.sa[k].value == v)
             
         self.ds = self.ds[mask]
         
-        return self
+        logger.debug(self.ds.shape)
         
+        return self
+    
+    
     def get_data(self, y_field='expertise'):
         """
         Get X matrix of samples and y array of outcomes
         """
+        logger.debug(self.ds.sa['age'])
+        logger.debug(y_field)
         return self.ds.samples, self.ds.sa[y_field].value    
             
 
@@ -99,9 +115,13 @@ class RegressionAnalysis(Analysis):
         samples_ = []
         i = 0
         n = cv.n_iter
-        for train_index, test_index in cv:           
+        for train_index, test_index in tqdm(cv, desc="regression cross-validation"):           
             i += 1
-            progress(i, n, suffix=' -- regression')
+            #progress(i, n, suffix=' -- regression')
+            
+            logger.debug(X.shape)
+            logger.debug(y.shape)
+            
             X_train = X[train_index]
             y_train = y[train_index]
             
@@ -115,7 +135,7 @@ class RegressionAnalysis(Analysis):
             #print X_test.shape
             
             # We suppose only scikit-learn transform algorithms are passed!
-            y_predict = self.learner.transform(X_train, y_train).predict(X_test)
+            y_predict = self.learner.fit(X_train, y_train).predict(X_test)
             
             errors = []
             for error_ in self.error_fx:
@@ -143,7 +163,7 @@ class PermutationAnalysis(Analysis):
         
         self.null_dist = []
         
-        for i in range(self.n_permutation):
+        for i in tqdm(range(self.n_permutation), desc="permutation"):
             
             X_, y_ = self.shuffle(X, y)
             permut_value = self.analysis.run(X_, y_)
@@ -230,6 +250,7 @@ class FeatureSelectionIterator(object):
         self.n = len(values)
         
         return self
+    
     
     def select_first(self, n):
         "If n<1 it indicates a percentage"
@@ -338,7 +359,8 @@ iterator_setup = {'directory':['20151030_141350_connectivity_filtered_first_no_g
                   
                   }
 
-subjects = np.loadtxt('/media/robbis/DATA/fmri/monks/attributes_struct.txt',
+subjects = np.loadtxt('/media/robbis/DATA/fmri/monks/attributes_struct.csv',
+                      delimiter=",",
                       dtype=np.str)
 
 _fields = {'path':'/media/robbis/DATA/fmri/monks/0_results', 
@@ -346,11 +368,11 @@ _fields = {'path':'/media/robbis/DATA/fmri/monks/0_results',
                       delimiter=',',
                       dtype=np.str), 
                #'directory':'20150427_124039_connectivity_fmri', 
-               #'conditions':['Samatha', 'Vipassana'],
-               'directory':'20150427_124039_connectivity_fmri',
-               'condition_list':['Rest'],
+               'condition_list':['Samatha', 'Vipassana'],
+               #'directory':'20150427_124039_connectivity_fmri',
+               #'condition_list':['Rest'],
                'subjects':subjects,
-               'filter_':{'meditation':'Rest', 'groups':'E'},
+               'filter_':{'groups':'E'},
                'fs_algorithm':Correlation,
                'fs_ranking_fx':ranking_correlation,
                'cv_schema':ShuffleSplit(12, 
@@ -358,7 +380,7 @@ _fields = {'path':'/media/robbis/DATA/fmri/monks/0_results',
                                         test_size=0.25),
                'learner':SVR(kernel='linear', C=1),
                'error_fx':[mean_squared_error, correlation],
-               'y_field':'expertise',
+               'y_field':'age',
                'n_permutations':1000
                }
 
