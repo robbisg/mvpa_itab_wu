@@ -30,6 +30,7 @@ def load_group(path, experiment, level):
 
 
 
+
 def load_group_total(path, experiment, level=[1,2,3]):
     
     total_data = []
@@ -47,6 +48,8 @@ def load_group_total(path, experiment, level=[1,2,3]):
     reshape_ = list(total_data.shape[:3]) + [-1]
         
     return np.array(total_data).reshape(reshape_), np.vstack(total_labels), affine, img_list    
+
+
 
 
 def load_beta_subjects(path, subjects, **kwargs):

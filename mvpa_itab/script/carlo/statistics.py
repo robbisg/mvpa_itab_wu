@@ -1,165 +1,26 @@
 ##############è Convert ######################
 from mvpa_itab.io.base import load_dataset, read_configuration
 from mvpa_itab.main_wu import preprocess_dataset
-from mvpa_itab.timewise import AverageLinearCSVM, ErrorPerTrial, StoreResults
-from mvpa2.measures.base import CrossValidation, Dataset
-from mvpa2.generators.partition import NFoldPartitioner, HalfPartitioner
-from mvpa2.clfs.svm import LinearCSVMC
-from mvpa2.suite import mean_group_sample
-from mvpa2.mappers.fx import BinaryFxNode
-from mvpa2.misc.errorfx import mean_mismatch_error
 import nibabel as ni
-import numpy as np
-from mvpa2.clfs.base import Classifier
-from mvpa2.generators.resampling import Balancer
 import mvpa_itab.results as rs
 from mvpa_itab.wrapper.sklearn import SKLCrossValidation
 from sklearn.cross_validation import StratifiedKFold
 
-from sklearn.svm import SVC
-from mvpa2.clfs.skl.base import SKLLearnerAdapter
-from mvpa2.suite import debug, sphere_searchlight
 from mvpa2.suite import *
+from mvpa_itab.pipeline.searchlight import SearchlightAnalysis
 
-from scipy.stats import ttest_ind
-from scipy.stats import ttest_1samp
-from numpy.random.mtrand import permutation
 #path = '/media/robbis/DATA/fmri/memory/'
 path = '/home/robbis/fmri/memory/'
 #path = '/DATA11/roberto/fmri/memory/'
 
 
-if __debug__:
-    debug.active += ["SLC"]
+from mvpa_itab.script.carlo import subjects, tasks, evidences
 
-evidences = [1,3,5]
-subjects = ['110929angque',
- '110929anngio',
- '111004edolat',
- '111006giaman',
- '111006rossep',
- '111011marlam',
- '111011corbev',
- '111013fabgue',
- '111018montor',
- '111020adefer',
- '111020mardep',
- '111027ilepac',
- '111123marcai',
- '111123roblan',
- '111129mirgra',
- '111202cincal',
- '111206marant',
- '111214angfav',
- '111214cardin',
- '111220fraarg',
- '111220martes',
- '120119maulig',
- '120126andspo',
- '120112jaclau']  
-tasks = ['memory', 'decision']
-res = []
-result_dict = dict()
+
+
  
-conf = read_configuration(path, 'memory.conf', 'BETA_MVPA')
-
-conf['analysis_type'] = 'searchlight'
-conf['analysis_task'] = 'memory'
-
-summarizers = [rs.SearchlightSummarizer()]
-savers = [rs.SearchlightSaver()]
-collection = rs.ResultsCollection(conf, path, summarizers)
-
-subjects = subjects[19:]
-
-for subj in subjects:
-    
-    data_type = 'BETA_MVPA'
-    conf = read_configuration(path, 'memory.conf', data_type)
-    data_path = conf['data_path']
-    ds_original = load_dataset(data_path, subj, data_type, **conf)
-
-    for task_ in tasks:
-        for ev in evidences:
             
-            print '---------------------------------'
-            
-            ev = str(ev)
-            
-            ds = ds_original.copy()
-            
-            # label managing
-            if task_ == 'memory':
-                field_ = 'stim'
-                conf['label_dropped'] = 'F0'
-                conf['label_included'] = 'N'+ev+','+'O'+ev
-                count_ = 1
-            else: # decision
-                field_ = 'decision'
-                conf['label_dropped'] = 'FIX0'
-                conf['label_included'] = 'NEW'+ev+','+'OLD'+ev
-                count_ = 5
 
-
-
-            ds.targets = np.core.defchararray.add(np.array(ds.sa[field_].value, dtype=np.str), 
-                                                  np.array(ds.sa.evidence,dtype= np.str))
-
-            
-            ds = preprocess_dataset(ds, data_type, **conf)
-    
-            balanc = Balancer(count=count_, apply_selection=True, limit=None)
-            gen = balanc.generate(ds)
-            
-            cv_storage = StoreResults()
-
-            maps = []
-            
-            clf = LinearCSVMC(C=1)
-            
-            for i, ds_ in enumerate(gen):
-                #print ds_.summary(sstats=False)
-                #Avoid balancing!
-                #ds_ = ds
-                
-                # This is used for the sklearn crossvalidation
-                y = np.zeros_like(ds_.targets, dtype=np.int_)
-                y[ds_.targets == ds_.uniquetargets[0]] = 1
-                
-                # We needs to modify the chunks in order to use sklearn
-                ds_.chunks = np.arange(len(ds_.chunks))
-                
-                partitioner = SKLCrossValidation(StratifiedKFold(y, n_folds=5))
-                
-                cvte = CrossValidation(clf,
-                                       partitioner,
-                                       enable_ca=['stats', 'probabilities'])
-                
-                sl = sphere_searchlight(cvte, radius=3, space = 'voxel_indices')
-                
-                sl_map = sl(ds_)
-                sl_map.samples *= -1
-                sl_map.samples +=  1
-
-                map_ = map2nifti(sl_map, imghdr=ds.a.imghdr)
-
-                '''
-                permut_ = np.array(permut_)
-                permut_ = np.roll(permut_, 0, 4)
-                ni.save(ni.Nifti1Image(permut_, map_.get_affine()), 
-                        os.path.join(path, subj, 'permutation_'+str(i)+'_'+task_+'_'+ev+'.nii.gz'))
-                '''
-                maps.append(map_)
-                
-                name = "%s_%s_%s_evidence_%s_balance_ds_%s" %(subj, task_, data_type, str(ev), str(i+1))
-                result_dict['radius'] = 3
-                result_dict['map'] = map_
-                
-                subj_result = rs.SubjectResult(name, result_dict, savers)
-                collection.add(subj_result)
-            
-            res.append(maps)
-                #err = cvte(ds_)
 
 path_results = os.path.join(path,'0_results','220715_decision_searchlight')
 os.system('mkdir '+path_results)
@@ -196,46 +57,7 @@ for i, subj in enumerate(subjects):
 from nipy.algorithms.statistics.empirical_pvalue import *
 
 group1 = []
-subjects = ['110929angque',
- '110929anngio',
- '111004edolat',
- '111006giaman',
- '111006rossep',
- '111011marlam',
- '111011corbev',
- '111013fabgue',
- '111018montor',
- '111020adefer',
- '111020mardep',
- '111027ilepac',
- '111123marcai',
- '111123roblan',
- '111129mirgra',
- '111202cincal',
- '111206marant',
- '111214angfav',
- '111214cardin',
- '111220fraarg',
- '111220martes',
- '120119maulig',
- '120126andspo',
- '120112jaclau']       
 
-group1 = ['110929angque',
- '110929anngio',
- '111004edolat',
- '111006giaman',
- '111006rossep',
- '111011marlam',
- '111123marcai',
- '111123roblan',
- '111129mirgra',
- '111202cincal',
- '111206marant',
- '120126andspo',]
-
-tasks = ['memory', 'decision']
-evidences = [1, 3, 5]
 result = dict()
 keys_ = ['group1', 'group2']
 ds_list = [1]
@@ -265,14 +87,14 @@ for t_ in tasks:
                 folder_ = '%s_%s_BETA_MVPA_evidence_%s_balance_ds_%s' \
                             % (subj, t_, str(ev_), str(ds_name))
                  
-                fname_ =  '%s_%s_BETA_MVPA_evidence_%s_balance_ds_%s_radius_3_searchlight_mean_map.nii.gz' \
+                mean_map =  '%s_%s_BETA_MVPA_evidence_%s_balance_ds_%s_radius_3_searchlight_mean_map.nii.gz' \
                             % (subj, t_, str(ev_), str(ds_name))
                 
-                total_ =  '%s_%s_BETA_MVPA_evidence_%s_balance_ds_%s_radius_3_searchlight_total_map.nii.gz' \
+                total_map =  '%s_%s_BETA_MVPA_evidence_%s_balance_ds_%s_radius_3_searchlight_total_map.nii.gz' \
                             % (subj, t_, str(ev_), str(ds_name))
                     
                 
-                img_name = os.path.join(path, subj, folder_, fname_)
+                img_name = os.path.join(path, subj, folder_, mean_map)
                 img_ = ni.load(img_name)
                 
                 subj_map.append(img_.get_data())
@@ -301,7 +123,7 @@ for t_ in tasks:
             #array_.append(img_.get_data())
             array_.append(img_mean)
             
-            t, p = check_total(folder_, total_, t_, subj, ev_)
+            t, p = check_total(folder_, total_map, t_, subj, ev_)
             cross_t.append(t)
             cross_p.append(p)
             
@@ -342,12 +164,16 @@ def check_total(folder_, total_, task_, subj_, evidence_):
     
     fname_save = os.path.join(path, subj_, '%s_%s_evidence_%s_%s.nii.gz' %(subj_, task_, str(evidence_), 't'))
     ni.save(ni.Nifti1Image(t, affine), fname_save)
+    
     fname_save = os.path.join(path, subj_, '%s_%s_evidence_%s_%s.nii.gz' %(subj_, task_, str(evidence_), 'p'))
     ni.save(ni.Nifti1Image(p, affine), fname_save)
+    
     fname_save = os.path.join(path, subj, '%s_%s_evidence_%s_p_fdr_corr.nii.gz' %(subj_, task_, str(evidence_)))
+    
     fdr_ = fdr(p[np.logical_not(np.isnan(p))])
     fdr_map = np.zeros_like(p)
     fdr_map[np.logical_not(np.isnan(p))] = fdr_
+    
     ni.save(ni.Nifti1Image(1.-fdr_map, affine), fname_save)   
     
     return t, p

@@ -101,13 +101,16 @@ class RegressionAnalysis(Analysis):
         return self
     
     
-    def run(self, X, y):
+    def run(self, X, y, sets=None):
         """
         The output is a vector r x n where r is the number
         of repetitions of the splitting method
         """
         
-        cv = self.cross_validation
+        if sets==None:
+            cv = self.cross_validation
+        else:
+            
         
         mse_ = []
         set_ = []
@@ -115,6 +118,7 @@ class RegressionAnalysis(Analysis):
         samples_ = []
         i = 0
         n = cv.n_iter
+        
         for train_index, test_index in tqdm(cv, desc="regression cross-validation"):           
             i += 1
             #progress(i, n, suffix=' -- regression')
@@ -288,6 +292,7 @@ class ScriptIterator(object):
         import itertools
             
         args = [arg for arg in kwargs]
+        logger.info(kwargs)
         combinations_ = list(itertools.product(*[kwargs[arg] for arg in kwargs]))
         self.configurations = [dict(zip(args, elem)) for elem in combinations_]
         self.i = 0
@@ -311,9 +316,7 @@ class ScriptIterator(object):
     def run(self, pipeline):
         results = []
 
-        for conf in self:
-            progress(self.i, self.n)
-            print str(np.float(self.i)/self.n)
+        for conf in tqdm(self, desc='configuration_iterator'):
             pipeline.update_configuration(**conf)
             res = pipeline.run()
             
@@ -348,23 +351,27 @@ class RegressionSaver(object):
             
 ###### Script ######
 
-r = '20151030_141350_connectivity_filtered_first_no_gsr_findlab_fmri'
-roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
+#path = "/media/robbis/DATA/fmri/monks"
+path = "/home/robbis/fmri/monks"
+dir_ = ""
+
+r = '20151103_132009_connectivity_filtered_first_filtered_after_each_run_no_gsr_findlab_fmri'
+roi_list = np.loadtxt(os.path.join(path, dir_, 'findlab_rois.txt'), 
                       delimiter=',',
                       dtype=np.str)
 
-iterator_setup = {'directory':['20151030_141350_connectivity_filtered_first_no_gsr_findlab_fmri'],
-                  'conditions': ['Rest'],
-                  'learner': [SVR(kernel='linear', C=1)]
-                  
+iterator_setup = {'directory':['20151103_132009_connectivity_filtered_first_filtered_after_each_run_no_gsr_findlab_fmri'],
+                  'conditions': ["Samatha", "Vipassana"],
+                  'learner': [SVR(kernel='linear', C=1)],
+                  "y_field": ['age']                  
                   }
 
-subjects = np.loadtxt('/media/robbis/DATA/fmri/monks/attributes_struct.csv',
+subjects = np.loadtxt(os.path.join(path, 'attributes_struct.csv'),
                       delimiter=",",
                       dtype=np.str)
 
-_fields = {'path':'/media/robbis/DATA/fmri/monks/0_results', 
-               'roi_list':np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
+_fields = {'path': os.path.join(path, '0_results'), 
+               'roi_list':np.loadtxt(os.path.join(path, 'findlab_rois.txt'), 
                       delimiter=',',
                       dtype=np.str), 
                #'directory':'20150427_124039_connectivity_fmri', 
@@ -380,7 +387,7 @@ _fields = {'path':'/media/robbis/DATA/fmri/monks/0_results',
                                         test_size=0.25),
                'learner':SVR(kernel='linear', C=1),
                'error_fx':[mean_squared_error, correlation],
-               'y_field':'age',
+               'y_field':'expertise',
                'n_permutations':1000
                }
 
@@ -394,5 +401,6 @@ pipeline.setup_analysis(**_fields)
 iter_ = ScriptIterator()
 iter_.setup_analysis(**iterator_setup)
 results = iter_.run(pipeline)
+pickle.dump(results, file("/home/robbis/fmri/monks/results_regression_age_perm_1000_cv_250.pyobj", "w"))
 '''
 

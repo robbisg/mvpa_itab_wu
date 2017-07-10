@@ -557,7 +557,9 @@ def load_attributes (path, task, subj, **kwargs):
         
         for dir in completeDirs:
             if (os.path.exists(os.path.join(dir, attrFiles[0]))):
-                fidl_convert(os.path.join(dir, attrFiles[0]), os.path.join(dir, attrFiles[0][:-5]+'.txt'), type=fidl_type)
+                fidl_convert(os.path.join(dir, attrFiles[0]), 
+                             os.path.join(dir, attrFiles[0][:-5]+'.txt'), 
+                             type=fidl_type)
                 attrFilename = os.path.join(dir, attrFiles[0][:-5]+'.txt')
 
     logger.debug(header)

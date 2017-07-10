@@ -1,16 +1,12 @@
 import numpy as np
 import scipy
-from mvpa2.suite import Measure, TransferMeasure
-from scipy.spatial.distance import mahalanobis, euclidean
+from mvpa2.suite import Measure
+from scipy.spatial.distance import mahalanobis
 from scipy.stats import pearsonr
 import sklearn.covariance
 import sklearn.metrics as sklm
 import sklearn.svm as svr
-from sklearn.covariance import EmpiricalCovariance, LedoitWolf, MinCovDet, \
-                        GraphLasso, ShrunkCovariance
-from mvpa2.generators.partition import Partitioner
 from mvpa2.datasets.base import Dataset
-from timeit import itertools
                         
 
 
@@ -63,7 +59,7 @@ class MahalanobisThresholdMeasure(SimilarityMeasure):
         
         """
         
-        super(MahalanobisMeasure, self).train(ds)
+        super(MahalanobisThresholdMeasure, self).train(ds)
         self.params['icov'] = self.method().transform(ds.samples).precision_
         self.is_trained = True
         

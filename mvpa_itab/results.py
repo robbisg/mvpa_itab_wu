@@ -4,9 +4,6 @@ import numpy as np
 import logging
 from scipy.stats import ttest_1samp
 import pickle
-from scipy.stats.stats import zscore
-from mvpa_itab.stats.base import Correlation
-import logging 
 
 
 logger = logging.getLogger(__name__)
@@ -177,8 +174,7 @@ class SearchlightSummarizer(Summarizer):
         fname = "accuracy_map_radius_%s_searchlight_mean_subj.nii.gz" % radius
         ni.save(mean_img, os.path.join(self.path,fname))         
         
-        logging.info('Summarizer writed in '+self.path)
-                
+        logging.info("Testing versus "+str(self._p_value))
         t, p = ttest_1samp(total_map, threshold_value, axis=3)
         
         fname = "t_map_vs_threshold_%s_uncorrected.nii.gz" % threshold_value 
@@ -187,7 +183,9 @@ class SearchlightSummarizer(Summarizer):
         
         fname = "p_map_vs_threshold_%s_uncorrected.nii.gz" % threshold_value 
         _img = ni.Nifti1Image(p, affine=affine)
-        ni.save(_img, os.path.join(self.path, fname))  
+        ni.save(_img, os.path.join(self.path, fname))
+        
+        logging.info('Summarizer writed in '+self.path)
 
 
 
@@ -322,7 +320,8 @@ class SearchlightSaver(Saver):
         radius_ = np.int(result._radius)
         map_ = result._map
         
-        print map_.get_affine()
+        print map_.affine
+        print map_.__class__
         
         # If map is obtained via folding we average across maps
         if len(map_.get_data().shape) > 3: 

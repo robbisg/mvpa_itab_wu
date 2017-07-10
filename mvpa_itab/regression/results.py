@@ -8,6 +8,8 @@ from mvpa_itab.conn.plot import *
 import nibabel as ni
 from scipy.stats.stats import zscore
 
+import logging
+logger = logging.getLogger(__name__)
 
 
 def save_results(path, results):
@@ -17,6 +19,7 @@ def save_results(path, results):
     for result in results:
     
         conf_ = result[0]
+        variable = conf_['y_field']
         real_res = result[1][0][0]
         perm_res = result[1][0][1]
         
@@ -29,8 +32,10 @@ def save_results(path, results):
             perm_save[fields_[i]] = np.array([np.vstack([f for f in s]) for s in perm_res[:,i,:]])
             
         
-        p_name = build_name(path, conf_, field='permutation', perm=1000, cv=50)
-        v_name = build_name(path, conf_, field='values', perm=1000, cv=50)
+        p_name = build_name(path, conf_, field='permutation', variable=variable, perm=1000, cv=250)
+        logger.debug(p_name)
+        v_name = build_name(path, conf_, field='values', variable=variable, perm=1000, cv=250)
+        logger.debug(v_name)
         
         np.savez_compressed(p_name, perm_save)
         np.savez_compressed(v_name, array_save)
@@ -39,7 +44,7 @@ def save_results(path, results):
     
     
             
-def build_name(path, conf, field='values', **kwargs):
+def build_name(path, conf, field='values', variable="expertise", **kwargs):
     
     fname = os.path.join(path, conf['directory'])
     alg = conf['learner'].__str__()[:3]
@@ -47,10 +52,11 @@ def build_name(path, conf, field='values', **kwargs):
     med_ = conf['conditions']
     
     return os.path.join(fname,
-                        "%s_%s_%s_%s.npz" %(med_, 
+                        "%s_%s_%s_%s_%s.npz" %(med_, 
                                               #alg, 
                                               #kernel, 
-                                              field, 
+                                              field,
+                                              variable,
                                               str(kwargs['perm']), 
                                               str(kwargs['cv'])) )       
         
@@ -58,8 +64,9 @@ def build_name(path, conf, field='values', **kwargs):
 
 
 def analyze_results(directory, 
-                    conditions, 
-                    n_permutations=1000.):
+                    conditions,
+                    variable="expertise",
+                    n_permutations=100.):
     
     
     """Write the results of the regression analysis
@@ -85,7 +92,7 @@ def analyze_results(directory,
                       dtype=np.str)
 
     path = '/media/robbis/DATA/fmri/monks/'
-    roi_list = []
+
     roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
                           delimiter=',',
                           dtype=np.str)
@@ -100,7 +107,7 @@ def analyze_results(directory,
     for dir_ in directory:
         for cond_ in conditions:
             
-            fname_ = os.path.join(res_path, dir_, cond_+'_values_1000_50.npz')
+            fname_ = os.path.join(res_path, dir_, cond_+'_values_'+variable+'_1000_250.npz')
             
             results_ = np.load(fname_)
             values_ = results_['arr_0'].tolist()
@@ -109,7 +116,7 @@ def analyze_results(directory,
             weights_ = values_['weights']   #values_['weights_']
             samples_ = values_['subjects']  #values_['samples_']
             
-            fname_ = os.path.join(res_path, dir_, cond_+'_permutation_1000_50.npz')
+            fname_ = os.path.join(res_path, dir_, cond_+'_permutation_'+variable+'_1000_250.npz')
             
             results_ = np.load(fname_)
             values_p = results_['arr_0'].tolist()

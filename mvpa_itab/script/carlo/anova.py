@@ -25,7 +25,7 @@ def analysis(path,
     
     default_conf.update(kwargs)
     
-    #file_pattern="%s_%s_%s_MVPA_evidence_%s_balance_ds_%s_radius_3_searchlight_total_map_mean_demenead.nii.gz"
+    # file_pattern="%s_%s_%s_MVPA_evidence_%s_balance_ds_%s_radius_3_searchlight_total_map_mean_demenead.nii.gz"
 
     data, labels, affine = load_total_subjects(path,
                                                subjects,

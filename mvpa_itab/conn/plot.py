@@ -117,7 +117,7 @@ def plot_matrix(matrix, roi_names, networks, threshold=0, zscore=True, **kwargs)
         ix = np.nonzero(networks == net)
         if _plot_cfg['ticks_type'] == 'networks':
             tick_ = items_idx[0].mean()
-            colors_.append(np.unique(_plot_cfg['ticks_color']))
+            colors_.append(_plot_cfg['ticks_color'])
         else:
             tick_ = items_idx[0]
             colors_.append(_plot_cfg['ticks_color'][tick_])
