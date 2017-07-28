@@ -13,9 +13,49 @@ from mvpa_itab.main_wu import preprocess_dataset
 from mvpa2.measures.base import CrossValidation
 from mvpa2.generators.partition import NFoldPartitioner
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 class SearchlightAnalysisPipeline(object):
+    """Searchligth Analysis class
+
+    Provides basic interface for searchlight analysis, on the top of that
+    other classes could be used to customize the pipeline with several
+    searchlight flavours.
+
+
+    Parameters
+    ----------
+    kwargs : dictionary of analysis field
+        
+
+    Examples
+    --------
+    >>> from sklearn import cross_validation
+    >>> X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]])
+    >>> y = np.array([1, 2, 1, 2])
+    >>> labels = np.array([1, 1, 2, 2])
+    >>> lol = cross_validation.LeaveOneLabelOut(labels)
+    >>> len(lol)
+    2
+    >>> print(lol)
+    sklearn.cross_validation.LeaveOneLabelOut(labels=[1 1 2 2])
+    >>> for train_index, test_index in lol:
+    ...    print("TRAIN:", train_index, "TEST:", test_index)
+    ...    X_train, X_test = X[train_index], X[test_index]
+    ...    y_train, y_test = y[train_index], y[test_index]
+    ...    print(X_train, X_test, y_train, y_test)
+    TRAIN: [2 3] TEST: [0 1]
+    [[5 6]
+     [7 8]] [[1 2]
+     [3 4]] [1 2] [1 2]
+    TRAIN: [0 1] TEST: [2 3]
+    [[1 2]
+     [3 4]] [[5 6]
+     [7 8]] [1 2] [1 2]
+    """
         
   
     def __init__(self, name="searchlight", **kwargs):
@@ -159,12 +199,12 @@ class SearchlightAnalysisPipeline(object):
         
         # dictionary of conditions used
         self.conditions = {k:options[k] for k in self._condition_names}
-        print self._default_conf.keys()      
+        logger.debug(self._default_conf.keys())      
 
         # On-fly change default options
         # A little bit dangerous!!
         for k, v in options.iteritems():
-            print k
+            logger.debug(k)
             if k in self._default_conf.keys():
                 setattr(self, "_"+k, v)
             else:

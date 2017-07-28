@@ -13,6 +13,8 @@ from sklearn.cross_validation import StratifiedKFold
 from mvpa_itab.pipeline import SearchlightAnalysisPipeline
 from mvpa_itab.io.base import load_dataset
 
+import logging
+logger = logging.getLogger(__name__)
 
 
 
@@ -47,13 +49,14 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
         sl_loso_cond1_val1_cond2_val2_split_1_test_2_train_1_balance_ds_1
         """
         
-        train_group = ds.sa.group_split[ds.sa[self._split_attr].value == rule[1][0]][0]
-        test_group  = ds.sa.group_split[ds.sa[self._split_attr].value == rule[-1][0]][0]
+        train_group = ds.sa.group[ds.sa[self._split_attr].value == rule[1][0]][0]
+        test_group  = ds.sa.group[ds.sa[self._split_attr].value == rule[-1][0]][0]
         test_subj = '_'.join(rule[-1])
         
         stringa = "Training Group: %s | Testing subject: %s | Testing Group: %s"
         stringa = stringa % (train_group, test_subj, test_group)
-        print(stringa) # Log it!
+        logger.debug(stringa) # Log it!
+        print stringa
         
 
         

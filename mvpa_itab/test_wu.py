@@ -605,6 +605,7 @@ def cross_decoding_confusion(predictions, targets, map_list):
     
     return c_matrix
 
+
 def signal_detection_measures(confusion_):
     
     result = dict()
