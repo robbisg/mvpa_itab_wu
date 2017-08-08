@@ -1,15 +1,14 @@
 import os
 import nibabel as ni
 import numpy as np
-from mvpa_itab.results import SearchlightSummarizer, SubjectResult,\
-    SearchlightSaver, ResultsCollection
+import mvpa_itab.results as rs
 from mvpa_itab.script.carlo.analysis import carlo_memory_set_targets
 from mvpa2.clfs.svm import LinearCSVMC
 from mvpa2.suite import debug
 from mvpa_itab.io.base import read_configuration
 from mvpa2.measures.searchlight import sphere_searchlight
 from mvpa2.datasets.mri import map2nifti
-from mvpa_itab.main_wu import preprocess_dataset
+from mvpa_itab.main_wu import preprocess_dataset, normalize_dataset
 from mvpa2.measures.base import CrossValidation
 from mvpa2.generators.partition import NFoldPartitioner
 
@@ -71,18 +70,18 @@ class SearchlightAnalysisPipeline(object):
                             'data_type': 'BETA_MVPA',
                             'n_folds':3,
                             "condition_names":["evidence", "task"],
-                            'evidence':1, # Default_value
+                            'evidence': 3, # Default_value (memory : 3)
                             'task':'decision', # Default_value
                             'split_attr':'subject', #
-                            'mask_area':'PCC',
-                            'normalization':'sample',
+                            'mask_area':'L_FFA', # memory                            
+                            'normalization':'both',
                             "radius": 3,
                             "n_balanced_ds": 1,
                             "set_targets": carlo_memory_set_targets,
                             "classifier":LinearCSVMC(C=1)
                             }
         
-
+        
         
         
         self._default_conf.update(**kwargs)
@@ -103,11 +102,6 @@ class SearchlightAnalysisPipeline(object):
         self._conf['analysis_type'] = 'searchlight'
         self._conf['analysis_task'] = self._project
         
-        self._summarizers = [SearchlightSummarizer()]
-        self._savers = [SearchlightSaver()]
-        self._collection = ResultsCollection(self._conf, 
-                                            self._path, 
-                                            self._summarizers)
     
         
         self._data_path = self._conf['data_path']
@@ -166,7 +160,7 @@ class SearchlightAnalysisPipeline(object):
         self.result_dict['radius'] = self._radius
         self.result_dict['map'] = map_
          
-        subj_result = SubjectResult(fname, 
+        subj_result = rs.SubjectResult(fname, 
                                        self.result_dict, 
                                        self._savers)
         
@@ -179,6 +173,12 @@ class SearchlightAnalysisPipeline(object):
         options: dictionary with condition to filter
             e.g. task="memory", evidence="1" depending on your data.
         """
+        self._summarizers = [rs.SearchlightSummarizer()]
+        self._savers = [rs.SearchlightSaver()]
+        self._collection = rs.ResultsCollection(self._conf, 
+                                            self._path, 
+                                            self._summarizers,
+                                            **options)
         
         # Preprocess dataset with options
         ds = self.pre_operations(**options)
@@ -188,6 +188,7 @@ class SearchlightAnalysisPipeline(object):
                                
         
         for i, ds_ in enumerate(balance_generator):
+            logger.info(ds_.summary(chunks_attr="subject"))
             self.algorithm(ds_, i)
             
         self._collection.summarize()
@@ -216,11 +217,13 @@ class SearchlightAnalysisPipeline(object):
         targets, self._conf = self._set_targets(ds, 
                                                 self._conf, 
                                                 **self.conditions)
-        
+
         ds.targets = targets
         
         ds = preprocess_dataset(ds, 
                                 self._data_type, 
                                 **self._conf)
         
+        ds = normalize_dataset(ds, **self._conf)
+
         return ds

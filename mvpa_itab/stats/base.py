@@ -76,6 +76,8 @@ class PermutationTest(object):
         self.n_permutation = n_permutation
         self._axis = permutation_axis
     
+    
+    
     def shuffle(self, ds, labels):
         # Temporary function
         fp = np.memmap('/media/robbis/DATA/perm.dat',
@@ -98,6 +100,7 @@ class PermutationTest(object):
         self.null_dist = fp
     
         return fp
+    
     
     def run(self, ds, labels):
         # What the fuck is labels???
@@ -123,6 +126,8 @@ class PermutationTest(object):
     
         return fp
     
+    
+    
     def p_values(self, true_values, null_dist=None, tails=0):
         """tails = [0, two-tailed; 1, upper; -1, lower]"""
         
@@ -143,6 +148,8 @@ class PermutationTest(object):
         self._p_values = p_values
         
         return p_values    
+    
+    
     
     def ds_permutation(self, ds):
         
@@ -167,6 +174,8 @@ class PermutationTest(object):
         
         return ds_
     
+    
+    
     def ds_simple_permutation(self, ds):
         
         from datetime import datetime
@@ -186,8 +195,12 @@ class PermutationTest(object):
         print (finish - start)
         
         return ds_
-        
+
+
+
+
 class TTest(object):
+    
     
     def __init__(self, ds, conditions=None, sample_value=None):
         self.dataset = ds
@@ -222,6 +235,8 @@ class TTest(object):
         t[np.isnan(t)] = 1
         return t
 
+
+
 class Correlation(object):
     
     
@@ -251,6 +266,8 @@ class Correlation(object):
     
     def __str__(self, *args, **kwargs):
         self.__name__
+            
+            
             
 class SKLRegressionWrapper(object):
     
@@ -287,6 +304,8 @@ class SKLRegressionWrapper(object):
         
         
         return
+        
+        
         
 class CrossValidation(object):
     
@@ -335,6 +354,8 @@ class CrossValidation(object):
         self.result = np.array(mse_)
         
         return self.result
+
+
 
 
 class RegressionPermutation(object):
@@ -390,6 +411,8 @@ class RegressionPermutation(object):
         
         return p_values    
     
+    
+    
     def ds_permutation(self, ds):
         
         from datetime import datetime
@@ -412,6 +435,8 @@ class RegressionPermutation(object):
         print (finish - start)
         
         return ds_
+    
+    
     
     def ds_simple_permutation(self, ds):
         

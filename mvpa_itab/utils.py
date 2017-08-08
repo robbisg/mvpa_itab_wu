@@ -125,6 +125,7 @@ def fidl_convert(fidlPath, outPath, type):
         fidl2txt_2(fidlPath, outPath)
 
 
+
 def fidl2txt (fidlPath, outPath):
     '''
     args:
@@ -284,6 +285,8 @@ def fidl2txt_2(fidlPath, outPath, runs=12., vol_run=248, stim_tr=4, offset_tr=2)
             
     outFile.close()   
 
+
+
 def extract_events_xls(filename, sheet_name):
     import xlrd
     
@@ -364,6 +367,9 @@ def build_attributes(out_path,
 
 
 def beta_attributes(fidl_file, output_filename, nrun=12.):
+    """
+    Build attributes for betas from fidl event
+    """
     
     file_ = open(fidl_file, 'r')
     line_ = file_.readline()
@@ -378,9 +384,70 @@ def beta_attributes(fidl_file, output_filename, nrun=12.):
     
     attr_ = np.vstack((line_, chunks)).T
     np.savetxt(output_filename, attr_, fmt='%s')
+    file_.close()
     
 
-def enhance_attributes(filename, current_header=['targets', 'chunks', 'trial', 'frame']):
+def enhance_attibutes_ofp(filename, current_header=['targets', 'chunks', 'trial', 'frame']):
+    
+    """Only for Carlo's ofp experiment"""
+    import re
+    attr = np.loadtxt(filename, dtype=np.str_)
+    
+    assert attr.shape[1] == len(current_header)
+    
+    # decision
+    pattern_face  = ['F.C', 'L.I']
+    pattern_place = ['F.I', 'L.C']
+    
+    def is_in(pattern_list, string_):
+        return np.array([re.search(pt, string_) != None for pt in pattern_list]).any()
+    
+    mask_face  = np.array([is_in(pattern_face, a) for a in attr.T[0]])
+    mask_place = np.array([is_in(pattern_place, a) for a in attr.T[0]])
+    
+    decision = attr.T[0].copy()
+    decision[mask_face] = 'F'
+    decision[mask_place] = 'L'
+    decision[np.logical_not(np.logical_or(mask_face, mask_place))] = 'N'
+    
+    
+    # memory_status
+    
+    mask_face  = np.array([a[0] == 'F' for a in attr.T[0]])
+    mask_place = np.array([a[0] == 'L' for a in attr.T[0]])
+    
+    memory_status = attr.T[0].copy()
+    memory_status[mask_face] = 'F'
+    memory_status[mask_place] = 'L'    
+    
+    stim = []
+    
+    for a_ in attr.T[0]:
+        if a_[-1] != 'R':
+            stim.append(list(a_)) # Used if attributes are more than 3
+        else:
+            stim.append(['N', '0', '0'])
+    
+    stim = np.array(stim)
+    
+    attr_ = np.hstack((attr, stim, memory_status[:,np.newaxis], decision[:,np.newaxis]))
+    current_header = current_header+['stim', 'evidence', 'accuracy', 'memory_status', 'decision']
+    
+    assert len(current_header) == attr_.shape[1]
+    
+    attr_ = np.vstack((current_header, attr_))
+    
+    filename_pts = filename.split('/')
+    filename_ = filename_pts.pop()
+    filename_new = filename_.split('.')[0]+'_plus.txt'
+    filename_pts.append(filename_new)
+    
+    fname = '/'.join(filename_pts)
+
+    np.savetxt(fname, attr_, fmt='%s')
+
+
+def enhance_attributes_memory(filename, current_header=['targets', 'chunks', 'trial', 'frame']):
     
     """Only for Carlo's memory experiment"""
     import re
@@ -392,7 +459,6 @@ def enhance_attributes(filename, current_header=['targets', 'chunks', 'trial', '
     pattern_new = ['O_._0', 'N_._1']
     
     def is_in(pattern_list, string_):
-        
         return np.array([re.search(pt, string_)!=None for pt in pattern_list]).any()
     
     mask_old = np.array([is_in(pattern_old, a) for a in attr.T[0]])
@@ -415,6 +481,7 @@ def enhance_attributes(filename, current_header=['targets', 'chunks', 'trial', '
     memory_status[mask_old] = 'OLD'    
     
     stim = []
+    
     for a_ in attr.T[0]:
         if a_ != 'FIX':
             stim.append(a_.split('_')[:3]) # Used if attributes are more than 3

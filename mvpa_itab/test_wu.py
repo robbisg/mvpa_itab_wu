@@ -166,6 +166,7 @@ def _test_spatial(path, subjects, conf_file, type_, **kwargs):
     return total_results, subj_result
 
 
+
 def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs):    
     
     if source == 'task':
@@ -216,6 +217,7 @@ def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs
     #save_results(path, total_results, conf_src)
 
     return total_results
+
 
 
 def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', \
@@ -663,6 +665,7 @@ def subjects_merged_ds(path,
         
         ds = load_dataset(data_path, subj, task, **conf)
         ds = preprocess_dataset(ds, task, **conf)
+        ds = normalize_dataset(ds, **conf)
         
         # add extra samples
         for k, v in extra_sa.iteritems():

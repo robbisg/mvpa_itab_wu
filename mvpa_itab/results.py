@@ -31,7 +31,7 @@ class SubjectResult(object):
 class ResultsCollection(object):
     
     
-    def __init__(self, conf, path, summarizers=None):
+    def __init__(self, conf, path, summarizers=None, **kwargs):
         
         self.collection = []
         self.index = 0
@@ -47,6 +47,9 @@ class ResultsCollection(object):
         
         self.analysis_path = path
         dir_ = '_'.join([datetime, self._analysis, self._mask, self._task])
+        if kwargs != None:
+            dir_ += "_"
+            dir_ += "_".join([k+"_"+v for k, v in kwargs.iteritems()])
         self.path = os.path.join(self.analysis_path, '0_results', dir_)
     
         make_dir(self.path)
@@ -129,7 +132,7 @@ class SearchlightSummarizer(Summarizer):
     expected_fields = ['name', 'map', 'radius']
     
     def __init__(self, p=0.05):
-        Summarizer.__init__(self)
+        super(SearchlightSummarizer, self).__init__()
         self._total_map = []        
         self._p_value = p
 
@@ -320,8 +323,8 @@ class SearchlightSaver(Saver):
         radius_ = np.int(result._radius)
         map_ = result._map
         
-        print map_.affine
-        print map_.__class__
+        logger.debug(map_.affine)
+        logger.debug(map_.__class__)
         
         # If map is obtained via folding we average across maps
         if len(map_.get_data().shape) > 3: 

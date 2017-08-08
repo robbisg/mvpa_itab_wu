@@ -48,15 +48,15 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
         
         sl_loso_cond1_val1_cond2_val2_split_1_test_2_train_1_balance_ds_1
         """
-        
-        train_group = ds.sa.group[ds.sa[self._split_attr].value == rule[1][0]][0]
-        test_group  = ds.sa.group[ds.sa[self._split_attr].value == rule[-1][0]][0]
+        _split_attr = "subject" # OFP
+        train_group = ds.sa.group[ds.sa[_split_attr].value == rule[1][0]][0]
+        test_group  = ds.sa.group[ds.sa[_split_attr].value == rule[-1][0]][0]
         test_subj = '_'.join(rule[-1])
         
         stringa = "Training Group: %s | Testing subject: %s | Testing Group: %s"
         stringa = stringa % (train_group, test_subj, test_group)
         logger.debug(stringa) # Log it!
-        print stringa
+        logger.info(stringa)
         
 
         
@@ -85,7 +85,7 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
         # TODO: Make also imbalanced-learn methods available
         balanc = Balancer(count=self._n_balanced_ds, 
                           apply_selection=True, 
-                          limit='group')
+                          limit='subject') # mdm = 'group'
         
         self.gen = balanc.generate(ds)
         
@@ -98,29 +98,27 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
         
         partitioner, splitter = get_partitioner(self._split_attr)
         splitrule = partitioner.get_partition_specs(ds)
-        
+        print splitrule
         # With this (if the workstation runs out, we save results)      
         for ii, rule in enumerate(splitrule):
             
-            print ii, rule
-            ## Remove !?!!?
+            logger.debug(rule)
             
-            print rule
             # We compose a simple partitioner
             partitioner = CustomPartitioner(splitrule=[rule],
-                                            attr=self._split_attr                                                
+                                            attr="subject"                                                
                                             )
             # Custom cross-validator
             cvte = CrossValidation(self._classifier,
                                    partitioner,
                                    splitter=splitter,
                                    enable_ca=['stats', 'probabilities'],
-                                   errorfx=SubjectWiseError(mean_mismatch_error, 
-                                                            'group', 
-                                                            'subject')
+                                   #errorfx=SubjectWiseError(mean_mismatch_error, 
+                                                            #'group', 
+                                                            #'subject')
                                    )
             fname = self.build_fname(ds, rule, ii, i)
-            print fname
+
             self.analysis(ds, i, cvte, fname)
 
             
@@ -184,7 +182,7 @@ class SingleSubjectSearchlight(SearchlightAnalysisPipeline):
         
         
         fname = self.build_fname(balance_ds_num)
-        print fname
+
         self.analysis(ds, balance_ds_num, cvte, fname)
         
         
@@ -204,25 +202,25 @@ class SingleSubjectSearchlight(SearchlightAnalysisPipeline):
 
   
 """
-sl_analysis = LeaveOneSubjectOutSL(path=")
+conf_ofp = {   
+            'path':'/media/robbis/DATA/fmri/carlo_ofp/',
+            'configuration_file':"ofp.conf",
+            "project":"carlo_ofp",
+            "partecipants": "subjects.csv",
+            'data_type': 'OFP',
+            'n_folds':3,
+            "condition_names":["evidence", "task"],
+            'evidence': 3, # Default_value (memory : 3)
+            'task':'decision', # Default_value
+            'split_attr':'subject', #
+            'mask_area':'L_FFA', # memory                            
+            'normalization':'both',
+            "radius": 3,
+            "n_balanced_ds": 1,
+            "set_targets": carlo_ofp_set_targets,
+            "classifier":LinearCSVMC(C=1)
+            }
+sl_analysis = LeaveOneSubjectOutSL(**conf_ofp)
 sl_analysis.load_dataset(**kwargs).run(**options)
 """
-
-            
-
-            
-
-                
-                
-
-
-
-
-
-
-
-
-
-
-
 

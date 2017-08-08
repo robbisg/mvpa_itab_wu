@@ -38,6 +38,11 @@ def get_partitioner(split_attr='group_split'):
         partitioner = MemoryGroupSubjectPartitioner(group_attr='group_split', 
                                                     subject_attr=split_attr,
                                                     attr=split_attr)
+        
+    elif split_attr == "subject_ofp":
+        
+        partitioner = partitioner = NFoldPartitioner(attr="subject")
+        splitter = Splitter(attr="partitions")
     
     elif split_attr == 'group':
         
