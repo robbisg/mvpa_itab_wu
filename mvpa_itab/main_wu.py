@@ -197,13 +197,14 @@ def preprocess_dataset(ds, type_, **kwargs):
         if (arg == 'label_included'):
             label_included = kwargs[arg].split(',')
         if (arg == 'label_dropped'):
-            label_dropped = kwargs[arg] 
+            label_dropped = kwargs[arg]
         if (arg == 'target'):
             target = str(kwargs[arg])
-            
-        if (arg.find('mask_label') != -1):
-            label_name = arg[arg.find('__')+2:]
-            label_value = str(kwargs[arg])
+        if (arg == 'label_mask_name'):
+            label_name = str(kwargs[arg])
+        if (arg == 'label_mask_value'):
+            label_value = kwargs[arg]
+
                 
     
     if target != None:
@@ -215,9 +216,15 @@ def preprocess_dataset(ds, type_, **kwargs):
     poly_detrend(ds, polyord = 1, chunks_attr = 'chunks')
     
     
+    
+    
     if  label_dropped != 'None':
         logger.info('Removing labels...')
         ds = ds[ds.sa.targets != label_dropped]
+        
+        #ds = ds[np.logical_or([ds.sa.targets != label for label in label_dropped])]
+        
+        
     if  label_included != ['all']:
         ds = ds[np.array([l in label_included for l in ds.sa.targets],
                           dtype='bool')]

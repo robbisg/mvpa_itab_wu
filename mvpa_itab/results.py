@@ -323,9 +323,7 @@ class SearchlightSaver(Saver):
         radius_ = np.int(result._radius)
         map_ = result._map
         
-        logger.debug(map_.affine)
-        logger.debug(map_.__class__)
-        
+                
         # If map is obtained via folding we average across maps
         if len(map_.get_data().shape) > 3: 
             mean_map = map_.get_data().mean(axis=3)

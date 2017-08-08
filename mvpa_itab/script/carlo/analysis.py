@@ -5,7 +5,7 @@ def carlo_memory_set_targets(ds, configuration, **conditions):
     
     
     evidence = conditions['evidence']
-    task = conditions['task']
+    task = conditions['task']     
     
     
     conf = dict()
@@ -14,12 +14,13 @@ def carlo_memory_set_targets(ds, configuration, **conditions):
         conf['field'] = 'stim'
         conf['label_dropped'] = 'F0'
         conf['label_included'] = 'N'+evidence+','+'O'+evidence
-    else: # decision
+    elif task == "decision": # decision
         conf['field'] = 'decision'
         conf['label_dropped'] = 'FIX0'
         conf['label_included'] = 'NEW'+evidence+','+'OLD'+evidence
-    
-    
+        
+        
+            
     field_ = conf.pop('field')
     configuration.update(conf)
     

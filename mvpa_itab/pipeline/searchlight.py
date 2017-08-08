@@ -29,15 +29,30 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
     def load_dataset(self):
         
         
+        if "label_mask_name" in self._conf:
+            label_name = self._conf["label_mask_name"]
+        else:
+            label_name = None
+        if "label_mask_name" in self._conf:
+            label_value = self._conf["label_mask_value"]
+        else:
+            label_value = None
+        
         ds_orig, _, _ = subjects_merged_ds(self._path,  # path or data_path
-                                           None, 
+                                           os.path.join(self._path, 
+                                                        self._partecipants), 
                                            self._configuration_file, 
                                            self._data_type,
-                                           subject_file=os.path.join(self._path, 
-                                                                     self._partecipants),
                                            normalization=self._normalization,
-                                           mask_area=self._mask_area)
+                                           mask_area=self._mask_area,
+                                           label_mask_name=label_name,
+                                           label_mask_value=label_value
+                                           )
         self.ds_orig = ds_orig
+        
+        self._conf["summary_ds_load"] = ds_orig.summary(chunks_attr="subject")
+        logger.info(ds_orig.summary(chunks_attr="subject"))
+        
         return ds_orig
     
     

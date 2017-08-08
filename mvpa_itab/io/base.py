@@ -14,30 +14,7 @@ from mvpa_itab.fsl_wrapper import bet_wu_data_
 from mvpa_itab.utils import fidl_convert
 #from memory_profiler import profile
 
-logger = logging.getLogger(__name__)
-
-def get_time():
-    
-    """Get the current time and returns a string (fmt: yymmdd_hhmmss)
-    
-    !!! THIS HAS BEEN INCLUDED IN results MODULE !!!
-    
-    """
-    
-    # Time acquisition
-    tempo = time.localtime()
-    
-    datetime = ''
-    i = 0
-    for elem in tempo[:-3]:
-        i = i + 1
-        if len(str(elem)) < 2:
-            elem = '0'+str(elem)
-        if i == 4:
-            datetime += '_'
-        datetime += str(elem)
-        
-    return datetime    
+logger = logging.getLogger(__name__) 
 
 
 #@profile
@@ -197,15 +174,16 @@ def load_wu_file_list(path, name, task, el_vols=None, **kwargs):
     
     if use_task_name == 'False':
         task = ''
-    
+
     for dir_ in sub_dirs:
         if dir_ == 'none':
             dir_ = ''
         if dir_.find('/') == -1:
             logger.debug(dir_)
-        path_file_dirs.append(os.path.join(path,name,dir_))
-
-   
+        path_file_dirs.append(os.path.join(path, name, dir_))
+    
+    
+    logger.debug(path_file_dirs)
     logger.info('Loading...')
     
     # TODO: Evaluate if it is useful to include searching code in a function

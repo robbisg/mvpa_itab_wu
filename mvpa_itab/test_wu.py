@@ -15,6 +15,7 @@ from mvpa2.suite import vstack, Sphere, Searchlight, IndexQueryEngine, Splitter
 import mvpa_itab.results as rs
 from mvpa_itab.similarity.partitioner import TargetCombinationPartitioner
 from mvpa_itab.preprocessing import get_preprocessing
+from __builtin__ import list, str
 
 
 logger = logging.getLogger(__name__)
@@ -633,23 +634,25 @@ def subjects_merged_ds(path,
                        subjects, 
                        conf_file, 
                        task, 
-                       extra_sa=None, 
-                       subject_file=None, 
+                       extra_sa=None,  
                        **kwargs):
     """
     extra_sa: dict or None, sample attributes added to the final dataset, they should be
     the same length as the subjects.
+    
+    subject: either a list of subjects or a csv file
     
     """
     
     conf = read_configuration(path, conf_file, task)
            
     conf.update(kwargs)
+    logger.debug(conf)
     
     data_path = conf['data_path']
 
-    if subject_file != None:
-        subject_array = np.genfromtxt(subject_file, 
+    if isinstance(subjects, str):
+        subject_array = np.genfromtxt(subjects, 
                                       delimiter=',', 
                                       dtype=np.string_)
         

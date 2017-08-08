@@ -73,7 +73,7 @@ class SearchlightAnalysisPipeline(object):
                             'evidence': 3, # Default_value (memory : 3)
                             'task':'decision', # Default_value
                             'split_attr':'subject', #
-                            'mask_area':'L_FFA', # memory                            
+                            'mask_area':'intersect', # memory                            
                             'normalization':'both',
                             "radius": 3,
                             "n_balanced_ds": 1,
@@ -102,7 +102,13 @@ class SearchlightAnalysisPipeline(object):
         self._conf['analysis_type'] = 'searchlight'
         self._conf['analysis_task'] = self._project
         
-    
+        # Avoid non serializable objects saving
+        self._default_conf.pop("set_targets")
+        self._default_conf.pop("classifier")
+        
+        self._conf.update(**self._default_conf)
+        
+            
         
         self._data_path = self._conf['data_path']
         
@@ -188,6 +194,7 @@ class SearchlightAnalysisPipeline(object):
                                
         
         for i, ds_ in enumerate(balance_generator):
+            self._conf["summary_ds_"+str(i)] = ds_.summary(chunks_attr="subject")
             logger.info(ds_.summary(chunks_attr="subject"))
             self.algorithm(ds_, i)
             
