@@ -2,7 +2,8 @@ import logging
 import numpy as np
 from mvpa2.generators.splitters import Splitter
 from mvpa2.generators.partition import CustomPartitioner, NFoldPartitioner
-from mvpa_itab.similarity.partitioner import MemoryGroupSubjectPartitioner
+from mvpa_itab.similarity.partitioner import MemoryGroupSubjectPartitioner, \
+                                            LeaveOneSubjectPerGroupPartitioner
 from mvpa2.mappers.fx import BinaryFxNode
 from mvpa2.datasets.base import Dataset
 
@@ -38,6 +39,13 @@ def get_partitioner(split_attr='group_split'):
         partitioner = MemoryGroupSubjectPartitioner(group_attr='group_split', 
                                                     subject_attr=split_attr,
                                                     attr=split_attr)
+        
+    elif split_attr == "group_mdm":
+        partitioner = LeaveOneSubjectPerGroupPartitioner(group_attr='group', 
+                                                            subject_attr="subject",
+                                                            attr="subject")
+        
+        
         
     elif split_attr == "subject_ofp":
         

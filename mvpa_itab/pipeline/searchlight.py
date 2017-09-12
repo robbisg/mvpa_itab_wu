@@ -63,7 +63,9 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
         
         sl_loso_cond1_val1_cond2_val2_split_1_test_2_train_1_balance_ds_1
         """
+        print rule
         _split_attr = "subject" # OFP
+        #_split_attr = "group"
         train_group = ds.sa.group[ds.sa[_split_attr].value == rule[1][0]][0]
         test_group  = ds.sa.group[ds.sa[_split_attr].value == rule[-1][0]][0]
         test_subj = '_'.join(rule[-1])
@@ -128,9 +130,9 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
                                    partitioner,
                                    splitter=splitter,
                                    enable_ca=['stats', 'probabilities'],
-                                   #errorfx=SubjectWiseError(mean_mismatch_error, 
-                                                            #'group', 
-                                                            #'subject')
+                                   errorfx=SubjectWiseError(mean_mismatch_error, 
+                                                            'group', 
+                                                            'subject')
                                    )
             fname = self.build_fname(ds, rule, ii, i)
 
