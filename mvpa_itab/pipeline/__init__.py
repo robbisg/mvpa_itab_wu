@@ -32,35 +32,17 @@ class SearchlightAnalysisPipeline(object):
 
     Examples
     --------
-    >>> from sklearn import cross_validation
-    >>> X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]])
-    >>> y = np.array([1, 2, 1, 2])
-    >>> labels = np.array([1, 1, 2, 2])
-    >>> lol = cross_validation.LeaveOneLabelOut(labels)
-    >>> len(lol)
-    2
-    >>> print(lol)
-    sklearn.cross_validation.LeaveOneLabelOut(labels=[1 1 2 2])
-    >>> for train_index, test_index in lol:
-    ...    print("TRAIN:", train_index, "TEST:", test_index)
-    ...    X_train, X_test = X[train_index], X[test_index]
-    ...    y_train, y_test = y[train_index], y[test_index]
-    ...    print(X_train, X_test, y_train, y_test)
-    TRAIN: [2 3] TEST: [0 1]
-    [[5 6]
-     [7 8]] [[1 2]
-     [3 4]] [1 2] [1 2]
-    TRAIN: [0 1] TEST: [2 3]
-    [[1 2]
-     [3 4]] [[5 6]
-     [7 8]] [1 2] [1 2]
+    
     """
         
   
     def __init__(self, name="searchlight", **kwargs):
+        """
+        This method is used to set up the configuration of the 
+        analysis. 
+        """
         
         self.name = name
-        
         
         self._default_conf = {   
                             'path':'/home/robbis/fmri/memory/',
@@ -107,9 +89,7 @@ class SearchlightAnalysisPipeline(object):
         self._default_conf.pop("classifier")
         
         self._conf.update(**self._default_conf)
-        
             
-        
         self._data_path = self._conf['data_path']
         
         self.result_dict = dict()
@@ -234,3 +214,4 @@ class SearchlightAnalysisPipeline(object):
         ds = normalize_dataset(ds, **self._conf)
 
         return ds
+

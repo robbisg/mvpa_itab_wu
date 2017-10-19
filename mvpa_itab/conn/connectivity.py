@@ -90,7 +90,7 @@ def analyze_connectivity(imagelist, path_roi, roi_names, ts_param, **kwargs):
 
 def create_similarity_files(path, subjects, target_label, source_label):
     
-    
+    folder_list = os.listdir(path)
     for s in subjects:
         for cond in ['trained', 'untrained']:
             for time in ['RestPre', 'RestPost']:

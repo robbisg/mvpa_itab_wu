@@ -33,10 +33,13 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
             label_name = self._conf["label_mask_name"]
         else:
             label_name = None
+        
         if "label_mask_name" in self._conf:
             label_value = self._conf["label_mask_value"]
         else:
             label_value = None
+            
+        print label_name, label_value
         
         ds_orig, _, _ = subjects_merged_ds(self._path,  # path or data_path
                                            os.path.join(self._path, 
@@ -126,13 +129,14 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
                                             attr="subject"                                                
                                             )
             # Custom cross-validator
+            # Watch out of Subject wise error
             cvte = CrossValidation(self._classifier,
                                    partitioner,
                                    splitter=splitter,
                                    enable_ca=['stats', 'probabilities'],
-                                   errorfx=SubjectWiseError(mean_mismatch_error, 
-                                                            'group', 
-                                                            'subject')
+                                   #errorfx=SubjectWiseError(mean_mismatch_error, 
+                                   #                         'group', 
+                                   #                         'subject')
                                    )
             fname = self.build_fname(ds, rule, ii, i)
 
@@ -152,7 +156,6 @@ class SingleSubjectSearchlight(SearchlightAnalysisPipeline):
         
         self.subject = subj
         
-        ####
         
         for k in self._conf.keys():
             if k in self._default_conf.keys():
@@ -219,6 +222,10 @@ class SingleSubjectSearchlight(SearchlightAnalysisPipeline):
 
   
 """
+from mvpa_itab.pipeline.searchlight import LeaveOneSubjectOutSL
+from mvpa_itab.script.carlo.analysis import carlo_ofp_set_targets
+from mvpa2.suite import LinearCSVMC
+
 conf_ofp = {   
             'path':'/media/robbis/DATA/fmri/carlo_ofp/',
             'configuration_file':"ofp.conf",
@@ -229,14 +236,15 @@ conf_ofp = {
             "condition_names":["evidence", "task"],
             'evidence': 3, # Default_value (memory : 3)
             'task':'decision', # Default_value
-            'split_attr':'subject', #
-            'mask_area':'L_FFA', # memory                            
+            'split_attr':'subject_ofp', #
+            'mask_area':'glm_atlas', # memory                            
             'normalization':'both',
             "radius": 3,
             "n_balanced_ds": 1,
             "set_targets": carlo_ofp_set_targets,
             "classifier":LinearCSVMC(C=1)
             }
+            
 sl_analysis = LeaveOneSubjectOutSL(**conf_ofp)
 sl_analysis.load_dataset(**kwargs).run(**options)
 """

@@ -228,13 +228,16 @@ def preprocess_dataset(ds, type_, **kwargs):
     if  label_included != ['all']:
         ds = ds[np.array([l in label_included for l in ds.sa.targets],
                           dtype='bool')]
+
     
-    
-    if label_name != None:       
-        ds = ds[np.equal(ds.sa[label_name].value, int(label_value))]
+    if label_name != "None" and label_name != None:
+        logger.info("Using only a portion of the dataset...")
+        logger.info("Label %s value %s" % (label_name, str(label_value)))      
+        ds = ds[ds.sa[label_name].value == label_value]
         
     
     return ds
+
 
 
 def balance_dataset(**kwargs):

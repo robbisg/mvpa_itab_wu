@@ -17,11 +17,6 @@ path = '/home/robbis/fmri/memory/'
 from mvpa_itab.script.carlo import subjects, tasks, evidences
 
 
-
- 
-            
-
-
 path_results = os.path.join(path,'0_results','220715_decision_searchlight')
 os.system('mkdir '+path_results)
 
