@@ -8,7 +8,7 @@ from mvpa2.suite import debug
 from mvpa_itab.io.base import read_configuration
 from mvpa2.measures.searchlight import sphere_searchlight
 from mvpa2.datasets.mri import map2nifti
-from mvpa_itab.main_wu import preprocess_dataset, normalize_dataset
+from mvpa_itab.main_wu import detrend_dataset, normalize_dataset
 from mvpa2.measures.base import CrossValidation
 from mvpa2.generators.partition import NFoldPartitioner
 
@@ -24,6 +24,8 @@ class SearchlightAnalysisPipeline(object):
     other classes could be used to customize the pipeline with several
     searchlight flavours.
 
+    Sequence of calls are:
+    - pipeline.transform() -> pipeline.algorithm() -> pipeline.analysis() -> pipeline.searchlight()
 
     Parameters
     ----------
@@ -154,7 +156,7 @@ class SearchlightAnalysisPipeline(object):
     
     
     
-    def run(self, **options):
+    def transform(self, **options):
         """
         options: dictionary with condition to filter
             e.g. task="memory", evidence="1" depending on your data.
@@ -207,9 +209,9 @@ class SearchlightAnalysisPipeline(object):
 
         ds.targets = targets
         
-        ds = preprocess_dataset(ds, 
-                                self._data_type, 
-                                **self._conf)
+        ds = detrend_dataset(ds, 
+                            self._data_type, 
+                            **self._conf)
         
         ds = normalize_dataset(ds, **self._conf)
 

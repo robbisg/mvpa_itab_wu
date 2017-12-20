@@ -68,6 +68,7 @@ class AverageLinearCSVM(LinearCSVMC):
         else:
             return Dataset(res, sa=ds.sa)
 
+
 class StoreResults(object):
     
     def __init__(self):
@@ -104,3 +105,16 @@ class ErrorPerTrial(BinaryFxNode):
                for i in np.unique(ds.sa.frame)]
         
         return Dataset(np.array(err).flatten())
+    
+    
+"""
+avg = TrialAverager(clf)
+cv_storage = StoreResults()
+cvte = CrossValidation(avg,
+                       HalfPartitioner(),
+                       errorfx=ErrorPerTrial(), 
+                       #callback=cv_storage,
+                       enable_ca=['stats', 'probabilities'])
+                       
+err = cvte(ds)
+"""                       

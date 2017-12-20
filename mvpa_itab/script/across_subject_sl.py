@@ -13,7 +13,7 @@ subjects = ['110929angque',
 if __debug__:
         debug.active += ["SLC"]
         
-ds_, _, conf_ = subjects_merged_ds(path, 
+ds_, _, conf_ = load_subjectwise_ds(path, 
                                    subjects, 
                                    'memory.conf', 
                                    'BETA_MVPA', 

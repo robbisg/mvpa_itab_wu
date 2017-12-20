@@ -52,7 +52,7 @@ def plot_matrix(matrix, roi_names, networks, threshold=0, zscore=True, **kwargs)
     
     
     _plot_cfg = {'ticks_type':'networks',
-                 'ticks_color':get_atlas_info('findlab')[1],
+                 'ticks_color': None,#get_atlas_info('findlab')[1],
                  'facecolor':'k',
                  'zscore': True
                  }

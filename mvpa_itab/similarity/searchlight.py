@@ -25,6 +25,7 @@ class SimilarityMeasure(Measure):
         self.params = {}
 
 
+
 class MahalanobisThresholdMeasure(SimilarityMeasure):
     """
     This class is used to run Mahalanobis similarity in a Searchlight analysis.

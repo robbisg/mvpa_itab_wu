@@ -1,7 +1,8 @@
 from mvpa_itab.conn.states.base import cluster_state
-from mvpa_itab.conn.states.utils import get_data
+from mvpa_itab.conn.states.utils import get_data, get_centroids
 from mvpa_itab.conn.states.metrics import calculate_metrics
-
+import os
+import cPickle as pickle
 
 def demeaned():
     

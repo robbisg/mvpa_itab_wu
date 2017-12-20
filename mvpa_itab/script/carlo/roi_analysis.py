@@ -25,7 +25,7 @@ def get_configuration(default_config):
 def analysis(path, subject_file='subjects.csv', **kwargs):
     
     roi_path = '1_single_ROIs'
-    rois = os.listdir(os.path.join(path,roi_path))
+    rois = os.listdir(os.path.join(path, roi_path))
     rois = [roi for roi in rois if roi.find('nii.gz') != -1]
 
     
@@ -64,7 +64,12 @@ def analysis(path, subject_file='subjects.csv', **kwargs):
                                       config['mask_label__evidence'],
                                       config['normalization'])
         
-        res = _test_spatial(path, subjects_, 'memory.conf', 'BETA_MVPA', analysis_type=analysis_type, **config)
+        res = _test_spatial(path, 
+                            subjects_, 
+                            'memory.conf', 
+                            'BETA_MVPA', 
+                            analysis_type=analysis_type, 
+                            **config)
         
     
     

@@ -13,9 +13,11 @@ class SubjectResult(object):
     
     def __init__(self, name, result_dict, savers=None):
         self.name = name
+        
         for k, v in result_dict.items():
             logger.debug("Setting %s" % (k))
             setattr(self, '_'+str(k), v)
+        
         if savers != None:
             self.savers = savers
     
@@ -347,22 +349,22 @@ class DecodingSaver(Saver):
     def __init__(self, fields=['classifier', 'mapper', 'ds_src', 'stats']):
         return Saver.__init__(self, fields=fields)
     
+    
+    
     def save(self, path, result):
         
         map_mean = result._map.pop()
-        map_mean_data = map_mean.get_data()
-        map_mean_data = (map_mean_data - np.mean(map_mean_data)) / np.std(map_mean_data)
-        fname = "%s_mean_map.nii.gz" % result.name
-        img_zscore = ni.Nifti1Image(map_mean_data, map_mean.get_affine())
-        ni.save(img_zscore, os.path.join(path, fname))
+
+        save_image(os.path.join(path, "%s_mean_map.nii.gz" % result.name), 
+                   map_mean
+                   )
  
         for map_, tar in zip(result._map, result._sensitivities.sa.targets):
             classes_ = '_'.join(tar)
-            fname = "%s_%s_map.nii.gz" % (result.name, classes_)
-            map_data = map_.get_data()
-            map_data_zscore = (map_data - np.mean(map_data)) / np.std(map_data)
-            map_zscore = ni.Nifti1Image(map_data_zscore, map_.get_affine())
-            ni.save(map_zscore, os.path.join(path,fname))
+            save_image(os.path.join(path, "%s_%s_map.nii.gz" % (result.name, 
+                                                                classes_)),
+                       map_
+                       )
                 
         # Save statistics
         stats = result._stats
@@ -567,11 +569,23 @@ class SignalDetectionSaver(Saver):
 
 def make_dir(path):
     """ Make dir unix command wrapper """
+    os.mkdir(os.path.join(path))
     command = 'mkdir '+os.path.join(path)
-    os.system(command)
+    logger.info(command)
+    #os.system(command)
     
     
-def save_image(filename, image):
+def save_image(filename, image, zscore=True):
+    
+    img_data = image.get_data()
+    
+    if zscore:
+        img_data = (img_data - np.mean(img_data)) / np.std(img_data)
+    
+    img_save = ni.Nifti1Image(img_data, image.affine)
+    ni.save(img_save, filename)  
+    
+    
     return  
 
 

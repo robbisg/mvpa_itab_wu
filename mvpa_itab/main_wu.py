@@ -23,7 +23,7 @@ from mvpa2.measures.anova import OneWayAnova
 from mvpa2.featsel.base import SensitivityBasedFeatureSelection
 from mvpa2.suite import ChainNode, MCNullDist, Repeater, AttributePermutator
 from mvpa2.suite import CrossValidation
-
+from mvpa2.mappers.detrend import PolyDetrendMapper
 import os
 import cPickle as pickle
 import nibabel as ni
@@ -32,6 +32,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import logging
 import warnings
+from mvpa2.clfs.meta import FeatureSelectionClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -159,9 +160,49 @@ def build_events_ds(ds, new_duration, **kwargs):
     evds = eventrelated_dataset(ds, events = new_event_list)
     
     return evds
-    
 
-def preprocess_dataset(ds, type_, **kwargs):
+
+def change_target(ds, target_name):
+    
+    ds.sa.targets = ds.sa[target_name]
+    
+    return ds
+
+
+
+def slice_dataset(ds, selection_dict):
+    """
+    Select only portions of the dataset based on a dictionary
+    The dictionary indicates the sample attributes to be used as key and a list
+    with conditions to be selected:
+    
+    selection_dict = {
+                        'accuracy': ['I'],
+                        'frame':[1,2,3]
+                        }
+    
+    """
+    selection_mask = np.ones_like(ds.targets, dtype=np.bool)
+    for key, values in selection_dict.iteritems():
+        
+        logger.info("Selected %s from %s attribute." %(str(values), key))
+        
+        ds_values = ds.sa[key].value
+        condition_mask = np.zeros_like(ds_values, dtype=np.bool)
+        
+        for value in values:        
+            condition_mask = np.logical_or(condition_mask, ds_values == value)
+            
+        selection_mask = np.logical_and(selection_mask, condition_mask)
+        
+    
+    return ds[selection_mask]
+        
+
+
+
+
+def detrend_dataset(ds, type_, **kwargs):
     """
     Preprocess the dataset: detrending of single run and for chunks, the zscoring is also
     done by chunks and by run.
@@ -184,57 +225,37 @@ def preprocess_dataset(ds, type_, **kwargs):
     
     
     """
-    warnings.warn("Deprecated: This is going to be\
-                   substituted with pipelines.", DeprecationWarning)
+    warnings.warn("Deprecated: This is going to be "+
+                  "substituted with pipelines.", DeprecationWarning)
     
-    warnings.warn("This function doesn't normalize features \
-                    and/or samples. See normalize_dataset.")
+    warnings.warn("This function doesn't normalize features"+
+                    " and/or samples. See normalize_dataset.")
     
-
-    target = None
-    label_name = None
+    warnings.warn("This function doesn't select samples automatically."+
+                  " Use slice_dataset to select samples from the dataset.")
+    
+    warnings.warn("This function doesn't select the target. "+
+                  "Use change_target to use another attribute as target.")
+    
+    
+    order = [1]
+    
     for arg in kwargs:
-        if (arg == 'label_included'):
-            label_included = kwargs[arg].split(',')
-        if (arg == 'label_dropped'):
-            label_dropped = kwargs[arg]
-        if (arg == 'target'):
-            target = str(kwargs[arg])
-        if (arg == 'label_mask_name'):
-            label_name = str(kwargs[arg])
-        if (arg == 'label_mask_value'):
-            label_value = kwargs[arg]
+        if arg == 'order':
+            order = kwargs[arg]
+            
+    
+    
+    for o in order:
+           
+        logger.info('Dataset preprocessing: Detrending with polynomial of order %s...' %(str(o)))
+        if len(np.unique(ds.sa['file'])) != 1:
+            detr1 = PolyDetrendMapper(chunks_attr='file', polyord=o)
+            ds = detr1.forward(ds)
+            
+        detr2 = PolyDetrendMapper(chunks_attr='chunks', polyord=o)
+        ds = detr2.forward(ds)
 
-                
-    
-    if target != None:
-        ds.targets = ds.sa[target].value
-        
-    logger.info('Dataset preprocessing: Detrending...')
-    if len(np.unique(ds.sa['file'])) != 1:
-        poly_detrend(ds, polyord = 1, chunks_attr = 'file')
-    poly_detrend(ds, polyord = 1, chunks_attr = 'chunks')
-    
-    
-    
-    
-    if  label_dropped != 'None':
-        logger.info('Removing labels...')
-        ds = ds[ds.sa.targets != label_dropped]
-        
-        #ds = ds[np.logical_or([ds.sa.targets != label for label in label_dropped])]
-        
-        
-    if  label_included != ['all']:
-        ds = ds[np.array([l in label_included for l in ds.sa.targets],
-                          dtype='bool')]
-
-    
-    if label_name != "None" and label_name != None:
-        logger.info("Using only a portion of the dataset...")
-        logger.info("Label %s value %s" % (label_name, str(label_value)))      
-        ds = ds[ds.sa[label_name].value == label_value]
-        
     
     return ds
 
@@ -259,6 +280,41 @@ def balance_dataset(**kwargs):
      
     return balancer
     
+
+
+def chunk_dataset(ds, **kwargs):
+    
+    import collections
+    import fractions
+    
+    chunk_number = None
+    
+    for arg in kwargs:
+        if (arg == 'chunk_number'):
+            chunk_number = kwargs[arg]
+    
+    
+    n_targets = np.array([value for value in collections.Counter(ds.targets).values()]).min()
+    
+    if chunk_number == 'adaptive':
+        n_chunks = np.max([fractions.gcd(n_targets, i) for i in np.arange(2, 10)])
+        if n_chunks == 1:
+            n_chunks = 4
+    elif isinstance(chunk_number, int):
+        n_chunks = int(chunk_number)
+        
+    if chunk_number != None:
+        argsort = np.argsort(ds.targets)
+        chunks = []
+        for _ in ds.uniquetargets:
+            chunk = np.linspace(0, n_chunks, n_targets, endpoint=False, dtype=np.int)
+            chunks.append(chunk)
+        
+        
+        ds.chunks[argsort] = np.hstack(chunks)   
+    
+    
+    return ds
 
 
 
@@ -332,10 +388,24 @@ def normalize_dataset(ds, **kwargs):
 
 
 
+def find_events_dataset(ds, **kwargs):
+    
+    ds.a.events = find_events(#event= ds.sa.event_num, 
+                              chunks = ds.sa.chunks, 
+                              targets = ds.sa.targets)
+    
+    return ds
+
+
+
+
 def spatial(ds, **kwargs):
 #    gc.enable()
 #    gc.set_debug(gc.DEBUG_LEAK)      
-        
+    
+    cvte = None
+    permutations = 0
+    
     for arg in kwargs:
         if arg == 'clf_type':
             clf_type = kwargs[arg]
@@ -343,9 +413,12 @@ def spatial(ds, **kwargs):
             enable_results = kwargs[arg].split(',')
         if arg == 'permutations':
             permutations = int(kwargs[arg])
+        if arg == 'cvte':
+            cvte = kwargs[arg]
+            fclf = cvte.learner # Send crossvalidation object
     
-    
-    [fclf, cvte] = setup_classifier(**kwargs)
+    if cvte == None:
+        [fclf, cvte] = setup_classifier(**kwargs)
     
     
     logger.info('Cross validation is performing ...')
@@ -611,34 +684,41 @@ def transfer_learning(ds_src, ds_tar, analysis, **kwargs):
 
     ###########################################################
     #   Pack_results
-    results = dict()
-    #del enable_results
-        
-    allowed_keys = ['targets', 'classifier', 'map',
-                    'stats', 'sensitivities', 'mapper',
-                    'predictions','fclf', 'ds_src', 'ds_tar', 'perm_pvalue', 'p']
-    
-      
-
     if isinstance(classifier, FeatureSelectionClassifier):
         classifier_s = classifier.clf
     else:
         classifier_s = classifier
     
+    results = dict()
+        
+    allowed_keys = ['targets', 
+                    'classifier', 
+                    'map',
+                    'stats', 
+                    'sensitivities', 
+                    'mapper',
+                    'predictions',
+                    'fclf', 
+                    'ds_src', 
+                    'ds_tar', 
+                    'perm_pvalue', 
+                    'p']
+    
+          
    
-    allowed_results = [ds_tar.targets, classifier_s, src_result['map'], 
-                       src_result['stats'], src_result['sensitivities'], 
-                       src_result['mapper'], predictions, 
-                       classifier, src_result['ds'], ds_tar, src_result['pvalue'],
+    allowed_results = [ds_tar.targets, 
+                       classifier_s, 
+                       src_result['map'], 
+                       src_result['stats'], 
+                       src_result['sensitivities'], 
+                       src_result['mapper'], 
+                       predictions, 
+                       classifier, 
+                       src_result['ds'], 
+                       ds_tar, 
+                       src_result['pvalue'],
                        src_result['p'] ]
-    '''
-    
-    allowed_keys = ['decoding_result', 'targets', 'classifier', 'predictions',
-                    'fclf', 'ds_tar', 'ds_src']
-    
-    allowed_results = [src_result, ds_tar.targets, classifier_s, predictions, 
-                       classifier, ds_tar, src_result['ds']]
-    '''
+
     
     results_dict = dict(zip(allowed_keys, allowed_results))
 
@@ -775,6 +855,8 @@ def setup_classifier(**kwargs):
     return [fclf, cvte]
 
 
+
+
 def clustering(ds, n_clusters=6):
 
     from sklearn.manifold import MDS
@@ -838,8 +920,7 @@ def clustering_analysis(ds_src, ds_tar, analysis, **kwargs):
         r_clustering[label] = clustering(ds_tar[mask], n_clusters=n_clusters)
         if mds_flag == True:
             mds = MDS(n_components=2, max_iter=2000,
-                   eps=1e-9, random_state=seed,
-                   n_jobs=1)
+                   eps=1e-9, n_jobs=1)
             logger.info('Multidimensional scaling is performing...')
             pos = mds.fit_transform(r_clustering[label]['dist'])
             r_clustering[label]['pos'] = pos
@@ -850,6 +931,7 @@ def clustering_analysis(ds_src, ds_tar, analysis, **kwargs):
     return dict({'clusters': r_clustering, 
                  'predictions': predictions, 
                  'targets': ds_tar.targets})
+
 
 
 def inertia_clustering_analysis(ds, max_clusters=13):
@@ -890,8 +972,8 @@ def analyze(path, subjects, analysis, model, conf_file, **kwargs):
         if ds == 0:
             continue
         else:
-            ds = preprocess_dataset(ds, model, **kwargs)
-
+            ds = detrend_dataset(ds, model, **kwargs)
+            
             res = analysis(ds, **kwargs)
 
             mask = configuration['mask_atlas'] + '_' + configuration['mask_area']

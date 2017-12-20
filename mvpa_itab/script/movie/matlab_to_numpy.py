@@ -1,4 +1,5 @@
 from scipy.io import loadmat, savemat
+import numpy as np
 
 filename = '/home/robbis/Share/viviana-2016/all_mat_nonstat_beta.mat'
 data = loadmat(filename)

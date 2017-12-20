@@ -1,5 +1,5 @@
 from mvpa_itab.io.base import load_dataset, read_configuration
-from mvpa_itab.main_wu import preprocess_dataset
+from mvpa_itab.main_wu import detrend_dataset
 from mvpa_itab.timewise import AverageLinearCSVM, ErrorPerTrial, StoreResults
 import mvpa_itab.similarity.searchlight as slsim 
 from mvpa2.measures.base import CrossValidation, Dataset
@@ -49,7 +49,7 @@ for i, partitioner in enumerate(partitioners):
     conf['label_dropped'] = '0'
     conf['label_included'] = ','.join([str(n) for n in np.array([-5,-3,-1,1,3,5])])
     
-    ds = preprocess_dataset(ds, task_, **conf)
+    ds = detrend_dataset(ds, task_, **conf)
     ds.targets = np.float_(ds.targets)
     ds.targets = (ds.targets - np.mean(ds.targets))/np.std(ds.targets)
     cv = CrossValidation(slsim.RegressionMeasure(), 

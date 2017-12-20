@@ -1,6 +1,7 @@
 import os
 import random
 import numpy as np
+import matplotlib.pylab as pl
 from sklearn.decomposition.pca import PCA
 from sklearn.metrics import r2_score
 from numpy.random.mtrand import permutation
@@ -187,7 +188,7 @@ for i in range(X.shape[1]):
 c = Correlation(X)
 
 for i in [1]:
-    corr = c.run(X[groups==i], y[groups==i])[0]
+    corr = c.transform(X[groups==i], y[groups==i])[0]
     pl.plot(corr, marker='o', c=color[i], label=labels_group[i])
 
 pl.xticks(np.arange(78), label_list, rotation=90)
@@ -253,7 +254,7 @@ for n in range(n_trial):
                 k+=1
                 
     p1_ = []
-    #mse_avg = mse_.mean(1)
+    mse_avg = mse_.mean(1)
     
     mse_t1_avg = mse_t[n].squeeze().mean(1)
     for v, dist in zip(mse_t1_avg, mse_avg):
@@ -320,7 +321,7 @@ for i in range(arg_.shape[0]):
             
             cv = CrossValidation(method, alg_)
             
-            mse_ = cv.run(X_fit, y1)
+            mse_ = cv.transform(X_fit, y1)
         
 ########### Permute feature set #########################
      

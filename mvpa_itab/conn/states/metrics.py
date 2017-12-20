@@ -12,8 +12,11 @@ logger = logging.getLogger(__name__)
 def get_k(labels):
     return len(np.unique(labels))
 
+
+
 def get_centers(X, labels):
     return np.array([X[labels == l].mean(0) for l in np.unique(labels)])
+
 
 
 def ch_criterion(X, labels, distance=euclidean):

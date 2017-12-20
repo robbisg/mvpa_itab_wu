@@ -43,7 +43,8 @@ def mic(signal1, signal2):
     mine.compute_score(signal1, signal2)
     
     return mine.mic()
-    
+
+
 def correlation(y_true, y_pred):
     return sp.stats.stats.pearsonr(y_true, y_pred)[0]
 

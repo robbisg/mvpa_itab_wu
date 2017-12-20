@@ -16,9 +16,9 @@ class PreprocessingPipeline(Node):
         return self
     
     
-    def run(self, ds):
+    def transform(self, ds):
         for node in self.nodes:
-            ds = node.run(ds)
+            ds = node.transform(ds)
             
         return ds
             

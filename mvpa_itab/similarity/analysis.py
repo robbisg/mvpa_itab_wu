@@ -4,8 +4,8 @@ from nitime.analysis import SeedCorrelationAnalyzer, BaseAnalyzer
 from scipy.spatial.distance import euclidean
 from nitime import descriptors as desc
 from numpy.random.mtrand import permutation
-
-import sys
+from tqdm import tqdm
+import matplotlib.pylab as pl
 
 
 class SeedAnalyzer(BaseAnalyzer):
@@ -85,7 +85,7 @@ class SeedSimilarityAnalysis(object):
         self.kwargs = kwargs
         return
     
-    def run(self, target_ds):
+    def transform(self, target_ds):
         
         seed_ds = self.seed_ds
         
@@ -117,14 +117,11 @@ class SeedSimilarityAnalysis(object):
                               dimy)
                        )
         
-        for i in range(self.n_permutation):
-            
-            progress(i, self.n_permutation)
-            
+        for i in tqdm(range(self.n_permutation)):
+                        
             target_p = self._permute(target_ds, axis)
-            fp[i,:] = self.run(target_p)
+            fp[i,:] = self.transform(target_p)
             
-        progress(i, self.n_permutation)
         self.null_dist = fp
     
         return fp

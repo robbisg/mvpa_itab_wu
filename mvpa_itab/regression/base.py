@@ -23,7 +23,7 @@ class Analysis(object):
         return self
 
     
-    def run(self):
+    def transform(self):
         return
     
     def __str__(self, *args, **kwargs):
@@ -101,7 +101,7 @@ class RegressionAnalysis(Analysis):
         return self
     
     
-    def run(self, X, y, sets=None):
+    def transform(self, X, y, sets=None):
         """
         The output is a vector r x n where r is the number
         of repetitions of the splitting method
@@ -109,9 +109,7 @@ class RegressionAnalysis(Analysis):
         
         if sets==None:
             cv = self.cross_validation
-        else:
             
-        
         mse_ = []
         set_ = []
         weights_ = []
@@ -130,7 +128,7 @@ class RegressionAnalysis(Analysis):
             y_train = y[train_index]
             
             # Feature selection
-            self.feature_selection.run(X_train, y_train).select_first(80)
+            self.feature_selection.transform(X_train, y_train).select_first(80)
             fset_ = self.feature_selection.ranking
             X_train = X_train[:, fset_]
             
@@ -160,7 +158,7 @@ class RegressionAnalysis(Analysis):
 class PermutationAnalysis(Analysis):
     
     
-    def run(self, X, y):
+    def transform(self, X, y):
         """
         Runs permutations shuffiling stuff indicated in dimension variable
         """
@@ -170,7 +168,7 @@ class PermutationAnalysis(Analysis):
         for i in tqdm(range(self.n_permutation), desc="permutation"):
             
             X_, y_ = self.shuffle(X, y)
-            permut_value = self.analysis.run(X_, y_)
+            permut_value = self.analysis.transform(X_, y_)
             self.null_dist.append(permut_value)
             progress(i, self.n_permutation, suffix='')
             
@@ -240,14 +238,14 @@ class FeatureSelectionIterator(object):
         return self
     
     
-    def run(self, X, y):
+    def transform(self, X, y):
         
         """
-        Algorithm should implement a run(X, y) method and the first value should be
+        Algorithm should implement a transform(X, y) method and the first value should be
         the ranking criterion
         """
         a = self.measure(X)
-        values, _ = a.run(X, y)
+        values, _ = a.transform(X, y)
         
         self.ranking = self.ranker(values)
         self.i = 0
@@ -313,12 +311,12 @@ class ScriptIterator(object):
             raise StopIteration()
         
     
-    def run(self, pipeline):
+    def transform(self, pipeline):
         results = []
 
         for conf in tqdm(self, desc='configuration_iterator'):
             pipeline.update_configuration(**conf)
-            res = pipeline.run()
+            res = pipeline.transform()
             
             results.append([conf, res])
         
@@ -400,7 +398,7 @@ pipeline = FeaturePermutationRegression()
 pipeline.setup_analysis(**_fields)
 iter_ = ScriptIterator()
 iter_.setup_analysis(**iterator_setup)
-results = iter_.run(pipeline)
+results = iter_.transform(pipeline)
 pickle.dump(results, file("/home/robbis/fmri/monks/results_regression_age_perm_1000_cv_250.pyobj", "w"))
 '''
 

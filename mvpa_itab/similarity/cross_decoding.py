@@ -143,6 +143,8 @@ def similarity_measure_euclidean (ds_tar, ds_src, results, p_value):
     #true_data = full_data[true_predictions]
 
     return full_data, np.bool_(true_predictions), threshold, p_values, distances    
+
+
         
 def similarity_measure_mahalanobis (ds_tar, ds_src, results, p_value=0.95):
     

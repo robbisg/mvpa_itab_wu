@@ -1,6 +1,6 @@
 ##############è Convert ######################
 from mvpa_itab.io.base import load_dataset, read_configuration
-from mvpa_itab.main_wu import preprocess_dataset
+from mvpa_itab.main_wu import detrend_dataset
 import nibabel as ni
 import mvpa_itab.results as rs
 from mvpa_itab.wrapper.sklearn import SKLCrossValidation

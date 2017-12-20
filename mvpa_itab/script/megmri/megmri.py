@@ -731,3 +731,284 @@ pl.scatter(m_final[:,0], m_final[:,1], s=100, marker="^")
 
 
 
+#################################
+path = 'development/svn/mutual/trunk/result/los_alamos/brain_offset_000_06/'
+image_list = os.listdir(path)
+image_list = [i for i in image_list if i.find('2_imTr') != -1]
+image_list.sort()
+image_ = [np.array(Image.open(os.path.join(path, f))) for f in image_list]
+image = np.rollaxis(np.array(image_), 0, 3)
+image = np.rollaxis(np.array(image), 0, 2)
+image = np.flip(np.flip(image, axis=0), axis=1)
+ni.save(ni.Nifti1Image(image[...,:5], affine), 'phantoms/Coregistration/BREAKBEN/lanl/lanl_hf.nii.gz')
+
+
+# Cluster overlap #
+path = "phantoms/Coregistration/BREAKBEN/lanl/"
+manual_mask = ni.load(os.path.join(path, "manual_mask_lanl_masked.nii.gz"))
+automat_mask = ni.load(os.path.join(path, "clustering_lanl.nii.gz"))
+
+autom_data = automat_mask.get_data()
+manual_data = np.int_(manual_mask.get_data())
+
+pl.figure()
+pl.imshow(autom_data[...,2])
+pl.figure()
+pl.imshow(manual_data[...,2])
+overlap_matrix = np.zeros((autom_data.max(), manual_data.max()))
+
+aut_mask_nilearn = np.zeros(autom_data.shape + (autom_data.max(),))
+man_mask_nilearn = np.zeros(manual_data.shape + (manual_data.max(),))
+
+for aroi in np.unique(autom_data)[1:]:
+    amask = autom_data == aroi
+    aut_mask_nilearn[...,aroi-1] = np.int_(amask) * (aroi+1)
+    
+    for mroi in np.unique(manual_data)[1:]:
+        
+        
+        mmask = manual_data == mroi
+        man_mask_nilearn[...,mroi-1] = np.int_(mmask) * (mroi+1)
+        
+        
+        overlap = np.count_nonzero(np.logical_and(amask, mmask))
+        total = np.count_nonzero(mmask)
+        
+        overlap_matrix[aroi-1, mroi-1] = overlap / np.float(total)
+
+
+
+
+
+pl.imshow(overlap_matrix.T, vmin=0, vmax=1.)
+pl.yticks(range(4), ['Eye', 'Tissue under the eye', 'White matter', 'Gray and white matter'])
+pl.colorbar()
+pl.xticks(range(5), ['Cluster 1', 'Cluster 2', 'Cluster 3', 'Cluster 4', 'Cluster 5'])
+
+
+ni.save(ni.Nifti1Image(manual_data, automat_mask.affine),
+        os.path.join(path, "manual_mask_lanl.nii.gz"))
+
+ni.save(ni.Nifti1Image(aut_mask_nilearn, automat_mask.affine), 
+        os.path.join(path, "automatic_mask_lanl_nilearn.nii.gz"))
+ni.save(ni.Nifti1Image(man_mask_nilearn, automat_mask.affine), 
+        os.path.join(path, "manual_mask_lanl_nilearn.nii.gz"))
+
+
+
+
+
+hf_data = ni.load("phantoms/Coregistration/BREAKBEN/lanl/lanl_hf.nii.gz").get_data()
+lf_data = ni.load("phantoms/Coregistration/BREAKBEN/lanl/lanl_lf.nii.gz").get_data()
+clusters = np.zeros((autom_data.max(), 2))
+
+
+
+for aroi in np.unique(autom_data)[1:]:
+    mask_ = autom_data == aroi
+    
+    clusters[aroi-1, 0] = hf_data[mask_].mean()
+    clusters[aroi-1, 1] = lf_data[mask_].mean()
+    
+    print aroi, hf_data[mask_].mean(), lf_data[mask_].mean()
+
+pl.figure()
+pl.imshow(clusters.T, cmap=pl.cm.gray)
+pl.yticks(range(2), ['High Field', 'Low Field'])
+pl.xticks(range(5), ['Cluster 1', 'Cluster 2', 'Cluster 3', 'Cluster 4', 'Cluster 5'])
+
+pl.figure()
+pl.imshow(np.arange(1, autom_data.max()+1)[np.newaxis,:], cmap=pl.cm.gist_rainbow)
+pl.xticks(range(5), ['Cluster 1', 'Cluster 2', 'Cluster 3', 'Cluster 4', 'Cluster 5'])
+
+
+
+
+# LANL
+
+# Clustering sara
+nil.plot_prob_atlas(ni.load(os.path.join(path, "automatic_mask_lanl_nilearn.nii.gz")), 
+                    anat_img=ni.load("phantoms/Coregistration/BREAKBEN/lanl/lanl_hf.nii.gz"), 
+                    view_type='filled_contours',
+                    alpha=0.3,
+                    draw_cross=False,
+                    display_mode='z',
+                    threshold=2,
+                    annotate=False)
+
+# Manual clustering
+nil.plot_prob_atlas(ni.load(os.path.join(path, "manual_mask_lanl_nilearn.nii.gz")), 
+                    anat_img=ni.load("phantoms/Coregistration/BREAKBEN/lanl/lanl_hf.nii.gz"), 
+                    view_type='contours',
+                    draw_cross=False,
+                    display_mode='z',
+                    threshold=None,
+                    linewidths=1,
+                    annotate=False)
+
+# High-field
+nil.plot_prob_atlas(ni.load(os.path.join(path, "manual_mask_lanl_nilearn.nii.gz")), 
+                    anat_img=ni.load("phantoms/Coregistration/BREAKBEN/lanl/lanl_hf.nii.gz"), 
+                    view_type='contours',
+                    draw_cross=False,
+                    display_mode='z',
+                    threshold=50,
+                    linewidths=1,
+                    annotate=False)
+
+
+# Low Field
+nil.plot_prob_atlas(ni.load(os.path.join(path, "manual_mask_lanl_nilearn.nii.gz")), 
+                    anat_img=ni.load("phantoms/Coregistration/BREAKBEN/lanl/lanl_lf.nii.gz"), 
+                    view_type='contours',
+                    draw_cross=False,
+                    display_mode='z',
+                    threshold=10,
+                    annotate=False)
+
+
+
+
+
+
+
+### AALTO tiff-to-nifti ###
+path = 'phantoms/Coregistration/AALTO/conversion/'
+image_list = os.listdir(path)
+image_list_lf = [i for i in image_list if i.find('1_imTr') != -1]
+image_list_hf = [i for i in image_list if i.find('2_imTr') != -1]
+image_list_hf.sort()
+image_list_lf.sort()
+
+image_ = [np.array(Image.open(os.path.join(path, f))) for f in image_list_hf]
+image = np.rollaxis(np.array(image_), 0, 3)
+image = np.rollaxis(np.array(image), 0, 2)
+image = np.flip(np.flip(image, axis=0), axis=1)
+affine = np.eye(4)
+ni.save(ni.Nifti1Image(image[...,2:], affine), 'phantoms/Coregistration/BREAKBEN/aalto_hf.nii.gz')
+
+image_ = [np.array(Image.open(os.path.join(path, f))) for f in image_list_lf]
+image = np.rollaxis(np.array(image_), 0, 3)
+image = np.rollaxis(np.array(image), 0, 2)
+image = np.flip(np.flip(image, axis=0), axis=1)
+affine = np.eye(4)
+ni.save(ni.Nifti1Image(image[...,2:], affine), 'phantoms/Coregistration/BREAKBEN/aalto_lf.nii.gz')
+
+
+clust_aalto_mat = loadmat("phantoms/Coregistration/BREAKBEN/ris_clust_aalto.mat")
+clust_data = clust_aalto_mat['ris_clust_aalto']
+#clust_data = np.rollaxis(clust_data, 0, 3)
+clust_data = np.rollaxis(clust_data, 0, 2)
+clust_data = np.flip(np.flip(clust_data, axis=0), axis=1)
+ni.save(ni.Nifti1Image(clust_data, affine), 'phantoms/Coregistration/BREAKBEN/clustering_aalto.nii.gz')
+
+
+# Cluster overlap #
+path = "phantoms/Coregistration/BREAKBEN/aalto"
+manual_mask = ni.load(os.path.join(path, "manual_mask_aalto.img"))
+automat_mask = ni.load(os.path.join(path, "clustering_aalto.nii.gz"))
+
+autom_data = automat_mask.get_data()
+manual_data = np.flip(manual_mask.get_data(), axis=0)
+
+pl.figure()
+pl.imshow(autom_data[...,2])
+pl.figure()
+pl.imshow(manual_data[...,2])
+overlap_matrix = np.zeros((autom_data.max(), manual_data.max()))
+
+aut_mask_nilearn = np.zeros(autom_data.shape + (autom_data.max(),))
+man_mask_nilearn = np.zeros(manual_data.shape + (manual_data.max(),))
+
+for aroi in np.unique(autom_data)[1:]:
+    amask = autom_data == aroi
+    aut_mask_nilearn[...,aroi-1] = np.int_(amask) * (aroi+1)
+    
+    for mroi in np.unique(manual_data)[1:]:
+        
+        
+        mmask = manual_data == mroi
+        man_mask_nilearn[...,mroi-1] = np.int_(mmask) * (mroi+1)
+        
+        
+        overlap = np.count_nonzero(np.logical_and(amask, mmask))
+        total = np.count_nonzero(mmask)
+        
+        overlap_matrix[aroi-1, mroi-1] = overlap / np.float(total)
+        
+pl.imshow(overlap_matrix.T, vmin=0, vmax=1.)
+pl.yticks(range(1), ['Structural Landmark'])
+pl.colorbar()
+pl.xticks(range(4), ['Cluster 1', 'Cluster 2', 'Cluster 3', 'Cluster 4'])
+
+
+ni.save(ni.Nifti1Image(aut_mask_nilearn, automat_mask.affine), 
+        os.path.join(path, "automatic_mask_aalto_nilearn.img"))
+ni.save(ni.Nifti1Image(man_mask_nilearn, automat_mask.affine), 
+        os.path.join(path, "manual_mask_aalto_nilearn.img"))
+
+
+hf_data = ni.load("phantoms/Coregistration/BREAKBEN/aalto/aalto_hf.nii.gz").get_data()
+lf_data = ni.load("phantoms/Coregistration/BREAKBEN/aalto/aalto_lf.nii.gz").get_data()
+clusters = np.zeros((autom_data.max(),2))
+for aroi in np.unique(autom_data)[1:]:
+    mask_ = autom_data == aroi
+    
+    clusters[aroi-1, 0] = hf_data[mask_].mean()
+    clusters[aroi-1, 1] = lf_data[mask_].mean()
+    
+    print aroi, hf_data[mask_].mean(), lf_data[mask_].mean()
+
+pl.figure()
+pl.imshow(clusters.T, cmap=pl.cm.gray)
+pl.yticks(range(2), ['High Field', 'Low Field'])
+pl.xticks(range(4), ['Cluster 1', 'Cluster 2', 'Cluster 3', 'Cluster 4'])
+
+pl.figure()
+pl.imshow(np.arange(1, autom_data.max()+1)[np.newaxis,:], cmap=pl.cm.gist_rainbow)
+pl.yticks(range(2), ['High Field', 'Low Field'])
+pl.xticks(range(4), ['Cluster 1', 'Cluster 2', 'Cluster 3', 'Cluster 4'])
+
+
+
+## Plot nilearn ##
+
+# Clustering sara
+nil.plot_prob_atlas(ni.load(os.path.join(path, "automatic_mask_aalto_nilearn.hdr")), 
+                    anat_img=ni.load("phantoms/Coregistration/BREAKBEN/aalto/aalto_hf.nii.gz"), 
+                    view_type='filled_contours',
+                    alpha=0.4,
+                    draw_cross=False,
+                    display_mode='z',
+                    threshold=2,
+                    linewidths=1,
+                    annotate=False)
+
+# Mask manual
+nil.plot_prob_atlas(ni.load(os.path.join(path, "manual_mask_aalto_nilearn.hdr")), 
+                    anat_img=ni.load("phantoms/Coregistration/BREAKBEN/aalto/aalto_hf.nii.gz"), 
+                    view_type='contours',
+                    draw_cross=False,
+                    display_mode='z',
+                    linewidths=1,
+                    threshold=None,
+                    annotate=False)
+
+# Low field
+nil.plot_prob_atlas(ni.load(os.path.join(path, "manual_mask_aalto_nilearn.hdr")), 
+                    anat_img=ni.load("phantoms/Coregistration/BREAKBEN/aalto/aalto_lf.nii.gz"), 
+                    view_type='contours',
+                    draw_cross=False,
+                    display_mode='z',
+                    threshold=10,
+                    annotate=False)
+
+
+# High field
+nil.plot_prob_atlas(ni.load(os.path.join(path, "manual_mask_aalto_nilearn.hdr")), 
+                    anat_img=ni.load("phantoms/Coregistration/BREAKBEN/aalto/aalto_hf.nii.gz"), 
+                    view_type='contours',
+                    draw_cross=False,
+                    display_mode='z',
+                    threshold=10,
+                    annotate=False)

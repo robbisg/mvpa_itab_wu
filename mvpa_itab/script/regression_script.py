@@ -14,7 +14,7 @@ class RegressionRunner(object):
         
         self.analysis = RegressionAnalysis()
     
-    def run(self):
+    def transform(self):
         
         self.analysis.setup_analysis(path, roi_list)
         
@@ -58,7 +58,7 @@ X_ = zscore(X, axis=1) # Sample-wise
 y_ = zscore(y)
 
 c = Correlation(X_)
-corr = c.run(X_, y_)[0]
+corr = c.transform(X_, y_)[0]
 
 arg_ = np.argsort(np.abs(corr))[::-1]
 arg_ = arg_[:80] # Focusing on first 500 features
@@ -71,11 +71,11 @@ for i in range(len(arg_)):
     X_sel = X_[:,arg_[:i]]
     
     cv_ = CrossValidation(cv, algorithm, error_fx=[mean_squared_error, correlation])
-    err = cv_.run(X_sel, y_)
+    err = cv_.transform(X_sel, y_)
     
 
     rp = RegressionPermutation(cv_)
-    rp.run(X_sel, y_)
+    rp.transform(X_sel, y_)
     
     feat_.append([err, rp.null_dist])
 

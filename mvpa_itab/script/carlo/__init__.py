@@ -1,6 +1,6 @@
 ############## Convert ######################
 from mvpa_itab.io.base import load_dataset, read_configuration
-from mvpa_itab.main_wu import preprocess_dataset
+from mvpa_itab.main_wu import detrend_dataset
 from mvpa_itab.timewise import AverageLinearCSVM, ErrorPerTrial, StoreResults
 from mvpa2.measures.base import CrossValidation, Dataset
 from mvpa2.generators.partition import NFoldPartitioner, HalfPartitioner
@@ -24,7 +24,7 @@ from mvpa2.suite import *
 from scipy.stats import ttest_ind
 from scipy.stats import ttest_1samp
 from numpy.random.mtrand import permutation
-from mvpa_itab.test_wu import subjects_merged_ds
+from mvpa_itab.test_wu import load_subjectwise_ds
 from mvpa_itab.similarity.partitioner import MemoryGroupSubjectPartitioner
 
 

@@ -1,7 +1,7 @@
 import os
 from mvpa_itab.conn.states.utils import get_data, get_centroids, save_data
 from mvpa_itab.conn.states.metrics import calculate_metrics
-from mvpa_itab.conn.states.base import cluster_state
+from mvpa_itab.conn.states.base import cluster_state, get_subsampling_measure
 
 import cPickle as pickle
 from mvpa_itab.conn.states.filters import get_filter

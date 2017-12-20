@@ -117,7 +117,7 @@ class RegressionAnalysisPipeline(Pipeline):
     
 
             
-    def run(self):
+    def transform(self):
         
         self.results = []
         self.loader = ConnectivityDataLoader()
@@ -138,7 +138,7 @@ class RegressionAnalysisPipeline(Pipeline):
         y = zscore(np.float_(y))
         
         self.fs = FeatureSelectionIterator()
-        self.fs.setup_analysis(self.fs_algorithm, self.fs_ranking_fx).run(X, y).select_first(80)
+        self.fs.setup_analysis(self.fs_algorithm, self.fs_ranking_fx).transform(X, y).select_first(80)
         
         self.reg = RegressionAnalysis().setup_analysis(self.cv_schema, 
                                                   self.learner, 
@@ -164,8 +164,8 @@ class RegressionAnalysisPipeline(Pipeline):
                 X_ = X[:,set_]
                 y_ = y
                             
-                reg_res = self.reg.run(X_, y_) # To be selected
-                n_dist = self.perm.run(X_, y_)
+                reg_res = self.reg.transform(X_, y_) # To be selected
+                n_dist = self.perm.transform(X_, y_)
                 
                 p_res = self.perm.pvalues(reg_res)
                 
@@ -179,7 +179,7 @@ class RegressionAnalysisPipeline(Pipeline):
 class NoPermutationPipeline(RegressionAnalysisPipeline):
     
     
-    def run(self):
+    def transform(self):
         
         self.loader = ConnectivityDataLoader()
         self.X, self.y = self.loader.setup_analysis(self.path, 
@@ -196,7 +196,7 @@ class NoPermutationPipeline(RegressionAnalysisPipeline):
         
         self.fs = FeatureSelectionIterator()
         self.fs.setup_analysis(self.fs_algorithm, 
-                          self.fs_ranking_fx).run(X, y).select_first(80)
+                          self.fs_ranking_fx).transform(X, y).select_first(80)
         
         
         
@@ -208,7 +208,7 @@ class NoPermutationPipeline(RegressionAnalysisPipeline):
             X_ = X[:,set_]
             y_ = y
                         
-            reg_res = self.reg.run(X_, y_) # To be selected
+            reg_res = self.reg.transform(X_, y_) # To be selected
                        
             self.results.append([reg_res])
         
@@ -219,7 +219,7 @@ class NoPermutationPipeline(RegressionAnalysisPipeline):
 
 class FeaturePermutationRegression(RegressionAnalysisPipeline):
     
-    def run(self):
+    def transform(self):
         
         logger.debug(self.filter_)
         
@@ -255,9 +255,9 @@ class FeaturePermutationRegression(RegressionAnalysisPipeline):
         self.results = []
 
                 
-        reg_res = self.reg.run(X, y) # To be selected
+        reg_res = self.reg.transform(X, y) # To be selected
         
-        perm_res = self.perm.run(X, y)
+        perm_res = self.perm.transform(X, y)
                        
         self.results.append([reg_res, perm_res])
         

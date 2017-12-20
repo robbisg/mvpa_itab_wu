@@ -91,8 +91,8 @@ class PermutationTest(object):
         for i in range(self.n_permutation):
             p_labels = permutation(labels)
             #print p_labels
-            fp[i,:] = self.analysis.run(p_labels)
-            #fp[i,:] = self.analysis.run(ds_p)
+            fp[i,:] = self.analysis.transform(p_labels)
+            #fp[i,:] = self.analysis.transform(ds_p)
         
             #null_dist.append(value_)
         
@@ -102,7 +102,7 @@ class PermutationTest(object):
         return fp
     
     
-    def run(self, ds, labels):
+    def transform(self, ds, labels):
         # What the fuck is labels???
         #null_dist = []
         
@@ -116,8 +116,8 @@ class PermutationTest(object):
         
         for i in range(self.n_permutation):
             ds_p = self.ds_simple_permutation(ds)
-            #fp[i,:] = self.analysis.run(p_labels)
-            fp[i,:] = self.analysis.run(ds_p)
+            #fp[i,:] = self.analysis.transform(p_labels)
+            fp[i,:] = self.analysis.transform(ds_p)
         
             #null_dist.append(value_)
         
@@ -210,7 +210,7 @@ class TTest(object):
         print len(conditions)
 
         
-    def run(self, labels):
+    def transform(self, labels):
         
         ds = self.dataset
         conditions = self.conditions
@@ -244,7 +244,7 @@ class Correlation(object):
         
         self._dataset = ds
         
-    def run(self, ds, seed):
+    def transform(self, ds, seed):
         """
         
         """
@@ -300,7 +300,7 @@ class SKLRegressionWrapper(object):
         return self.error_fx(y_true, y_pred)
         
         
-    def run(self, X, y, error_function=mean_squared_error, **kwargs):
+    def transform(self, X, y, error_function=mean_squared_error, **kwargs):
         
         
         return
@@ -318,7 +318,7 @@ class CrossValidation(object):
         self.errorfx = error_fx
         
         
-    def run(self, X, y):
+    def transform(self, X, y):
         """
         The output is a vector r x n where r is the number
         of repetitions of the splitting method
@@ -374,7 +374,7 @@ class RegressionPermutation(object):
     def shuffle(self, y):
         return permutation(y)
     
-    def run(self, X, y):
+    def transform(self, X, y):
 
         null_dist = []
 
@@ -382,7 +382,7 @@ class RegressionPermutation(object):
             if self.print_progress:
                 progress(i, self.n_permutation)
             y_perm = self.shuffle(y)
-            value = self.analysis.run(X, y_perm)
+            value = self.analysis.transform(X, y_perm)
         
             null_dist.append(value)
         
@@ -466,7 +466,7 @@ def permutation_test(ds, labels, analysis, n_permutation=1000):
     
     for _ in range(n_permutation):
         p_labels = permutation(labels)
-        t_, _ = analysis.run(ds, p_labels)
+        t_, _ = analysis.transform(ds, p_labels)
         
         null_dist.append(t_) 
     

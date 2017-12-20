@@ -2,12 +2,16 @@ import os
 import numpy as np
 
 
-#path = '/root/robbis/DATA/fmri/carlo_ofp/'
+path = '/home/robbis/mount/permut1/fmri/carlo_ofp/'
 #path = "/home/robbis/fmri/carlo_ofp/"
 path_remote = "/home/robbis/fmri/data7/Carlo_OFP/"
-path_remote = "/home/robbis/mount/meg_carlo/Carlo_OFP/"
+#path_remote = "/home/robbis/mount/meg_carlo/Carlo_OFP/"
+path_remote = "/home/robbis/mount/meg_carlo/data7/Carlo_OFP"
 
 subdir = "analysis_SEP/DE_ASS_noHP/SINGLE_TRIAL_MAGS_voxelwise/"
+subdir = "analysis_SEP/DE_ASS_noHP/"
+subdir = "analysis_SEP/DE_ASS_SINGLE_MIXED_EXE/MAGS_MR_UNITS/"
+
 
 subjects = os.listdir(path_remote)
 subjects = [s for s in subjects if s[0] == 's']
@@ -16,13 +20,20 @@ subjects.sort()
 rm_cmd = ""
 
 for s in subjects:
-    #orig_dir = os.path.join(s, subdir)
+    orig_dir = os.path.join(s, subdir)
     #command = "cp --parents %s* %s" % (os.path.join(s,subdir), path)
-    #print command
+    command = "cp --parents %s*.ifh %s" % (os.path.join(s,subdir), path)
+    
+    print command
     #os.system(command)
+    command = "cp --parents %s*.img %s" % (os.path.join(s,subdir), path)
+    print command
+    
+    command = "cp --parents %s*.txt %s" % (os.path.join(s,subdir), path)
+    print command   
     
     
-
+for s in subjects:
     path_subj = os.path.join(path, s, subdir)
     filelist = os.listdir(path_subj)
     filelist = [f for f in filelist if f.find('.ifh') != -1]
@@ -31,21 +42,25 @@ for s in subjects:
         in_file = os.path.join(path_subj, f)
         out_file = os.path.join(path_subj, f[:-9])
         cmd = 'nifti_4dfp -n '+in_file+' '+out_file
-        os.system(cmd)
+        print cmd
+        #os.system(cmd)
         rm_cmd += 'rm '+in_file+'\n'
         rm_cmd += 'rm '+in_file[:-4]+'.img\n'
-        #print cmd
+        print cmd
         #os.system(cmd)
     
+    filelist = filelist[1:] # Remove first regressor movement
     filetotal = [os.path.join(path_subj, f[:-9]+'.nii') for f in filelist]
+    
     cmd = 'fslmerge -t '+os.path.join(path_subj, "residuals.nii.gz")+" "+" ".join(filetotal)
-    os.system(cmd)
+    print cmd
+    #os.system(cmd)
     
     conditionlist = [[l for l in f.split('_')[7]] for f in filelist]
     conditionlist = np.array(conditionlist)
     filename = "%s_condition_list.txt" % (s)
     #np.savetxt(os.path.join(path_subj, filename), conditionlist, dtype=np.str)
-    np.savetxt(os.path.join(path_subj, filename), conditionlist, fmt="%s", delimiter=",")
+    #np.savetxt(os.path.join(path_subj, filename), conditionlist, fmt="%s", delimiter=",")
     
 print rm_cmd
 
@@ -65,15 +80,24 @@ for s in subjects:
     
     
 ### from fidl to pymvpa attributes
-from mvpa_itab.utils import beta_attributes, enhance_attibutes_ofp
+
+path_dest = "/home/robbis/mount/permut1/fmri/carlo_ofp/"
+subdir = "analysis_SEP/DE_ASS_noHP/"
+fname = "%s_eventfiles_DE_ASS_SINGLE.txt"
+from mvpa_itab.utils import beta_attributes, enhance_attributes_ofp, fidl2txt_2
 for s in subjects:
     sub_ = s[:4]+s[-6:]
     eventfile = os.path.join(path_dest, s, subdir, fname % (sub_))
     # fidl2txt
-    output_beta = os.path.join(path_dest, s, "%s_eventfile_beta.txt" % (s))
-    beta_attributes(eventfile, output_beta, nrun=8)
-    enhance_attibutes_ofp(output_beta, current_header=['targets', 'chunks'])
+    #output_beta = os.path.join(path_dest, s, "%s_eventfile_beta.txt" % (s))
+    output_residuals = os.path.join(path_dest, s, "%s_eventfile_residuals.txt" % (s))
+    #beta_attributes(eventfile, output_beta, nrun=8)
+    #residuals_attributes(eventfile, output_residuals, nrun=8)
+    fidl2txt_2(eventfile, output_residuals, runs=8., vol_run=246, stim_tr=6, offset_tr=0)
+    enhance_attributes_ofp(output_residuals)
     
+    
+
     
 
 ## reordering files

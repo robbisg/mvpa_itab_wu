@@ -5,26 +5,16 @@ import nitime.fmri.io as io
 from nipy.modalities.fmri.glm import GeneralLinearModel
 
 from nitime.timeseries import TimeSeries
-from nitime.analysis.correlation import CorrelationAnalyzer,\
-    SeedCorrelationAnalyzer
-from mvpa_itab.io.base import get_time
+from nitime.analysis.correlation import CorrelationAnalyzer
+from mvpa_itab.results import get_time
 from scipy.signal.windows import boxcar
 from scipy.signal.signaltools import convolve
 from scipy.stats.mstats import zscore
 
-from mvpa_itab.io.base import load_wu_file_list, read_configuration, get_time
-
-import matplotlib.pyplot as pl
-
 import os
 import nibabel as ni
 import numpy as np
-from nitime.analysis.coherence import CoherenceAnalyzer
-
 from nitime.analysis.spectral import FilterAnalyzer
-
-from memory_profiler import profile
-from scipy.stats.stats import ttest_ind
 
 from sklearn.decomposition import PCA
 
@@ -255,6 +245,8 @@ def get_bold_timeserie(imagelist, path_roi, roi_names, ts_param, detrend=False, 
     
     return ts
 
+
+
 def get_similarity_timeserie(path, name, condition, time, **kwargs):
     
     TR = 1.
@@ -284,7 +276,9 @@ def get_similarity_timeserie(path, name, condition, time, **kwargs):
     ts = TimeSeries(np.vstack(total_data), sampling_interval=TR)
     
     return ts
-    
+
+
+
 def get_condition_timeserie(ts, paradigm, 
                             delete_condition=None,
                             #ts_extraction='mean',
@@ -331,6 +325,8 @@ def get_condition_timeserie(ts, paradigm,
         timeserie[c] = ts_dummy
             
     return timeserie
+
+
 
 #@profile      
 def connectivity_analysis(ts_condition, sampling_interval=1.):
@@ -453,6 +449,7 @@ def get_bold_signals (image, mask, TR,
     del ts
     return TimeSeries(np.vstack(final_data), sampling_interval=float(TR))
 
+
        
 def save_matrices(path, results, gsr='gsr', atlas='findlab'):
     
@@ -481,6 +478,8 @@ def save_matrices(path, results, gsr='gsr', atlas='findlab'):
                 path_fn = os.path.join(sub_dir, fname)
                 
                 np.savetxt(path_fn, matrices[i], fmt='%.4f')
+
+
 
    
 def load_matrices(path, condition):

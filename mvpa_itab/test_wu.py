@@ -4,19 +4,35 @@
 #     See the file license.txt for copying permission.
 ########################################################
 
-from mvpa_itab.main_wu import *
-from mvpa_itab.io import *
-from mvpa_itab.io.base import *
+
 from mvpa2.clfs.transerror import ConfusionMatrix
 import os
 import copy
-from mvpa_itab.similarity.cross_decoding import *
+import numpy as np
+import nibabel as ni
 from mvpa2.suite import vstack, Sphere, Searchlight, IndexQueryEngine, Splitter
 import mvpa_itab.results as rs
 from mvpa_itab.similarity.partitioner import TargetCombinationPartitioner
 from mvpa_itab.preprocessing import get_preprocessing
-from __builtin__ import list, str
+from mvpa_itab.results import get_time
+from mvpa_itab.io.save import save_results
+from mvpa_itab.io.base import read_configuration, load_dataset,\
+    read_json_configuration, load_subjectwise_ds, load_spatiotemporal_dataset
+from mvpa_itab.main_wu import detrend_dataset, balance_dataset_timewise,\
+    spatiotemporal, spatial, balance_dataset, normalize_dataset,\
+    clustering_analysis, transfer_learning, searchlight, build_events_ds
 
+import logging
+import warnings
+from mvpa_itab.similarity.cross_decoding import similarity_measure,\
+    similarity_measure_mahalanobis
+from mvpa_itab.similarity.searchlight import CorrelationThresholdMeasure
+from mvpa2.measures.base import CrossValidation
+from mvpa2.base import debug
+from mvpa2.clfs.svm import LinearCSVMC
+from mvpa2.generators.partition import NFoldPartitioner
+from mvpa2.measures.searchlight import sphere_searchlight
+from mvpa2.datasets.mri import map2nifti
 
 logger = logging.getLogger(__name__)
     
@@ -42,7 +58,7 @@ def test_spatiotemporal(path, subjects, conf_file, type_, **kwargs):
         except Exception, err:
             print err
             continue
-        ds = preprocess_dataset(ds, type_, **conf)
+        ds = detrend_dataset(ds, type_, **conf)
         
         if 'balance' in locals() and balance == True:
             if conf['label_included'] == 'all' and \
@@ -91,7 +107,7 @@ def test_spatial(path, subjects, conf_file, type_, **kwargs):
             continue
         
         #ds = preprocess_dataset(ds, type_, **conf)
-        ds = get_preprocessing(**conf).run(ds)
+        ds = get_preprocessing(**conf).transform(ds)
                 
         r = spatial(ds, **conf)
         total_results[subj] = r
@@ -126,7 +142,7 @@ def _test_spatial(path, subjects, conf_file, type_, **kwargs):
     data_path = conf['data_path']
         
     summarizers = [rs.DecodingSummarizer()]
-    savers = [rs.DecodingSaver(conf['saver__fields'])]
+    savers = [rs.DecodingSaver()]
     result = rs.ResultsCollection(conf, path, summarizers)
     
     for subj in subjects:
@@ -138,7 +154,7 @@ def _test_spatial(path, subjects, conf_file, type_, **kwargs):
             continue
         
         
-        ds = preprocess_dataset(ds, type_, **conf)
+        ds = detrend_dataset(ds, type_, **conf)
         
         balancer = balance_dataset(**conf)
         
@@ -148,7 +164,7 @@ def _test_spatial(path, subjects, conf_file, type_, **kwargs):
             
             ds_ = normalize_dataset(ds_, **conf)
             
-            logger.debug(ds_.summary())
+            logger.info(ds_.summary())
             
             r = spatial(ds_, **conf)
             total_results[subj_] = r
@@ -199,8 +215,8 @@ def test_clustering(path, subjects, analysis, conf_file, source='task', **kwargs
             print err
             continue
         
-        ds_src = preprocess_dataset(ds_src, source, **conf_src)
-        ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
+        ds_src = detrend_dataset(ds_src, source, **conf_src)
+        ds_tar = detrend_dataset(ds_tar, target, **conf_tar) 
         
         if conf_src['label_included'] == 'all' and \
                 conf_src['label_dropped'] != 'fixation':
@@ -317,8 +333,8 @@ def test_transfer_learning(path, subjects, analysis,  conf_file, source='task', 
                 continue
          
         # Evaluate if is correct to do further normalization after merging two ds. 
-        ds_src = preprocess_dataset(ds_src, source, **conf_src)
-        ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
+        ds_src = detrend_dataset(ds_src, source, **conf_src)
+        ds_tar = detrend_dataset(ds_tar, target, **conf_tar) 
         
         if conf_src['label_included'] == 'all' and \
            conf_src['label_dropped'] != 'fixation':
@@ -420,7 +436,7 @@ def test_searchlight(path, subjects, conf_file, type_, **kwargs):
     for subj in subjects:
         
         ds = load_dataset(data_path, subj, type_, **conf)
-        ds = preprocess_dataset(ds, type_, **conf)
+        ds = detrend_dataset(ds, type_, **conf)
         
         r = searchlight(ds, **kwargs)
         
@@ -630,63 +646,7 @@ def signal_detection_measures(confusion_):
     
     return result
     
-def subjects_merged_ds(path, 
-                       subjects, 
-                       conf_file, 
-                       task, 
-                       extra_sa=None,  
-                       **kwargs):
-    """
-    extra_sa: dict or None, sample attributes added to the final dataset, they should be
-    the same length as the subjects.
-    
-    subject: either a list of subjects or a csv file
-    
-    """
-    
-    conf = read_configuration(path, conf_file, task)
-           
-    conf.update(kwargs)
-    logger.debug(conf)
-    
-    data_path = conf['data_path']
 
-    if isinstance(subjects, str):
-        subject_array = np.genfromtxt(subjects, 
-                                      delimiter=',', 
-                                      dtype=np.string_)
-        
-        subjects = subject_array[1:,0]
-        extra_sa = {a[0]:a[1:] for a in subject_array.T}
-    
-    
-    i = 0
-
-    print 'Merging subjects from '+data_path
-    
-    for subj in subjects:
-        
-        ds = load_dataset(data_path, subj, task, **conf)
-        ds = preprocess_dataset(ds, task, **conf)
-        ds = normalize_dataset(ds, **conf)
-        
-        # add extra samples
-        for k, v in extra_sa.iteritems():
-            if len(v) == len(subjects):
-                ds.sa[k] = [v[i] for _ in range(ds.samples.shape[0])]
-        
-        if i == 0:
-            ds_merged = ds.copy()
-        else:
-            ds_merged = vstack((ds_merged, ds))
-            ds_merged.a.update(ds.a)
-            
-        
-        i = i + 1
-        
-        del ds
-
-    return ds_merged, ['group'], conf
 
 
 def sources_merged_ds(path_list, subjects_list, conf_list, task, **kwargs):
@@ -694,7 +654,7 @@ def sources_merged_ds(path_list, subjects_list, conf_list, task, **kwargs):
     ds_list = []
     for path, subjects, conf in zip(path_list, subjects_list, conf_list):
         
-        ds, _, conf_n = subjects_merged_ds(path, subjects, conf, task, **kwargs)
+        ds, _, conf_n = load_subjectwise_ds(path, subjects, conf, task, **kwargs)
         
         ds_list.append(ds)
         
@@ -751,8 +711,8 @@ def get_merged_ds(path, subjects, conf_file, source='task', dim=3, **kwargs):
             print err
             continue
         
-        ds_src = preprocess_dataset(ds_src, source, **conf_src)
-        ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
+        ds_src = detrend_dataset(ds_src, source, **conf_src)
+        ds_tar = detrend_dataset(ds_tar, target, **conf_tar) 
 
         if dim == 4:    
             duration = np.min([e['duration'] for e in ds_src.a.events])      
@@ -857,19 +817,15 @@ def _group_transfer_learning(path, subjects, analysis,  conf_file, source='task'
                     continue
     
             
-            ds_tar = preprocess_dataset(ds_tar, target, **conf_tar) 
+            ds_tar = detrend_dataset(ds_tar, target, **conf_tar) 
     
             if conf_src['label_included'] == 'all' and \
                conf_src['label_dropped'] != 'fixation':
                     print 'Balancing dataset...'
                     ds_src = balance_dataset_timewise(ds_src, 'fixation')       
-                    
-             
             
             predictions = clf.predict(ds_tar)
-            
-            
-            
+           
             pred = np.array(predictions)
             targets = ds_tar.targets
             

@@ -6,7 +6,7 @@ from mvpa2.generators.partition import CustomPartitioner
 from mvpa2.measures.base import CrossValidation
 from mvpa2.misc.errorfx import mean_mismatch_error
 
-from mvpa_itab.test_wu import subjects_merged_ds
+from mvpa_itab.io.base import load_subjectwise_ds
 from mvpa_itab.script.carlo.subject_wise_decoding import get_partitioner, SubjectWiseError
 from mvpa_itab.wrapper.sklearn import SKLCrossValidation
 from sklearn.cross_validation import StratifiedKFold
@@ -19,47 +19,79 @@ logger = logging.getLogger(__name__)
 
 
 class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
+    """
+    
+    This class is used to perform leave one subject out searchlight
+    this is the script used for start the analysis.
+    
+    from mvpa_itab.pipeline.searchlight import LeaveOneSubjectOutSL
+    from mvpa_itab.script.carlo.analysis import carlo_ofp_set_targets
+    from mvpa2.suite import LinearCSVMC
+    
+    conf_ofp = {   
+                'path':'/media/robbis/DATA/fmri/carlo_ofp/',
+                'configuration_file':"ofp.conf",
+                "project":"carlo_ofp",
+                "partecipants": "subjects.csv",
+                'data_type': 'OFP',
+                'n_folds':3,
+                "condition_names":["evidence", "task"],
+                'evidence': 3, # Default_value (memory : 3)
+                'task':'decision', # Default_value
+                'split_attr':'subject_ofp', #
+                'mask_area':'glm_atlas', # memory                            
+                'normalization':'both',
+                "radius": 3,
+                "n_balanced_ds": 1,
+                "set_targets": carlo_ofp_set_targets,
+                "classifier":LinearCSVMC(C=1)
+                }
+                
+    sl_analysis = LeaveOneSubjectOutSL(**conf_ofp)
+    sl_analysis.load_dataset(**kwargs).run(**options)
+    """
+    
+    
     
     def __init__(self, name="sl_loso", **kwargs):
         return SearchlightAnalysisPipeline.__init__(self, name=name, **kwargs)
+    
+    
+    def algorithm(self, ds, i):
+        
+        
+        partitioner, splitter = get_partitioner(self._split_attr)
+        splitrule = partitioner.get_partition_specs(ds)
+        print splitrule
+        # With this (if the workstation runs out, we save results)      
+        for ii, rule in enumerate(splitrule):
             
-       
-    
-    
-    def load_dataset(self):
-        
-        
-        if "label_mask_name" in self._conf:
-            label_name = self._conf["label_mask_name"]
-        else:
-            label_name = None
-        
-        if "label_mask_name" in self._conf:
-            label_value = self._conf["label_mask_value"]
-        else:
-            label_value = None
+            logger.debug(rule)
             
-        print label_name, label_value
-        
-        ds_orig, _, _ = subjects_merged_ds(self._path,  # path or data_path
-                                           os.path.join(self._path, 
-                                                        self._partecipants), 
-                                           self._configuration_file, 
-                                           self._data_type,
-                                           normalization=self._normalization,
-                                           mask_area=self._mask_area,
-                                           label_mask_name=label_name,
-                                           label_mask_value=label_value
-                                           )
-        self.ds_orig = ds_orig
-        
-        self._conf["summary_ds_load"] = ds_orig.summary(chunks_attr="subject")
-        logger.info(ds_orig.summary(chunks_attr="subject"))
-        
-        return ds_orig
-    
-    
-    
+            # We compose a simple partitioner
+            partitioner = CustomPartitioner(splitrule=[rule],
+                                            attr="subject"                                                
+                                            )
+            # Custom cross-validator
+            # Watch out of Subject wise error
+            # TODO: Use a strategy for errorfx
+            cvte = CrossValidation(self._classifier,
+                                   partitioner,
+                                   splitter=splitter,
+                                   enable_ca=['stats', 'probabilities'],
+                                   #errorfx=SubjectWiseError(mean_mismatch_error, 
+                                   #                         'group', 
+                                   #                         'subject')
+                                   )
+            fname = self.build_fname(ds, rule, ii, i)
+
+            self.analysis(ds, i, cvte, fname)
+
+            
+        return
+            
+            
+            
     def build_fname(self, ds, rule, split_no, balance_ds_no):
         """
         Example:
@@ -97,6 +129,43 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
         return fname
     
     
+    def check_conf(self, value):
+        
+        if value in self._conf:
+            return self._conf[value]
+        
+        return None
+    
+    
+    
+    def load_dataset(self):
+        
+        
+        label_name = self.check_conf("label_mask_name")
+        label_value = self.check_conf("label_mask_value")
+        roi_labels = self.check_conf("roi_labels")
+                    
+        print label_name, label_value
+        
+        ds_orig, _, _ = load_subjectwise_ds(self._path,  # path or data_path
+                                           os.path.join(self._path, 
+                                                        self._partecipants), 
+                                           self._configuration_file, 
+                                           self._data_type,
+                                           normalization=self._normalization,
+                                           mask_area=self._mask_area,
+                                           label_mask_name=label_name,
+                                           label_mask_value=label_value,
+                                           roi_labels=roi_labels
+                                           )
+        self.ds_orig = ds_orig
+        
+        self._conf["summary_ds_load"] = ds_orig.summary(chunks_attr="subject")
+        logger.info(ds_orig.summary(chunks_attr="subject"))
+        
+        return ds_orig
+    
+     
     
     
     
@@ -113,76 +182,18 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
     
     
     
-    def algorithm(self, ds, i):
-        
-        
-        partitioner, splitter = get_partitioner(self._split_attr)
-        splitrule = partitioner.get_partition_specs(ds)
-        print splitrule
-        # With this (if the workstation runs out, we save results)      
-        for ii, rule in enumerate(splitrule):
-            
-            logger.debug(rule)
-            
-            # We compose a simple partitioner
-            partitioner = CustomPartitioner(splitrule=[rule],
-                                            attr="subject"                                                
-                                            )
-            # Custom cross-validator
-            # Watch out of Subject wise error
-            cvte = CrossValidation(self._classifier,
-                                   partitioner,
-                                   splitter=splitter,
-                                   enable_ca=['stats', 'probabilities'],
-                                   #errorfx=SubjectWiseError(mean_mismatch_error, 
-                                   #                         'group', 
-                                   #                         'subject')
-                                   )
-            fname = self.build_fname(ds, rule, ii, i)
 
-            self.analysis(ds, i, cvte, fname)
-
-            
-        return
     
     
 class SingleSubjectSearchlight(SearchlightAnalysisPipeline):
     
+    
+    
     def __init__(self, name="sl_single", **kwargs):
         SearchlightAnalysisPipeline.__init__(self, name=name, **kwargs)
-        
-    
-    def load_dataset(self, subj):
-        
-        self.subject = subj
-        
-        
-        for k in self._conf.keys():
-            if k in self._default_conf.keys():
-                self._conf[k] = self._default_conf[k]
-        
-        
-        self.ds_orig = load_dataset(self._data_path, 
-                                    self.subject, 
-                                    self._data_type, 
-                                    **self._conf)
-        
-        return self.ds_orig
-        
-    
-    def get_balancer(self, ds, method="pympva"):
-        
-        # TODO: Make also imbalanced-learn methods available
-        balanc = Balancer(count=self._n_balanced_ds, 
-                          apply_selection=True, 
-                          limit=None)
-        
-        self.gen = balanc.generate(ds)
-        
-        return self.gen
-    
-    
-    
+
+
+
     def algorithm(self, ds, balance_ds_num, cvte=None, fname=None):
         
         # This is used for the sklearn crossvalidation
@@ -219,33 +230,42 @@ class SingleSubjectSearchlight(SearchlightAnalysisPipeline):
         
         return fname 
             
+        
+    
+    def load_dataset(self, subj):
+        
+        self.subject = subj
+        
+        
+        for k in self._conf.keys():
+            if k in self._default_conf.keys():
+                self._conf[k] = self._default_conf[k]
+        
+        
+        self.ds_orig = load_dataset(self._data_path, 
+                                    self.subject, 
+                                    self._data_type, 
+                                    **self._conf)
+        
+        return self.ds_orig
+        
+    
+    
+    def get_balancer(self, ds, method="pympva"):
+        
+        # TODO: Make also imbalanced-learn methods available
+        balanc = Balancer(count=self._n_balanced_ds, 
+                          apply_selection=True, 
+                          limit=None)
+        
+        self.gen = balanc.generate(ds)
+        
+        return self.gen
+    
+    
+    
+
 
   
-"""
-from mvpa_itab.pipeline.searchlight import LeaveOneSubjectOutSL
-from mvpa_itab.script.carlo.analysis import carlo_ofp_set_targets
-from mvpa2.suite import LinearCSVMC
 
-conf_ofp = {   
-            'path':'/media/robbis/DATA/fmri/carlo_ofp/',
-            'configuration_file':"ofp.conf",
-            "project":"carlo_ofp",
-            "partecipants": "subjects.csv",
-            'data_type': 'OFP',
-            'n_folds':3,
-            "condition_names":["evidence", "task"],
-            'evidence': 3, # Default_value (memory : 3)
-            'task':'decision', # Default_value
-            'split_attr':'subject_ofp', #
-            'mask_area':'glm_atlas', # memory                            
-            'normalization':'both',
-            "radius": 3,
-            "n_balanced_ds": 1,
-            "set_targets": carlo_ofp_set_targets,
-            "classifier":LinearCSVMC(C=1)
-            }
-            
-sl_analysis = LeaveOneSubjectOutSL(**conf_ofp)
-sl_analysis.load_dataset(**kwargs).run(**options)
-"""
 

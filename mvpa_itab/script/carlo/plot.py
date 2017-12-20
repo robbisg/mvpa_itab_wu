@@ -1,6 +1,32 @@
 import seaborn as sns
 import os
 import nibabel as ni
+import numpy as np
+import matplotlib.pylab as pl
+
+
+def get_images(path, subj, task_name):
+    
+    subject_path = os.path.join(path, subj)
+    
+    image_list = os.listdir(os.path.join(path, subj))
+    image_list.sort()
+    
+    image_list = [i for i in image_list if i.find(task_name) != -1]
+    image_list = [i for i in image_list if i.find('.nii.gz') != -1]
+    image_list = [i for i in image_list if i.find('mean') != -1]
+    
+    img_container = []
+    for img_name in image_list:
+        img = ni.load(os.path.join(subject_path, img_name))
+        print os.path.join(subject_path, img_name)
+        img_container.append(img.get_data())
+        
+    
+    return np.array(img_container)
+
+
+
 
 path = '/media/robbis/DATA/fmri/memory/0_results/balanced_analysis/local/'
 list_subj = os.listdir(path)
@@ -24,23 +50,5 @@ for s in list_subj:
 
 #############################
 
-def get_images(path, subj, task_name):
-    
-    subject_path = os.path.join(path, subj)
-    
-    image_list = os.listdir(os.path.join(path, subj))
-    image_list.sort()
-    
-    image_list = [i for i in image_list if i.find(task_name) != -1]
-    image_list = [i for i in image_list if i.find('.nii.gz') != -1]
-    image_list = [i for i in image_list if i.find('mean') != -1]
-    
-    img_container = []
-    for img_name in image_list:
-        img = ni.load(os.path.join(subject_path, img_name))
-        print os.path.join(subject_path, img_name)
-        img_container.append(img.get_data())
-        
-    
-    return np.array(img_container)
+
         

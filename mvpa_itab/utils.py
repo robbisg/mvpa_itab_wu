@@ -16,6 +16,7 @@ import matplotlib.cm as cm
 from mvpa2.base.hdf5 import h5load
 import logging
 import itertools
+from xlrd.biffh import XLRDError
 
 #from mvpa2.suite import h5load
       
@@ -27,6 +28,8 @@ def enable_logging():
     ch.setFormatter(form)
     root.addHandler(ch)
     root.setLevel(logging.INFO)
+    
+    return root
 
 
 
@@ -264,20 +267,19 @@ def fidl2txt_2(fidlPath, outPath, runs=12., vol_run=248, stim_tr=4, offset_tr=2)
     if onset[0] != 0:
         f = 0
         while f < np.rint(onset[0]/TR):
-            outFile.write(u'FIX 0 0 0\n')
+            outFile.write(u'FIX_00 0 0 0 0\n')
             f = f + 1
     
-    chunk_size = len(line_)/runs
+    chunk_size = int(len(line_)/runs)
+    r = 1
     for i in range(len(onset)-1):
-        '''
-        if i <= 1:
-            runArr = np.array(np.ceil(np.bincount(np.int_(events[:2]))/4.) - 1, dtype=np.int)
-        else:
-            runArr = np.array(np.ceil(np.bincount(np.int_(events[:i+1]), 
-                                              minlength=noEvents)/4.) - 1, 
-                          dtype=np.int)
-        '''
+
         j = 0
+        
+        duration_volumes = np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR)
+        
+
+            
 
         while j < np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR):
             
@@ -286,12 +288,22 @@ def fidl2txt_2(fidlPath, outPath, runs=12., vol_run=248, stim_tr=4, offset_tr=2)
                 #outFile.write(eventLabels[int(events[i])]+' '+str(runArr[int(events[i])])+'\n')
                 outFile.write(eventLabels[int(events[i])]+' '
                                             +str(i/chunk_size)+' '  #Chunk
-                                            +str(i)+' '     #Event
-                                            +str(j+1)+'\n') #Frame
+                                            +str(int(r/vol_run))+' '#Run
+                                            +str(i)+' '             #Event
+                                            +str(j+1)+'\n')         #Frame
             else:
                 #outFile.write(u'fixation '+str(runArr[int(events[i])])+'\n')
-                outFile.write(u'FIX '+str(i/30)+' '+str(i)+' '+str(j+1)+'\n')
+                outFile.write(u'FIX_00 '
+                              +str(i/chunk_size)+' '
+                              +str(int(r/vol_run))+' '     #Run
+                              +str(i)+' '
+                              +str(j+1)+'\n')
             j = j + 1
+            r = r + 1
+        
+        if r == vol_run:
+            r = 0
+
             
     outFile.close()   
 
@@ -337,14 +349,18 @@ def build_attributes(out_path,
                      event_labels,
                      runs=12, vol_run=250, stim_vol=4, offset_tr=2):
     
+    f = 0
     outFile = open(out_path, 'w')
     if onset[0] != 0:
-        f = 0
+        
         while f < np.rint(onset[0]/TR):
-            outFile.write(u'FIX 0 0 0\n')
+            outFile.write(u'FIX 0 1 0 0\n')
             f = f + 1
      
     onset = np.append(onset, vol_run * runs * TR)
+    n_events_run = np.int(len(duration)/runs)
+    
+    r = 1
     
     for i in range(len(onset)-1):
         '''
@@ -356,18 +372,26 @@ def build_attributes(out_path,
                           dtype=np.int)
         '''
         j = 0
-
+        
+        if r == vol_run:
+            r = 0
+        else:
+            r+=1
+        
         while j < np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR):
             
             #if (j < np.rint(duration[i]/TR)):#-1
             if (offset_tr <= j < offset_tr + stim_vol):#-1
                 #outFile.write(eventLabels[int(events[i])]+' '+str(runArr[int(events[i])])+'\n')
                 index = int(events[i])
-                # Condition, Chunk, Event, Frame
-                line = event_labels[index]+' '+str(i/30)+' '+str(i)+' '+str(j+1)+'\n'
+                
+                # Condition, Chunk, File, Event, Frame
+                line = "%s %s %s %s %s\n" % (event_labels[index], str(i / n_events_run), str(r), str(i), str(j+1))
+                #line = event_labels[index]+' '+str(i / n_events_run)+' '+str(i)+' '+str(j+1)+'\n'
             else:
                 #outFile.write(u'fixation '+str(runArr[int(events[i])])+'\n')
-                line = u'FIX '+str(i/30)+' '+str(i)+' '+str(j+1)+'\n'
+                line = "%s %s %s %s %s\n" % ("FIX", str(i/n_events_run), str(r), str(i), str(j+1))
+                #line = u'FIX '+str(i/n_events_run)+' '+str(i)+' '+str(j+1)+'\n'
             outFile.write(line)
             j = j + 1
             
@@ -397,7 +421,7 @@ def beta_attributes(fidl_file, output_filename, nrun=12.):
     file_.close()
     
 
-def enhance_attibutes_ofp(filename, current_header=['targets', 'chunks', 'trial', 'frame']):
+def enhance_attributes_ofp(filename, current_header=['targets', 'run', 'chunks', 'trial', 'frame']):
     
     """Only for Carlo's ofp experiment"""
     import re
@@ -415,28 +439,34 @@ def enhance_attibutes_ofp(filename, current_header=['targets', 'chunks', 'trial'
     mask_face  = np.array([is_in(pattern_face, a) for a in attr.T[0]])
     mask_place = np.array([is_in(pattern_place, a) for a in attr.T[0]])
     
+    
     decision = attr.T[0].copy()
     decision[mask_face] = 'F'
     decision[mask_place] = 'L'
-    decision[np.logical_not(np.logical_or(mask_face, mask_place))] = 'N'
+    decision[np.logical_not(np.logical_or(mask_face, mask_place))] = 'X'
     
     
     # memory_status
     
-    mask_face  = np.array([a[0] == 'F' for a in attr.T[0]])
+    mask_face  = np.array([a[0] == 'F' and a[1] != 'I' for a in attr.T[0]])
     mask_place = np.array([a[0] == 'L' for a in attr.T[0]])
     
     memory_status = attr.T[0].copy()
     memory_status[mask_face] = 'F'
     memory_status[mask_place] = 'L'    
+    memory_status[np.logical_not(np.logical_or(mask_face, mask_place))] = 'X'
     
     stim = []
     
     for a_ in attr.T[0]:
-        if a_[-1] != 'R':
-            stim.append(list(a_)) # Used if attributes are more than 3
-        else:
+        
+        if a_.find('R') != -1:
             stim.append(['N', '0', '0'])
+        elif a_.find('X') != -1:
+            stim.append(['X', '0', '0'])
+        else:
+            stim.append(list(a_)[:3]) # Used if attributes are more than 3
+
     
     stim = np.array(stim)
     
