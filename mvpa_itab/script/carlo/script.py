@@ -32,7 +32,7 @@ for s in subjects:
     command = "cp --parents %s*.txt %s" % (os.path.join(s,subdir), path)
     print command   
     
-    
+rm_cmd = ""  
 for s in subjects:
     path_subj = os.path.join(path, s, subdir)
     filelist = os.listdir(path_subj)
@@ -49,7 +49,10 @@ for s in subjects:
         print cmd
         #os.system(cmd)
     
+    rm_cmd += "rm "+os.path.join(path_subj, filelist[0][:-4]+".nii")+"\n"
+    
     filelist = filelist[1:] # Remove first regressor movement
+    #print filelist
     filetotal = [os.path.join(path_subj, f[:-9]+'.nii') for f in filelist]
     
     cmd = 'fslmerge -t '+os.path.join(path_subj, "residuals.nii.gz")+" "+" ".join(filetotal)
@@ -65,10 +68,16 @@ for s in subjects:
 print rm_cmd
 
 # copy fidl event to wkpsy01
-path_orig = "/home/robbis/mount/meg_carlo/Carlo_OFP/"
-path_dest = "/home/robbis/mount/wkpsy01/carlo_ofp/" 
-subdir = "analysis_SEP/DE_ASS_noHP/"
+path_orig = "/home/robbis/mount/meg_carlo/data7/Carlo_OFP/"
+
+path_dest = "/home/robbis/mount/wkpsy01/carlo_ofp/"
+path_dest = "/home/robbis/mount/permut1/fmri/carlo_ofp/"
+
+subdir = "analysis_SEP/"
+
 fname = "%s_eventfiles_DE_ASS_SINGLE.txt"
+fname = "%s_eventfiles_DE_ASS_MIXED_EXE.txt"
+
 
 for s in subjects:
     sub_ = s[:4]+s[-6:]
@@ -78,6 +87,21 @@ for s in subjects:
     command = "cp %s %s" % (orig_dir, dest_dir)
     print command
     
+  
+##
+path_orig = "/media/robbis/Seagate_Pt1/data/carlo_ofp/"
+
+
+
+for s in subjects:
+    sub_ = s[:4]+s[-6:]
+    orig_dir = os.path.join(path_orig, s, subdir, fname % (sub_))
+    dest_dir = os.path.join(path_dest, s, subdir)
+    
+    command = "cp %s %s" % (orig_dir, dest_dir)
+    print command
+  
+  
     
 ### from fidl to pymvpa attributes
 
@@ -101,12 +125,22 @@ for s in subjects:
     
 
 ## reordering files
-path_dest = "/home/robbis/mount/wkpsy01/carlo_ofp/" 
+path_dest = "/home/robbis/mount/wkpsy01/carlo_ofp/"
+path_dest = "/home/robbis/mount/permut1/fmri/carlo_ofp/"
+
 subdir = "analysis_SEP/DE_ASS_noHP/"
+subdir = "analysis_SEP/"
+
 niidir = "analysis_SEP/DE_ASS_noHP/SINGLE_TRIAL_MAGS_voxelwise/"
+niidir = "analysis_SEP/DE_ASS_SINGLE_MIXED_EXE/MAGS_MR_UNITS/"
+
+
 fname = "%s_eventfiles_DE_ASS_SINGLE.txt"
+fname = "%s_eventfiles_DE_ASS_MIXED_EXE.txt"
 
 filepattern = "%s_DE_ASS_noHP_res_SINGLE_%s_mag_333_t88.nii"
+filepattern = "%s_DE_ASS_SINGLE_MIXED_EXE_%s_mag_333_t88.nii"
+filepattern = "%s_DE_ASS_MIXED_EXE_%s_mag_333_t88.nii"
 
 for s in subjects:
     sub_ = s[:4]+s[-6:]
@@ -115,13 +149,15 @@ for s in subjects:
     
     eventlist = eventfile.readline().split()
     tr = float(eventlist[0])
-    eventlist = eventlist[1:]
+    eventlist = eventlist[1:-1]
     
     filelist = [os.path.join(path_dest, s, niidir, filepattern % (sub_, event)) for event in eventlist]
     
     output_fname = os.path.join(path_dest, s, niidir, "residuals_sorted.nii.gz")
     command = "fslmerge -t %s %s" %(output_fname, " ".join(filelist))
     print command
+    print "\n\n"
+
     os.system(command)
     
     

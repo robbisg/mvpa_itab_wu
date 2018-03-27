@@ -52,6 +52,8 @@ for d in dlist:
 
 
 ####################### HEADER STUFF ########################################
+
+
 for d in dlist:
     sub_dir = os.path.join(path, d)
     
@@ -67,6 +69,7 @@ for d in dlist:
     
     command = 'fslorient -setqformcode 1 '+os.path.join(sub_dir, 'mprage', 'mprage_orient.nii.gz')
     print command
+    
     s_list = os.listdir(os.path.join(sub_dir, 'fmri'))
     
     struct_list = [m for m in s_list if m.find('x') == -1 and m.find('bold.nii.gz') != -1]
@@ -74,11 +77,11 @@ for d in dlist:
     image = os.path.join(sub_dir, 'fmri', 'bold.nii.gz')        
 
     command = 'fslswapdim '+ image + ' -z -x -y ' + image.strip('.nii.gz')+'_orient'
-
     print command
-    command = 'fslorient -setqformcode 1 ' + image.strip('.nii.gz')+'_orient'
     
+    command = 'fslorient -setqformcode 1 ' + image.strip('.nii.gz')+'_orient'
     print command
+
 
 for d in dlist:
     sub_dir = os.path.join(path, d)
@@ -124,23 +127,30 @@ for d in dlist[-4:]:
     print command
     
 ############### REGISTRATION + WARPING STRUCTURAL ################################
+
+join = os.path.join
+path_templates = '/media/DATA/fmri/templates_MNI_3mm/'
+
 for s in subjlist:
     
     sub_dir = os.path.join(path, s)
     
-    s_list = os.listdir(os.path.join(sub_dir, 'mprage'))
+    s_list = os.listdir(join(sub_dir, 'mprage'))
 
     struct_list = [m for m in s_list if m.find('mprage_orient.nii.gz') != -1]
 
     image = os.path.join(sub_dir, 'mprage', struct_list[0])
     
+    # Register structural to mni template
     command = 'flirt -in '+ image + \
-                    ' -ref /media/DATA/fmri/templates_MNI_3mm/MNI152_T1_3mm.nii.gz' + \
+                    ' -ref '+os.path.join(path_templates, 'MNI152_T1_3mm.nii.gz') + \
                     ' -omat '+os.path.join(sub_dir, 'mprage','mprage2mni_3mm.mat') + \
                     ' -o '+ os.path.join(sub_dir, 'mprage','mprage2mni_3mm.nii.gz')
+                    
 
     print command
-
+    
+    # Linear warping
     command = 'fnirt --in='+ image + \
                     ' --ref=/media/DATA/fmri/templates_MNI_3mm/MNI152_T1_3mm.nii.gz' + \
                     ' --aff='+os.path.join(sub_dir, 'mprage','mprage2mni_3mm.mat') + \
@@ -568,3 +578,79 @@ for f in list_files:
     print 'nifti_4dfp -n '+os.path.join(path_4dfp, f_)+' '+os.path.join(path_4dfp, f_)
     print 'mv '+os.path.join(path_4dfp, f_)+'.nii '+os.path.join(path_4dfp, 'nifti')
     
+    
+    
+####### Bold to MNI registration ####################
+path_templates = '/media/robbis/DATA/fmri/templates_MNI_3mm/' 
+for s in subjects:
+    
+    sub_dir = os.path.join(path, s)
+    image = os.path.join(path, s, 'mprage', 'mprage_orient_brain.nii.gz')
+    
+    
+    ## Register anat to mni
+    command = 'flirt -in '+ image + \
+                    ' -ref '+os.path.join(path_templates, 'MNI152_T1_3mm_brain.nii.gz') + \
+                    ' -omat '+os.path.join(sub_dir, 'mprage','mprage2mni_3mm.mat') + \
+                    ' -o '+ os.path.join(sub_dir, 'mprage','mprage2mni_3mm.nii.gz')
+                    
+
+    print command
+    
+    ## Register anat to bold
+    command = 'flirt -in '+ image + \
+                    ' -ref '+os.path.join(sub_dir, 'fmri', 'bold_orient_mean.nii.gz') + \
+                    ' -omat '+os.path.join(sub_dir, 'fmri','mprage2bold_3mm.mat') + \
+                    ' -o '+ os.path.join(sub_dir, 'mprage','mprage2bold_3mm.nii.gz')
+                    
+    print command
+    
+    ## Invert anat2bold matrix
+    command = 'convert_xfm -omat %s -inverse %s' % (os.path.join(sub_dir, 'fmri','bold2mprage_3mm.mat'),
+                                                    os.path.join(sub_dir, 'fmri','mprage2bold_3mm.mat'))
+    print command
+    
+    ## Concatenate bold2anat2mni matrices
+    command = 'convert_xfm -omat %s -concat %s %s' %(os.path.join(sub_dir, 'fmri','bold2mni_3mm.mat'),
+                                                     os.path.join(sub_dir, 'mprage','mprage2mni_3mm.mat'),
+                                                     os.path.join(sub_dir, 'fmri','bold2mprage_3mm.mat'))
+    print command
+    
+    ## Transform bold2mni             
+    command = 'applyxfm4D '+ os.path.join(sub_dir, 'fmri', 'bold_orient.nii.gz') + ' ' \
+                           + os.path.join(path_templates, 'MNI152_T1_3mm_brain.nii.gz') + ' ' \
+                           + os.path.join(sub_dir, 'fmri', 'bold_orient_mni_3mm.nii.gz') + ' ' \
+                           +  os.path.join(sub_dir, 'fmri','bold2mni_3mm.mat') + ' ' \
+                           + '-singlematrix'   
+    print command          
+
+filelist = []
+for s in subjects:
+    sub_dir = os.path.join(path, s)
+    filelist.append(os.path.join(sub_dir, 'fmri', 'bold_orient_mni_3mm.nii.gz'))
+command = 'slicesdir -p' +os.path.join(path_templates, 'MNI152_T1_3mm.nii.gz') + ' ' +' '.join(filelist)
+
+print command
+
+
+path_results = '/media/robbis/DATA/fmri/monks/0_results/20131201_073007_searchlight_total_fmri/'
+
+for s in subjects:
+
+    image = os.path.join(path_results, s, s+"_radius_3_searchlight_mean_map.nii.gz")        
+
+    command = 'fslswapdim %s -z -x -y %s ' %(image, image[:-7]+"_orient.nii.gz")
+    print command
+    
+    command = 'fslorient -setqformcode 1 %s ' %(image[:-7]+"_orient.nii.gz")
+    print command
+    
+    
+for s in subjects:
+    sub_dir = os.path.join(path, s)
+    command = 'applyxfm4D '+ os.path.join(path_results, s, s+"_radius_3_searchlight_mean_map_orient.nii.gz") + ' ' \
+                           + os.path.join(path_templates, 'MNI152_T1_3mm_brain.nii.gz') + ' ' \
+                           + os.path.join(path_results, s, s+"_radius_3_searchlight_mean_map_mni_3mm.nii.gz") + ' ' \
+                           +  os.path.join(sub_dir, 'fmri','bold2mni_3mm.mat') + ' ' \
+                           + '-singlematrix'   
+    print command 

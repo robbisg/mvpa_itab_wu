@@ -39,7 +39,7 @@ class LeaveOneSubjectOutSL(SearchlightAnalysisPipeline):
                 'evidence': 3, # Default_value (memory : 3)
                 'task':'decision', # Default_value
                 'split_attr':'subject_ofp', #
-                'mask_area':'glm_atlas', # memory                            
+                'mask_area':'glm_atlas_mask_333.nii.gz', # memory                            
                 'normalization':'both',
                 "radius": 3,
                 "n_balanced_ds": 1,
@@ -202,6 +202,10 @@ class SingleSubjectSearchlight(SearchlightAnalysisPipeline):
         
         # We needs to modify the chunks in order to use sklearn
         ds.chunks = np.arange(len(ds.chunks))
+
+        b = balance_ds_num
+        self._conf["summary_ds_"+str(b)] = ds.summary()
+        logger.info(ds.summary())
         
         partitioner = SKLCrossValidation(StratifiedKFold(y, 
                                                          n_folds=self._n_folds))
@@ -236,16 +240,18 @@ class SingleSubjectSearchlight(SearchlightAnalysisPipeline):
         
         self.subject = subj
         
-        
+        analysis_dict = {}
         for k in self._conf.keys():
             if k in self._default_conf.keys():
                 self._conf[k] = self._default_conf[k]
+            if k != 'path' and k != 'task':
+                analysis_dict[k] = self._conf[k]
         
         
         self.ds_orig = load_dataset(self._data_path, 
                                     self.subject, 
                                     self._data_type, 
-                                    **self._conf)
+                                    **analysis_dict)
         
         return self.ds_orig
         

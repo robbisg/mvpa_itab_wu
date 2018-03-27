@@ -51,7 +51,14 @@ class ResultsCollection(object):
         dir_ = '_'.join([datetime, self._analysis, self._mask, self._task])
         if kwargs != None:
             dir_ += "_"
-            dir_ += "_".join([k+"_"+v for k, v in kwargs.iteritems()])
+            for key, value in kwargs.iteritems():
+                
+                if isinstance(value, dict):
+                    for kk, vv in value.iteritems():
+                        dir_ += kk+"_"+"_".join(vv)
+                else:
+                    dir_ += key+"_"+value
+
         self.path = os.path.join(self.analysis_path, '0_results', dir_)
     
         make_dir(self.path)

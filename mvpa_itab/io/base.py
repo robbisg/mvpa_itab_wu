@@ -14,8 +14,9 @@ from mvpa_itab.main_wu import detrend_dataset, normalize_dataset
 from mvpa2.base.dataset import vstack
 from mvpa_itab.io.configuration import read_configuration
 from mvpa_itab.io.utils import add_subdirs, build_pathnames
+from mvpa_itab.preprocessing.pipelines import StandardPreprocessingPipeline
 #from memory_profiler import profile
-
+from tqdm import tqdm
 logger = logging.getLogger(__name__) 
 
 
@@ -44,7 +45,7 @@ def load_dataset(path, subj, folder, **kwargs):
     # TODO: Slim down algorithm parts and checks
     
     skip_vols = 0
-    roi_labels = None 
+    roi_labels = None
     
     
     for arg in kwargs:
@@ -77,6 +78,7 @@ def load_dataset(path, subj, folder, **kwargs):
     # Load the pymvpa dataset.    
     try:
         logger.info('Loading dataset...')
+        
         ds = fmri_dataset(fmri_list, 
                           targets=attr.targets, 
                           chunks=attr.chunks, 
@@ -394,7 +396,6 @@ def load_subjectwise_ds(path,
     data_path = conf['data_path']
     
     
-
     if isinstance(subjects, str):        
         subjects, extra_sa = load_subject_file(subjects)
         
@@ -404,13 +405,15 @@ def load_subjectwise_ds(path,
     for i, subj in enumerate(subjects):
         
         ds = load_dataset(data_path, subj, task, **conf)
+        
         ds = detrend_dataset(ds, task, **conf)
         ds = normalize_dataset(ds, **conf)
         
         # add extra samples
-        for k, v in extra_sa.iteritems():
-            if len(v) == len(subjects):
-                ds.sa[k] = [v[i] for _ in range(ds.samples.shape[0])]
+        if extra_sa != None:
+            for k, v in extra_sa.iteritems():
+                if len(v) == len(subjects):
+                    ds.sa[k] = [v[i] for _ in range(ds.samples.shape[0])]
         
         
         # First subject
@@ -425,6 +428,55 @@ def load_subjectwise_ds(path,
 
     return ds_merged, ['group'], conf
 
+
+
+def load_subject_ds(path, 
+                    subjects, 
+                    conf_file, 
+                    task, 
+                    extra_sa=None,
+                    prepro=StandardPreprocessingPipeline(), 
+                    **kwargs):
+    
+    
+    conf = read_configuration(path, conf_file, task)
+           
+    conf.update(kwargs)
+    logger.debug(conf)
+    
+    data_path = conf['data_path']
+    
+    
+    if isinstance(subjects, str):        
+        subjects, extra_sa = load_subject_file(subjects)
+        
+    
+    print 'Merging subjects from '+data_path
+    
+    for i, subj in tqdm(enumerate(subjects)):
+        
+        ds = load_dataset(data_path, subj, task, **conf)
+        
+        ds = prepro.transform(ds)
+        
+        # add extra samples
+        if extra_sa != None:
+            for k, v in extra_sa.iteritems():
+                if len(v) == len(subjects):
+                    ds.sa[k] = [v[i] for _ in range(ds.samples.shape[0])]
+        
+        
+        # First subject
+        if i == 0:
+            ds_merged = ds.copy()
+        else:
+            ds_merged = vstack((ds_merged, ds))
+            ds_merged.a.update(ds.a)
+            
+        
+        del ds
+
+    return ds_merged, ['group'], conf
 
 
 def load_subject_file(fname):

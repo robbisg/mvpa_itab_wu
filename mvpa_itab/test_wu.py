@@ -17,7 +17,7 @@ from mvpa_itab.preprocessing import get_preprocessing
 from mvpa_itab.results import get_time
 from mvpa_itab.io.save import save_results
 from mvpa_itab.io.base import read_configuration, load_dataset,\
-    read_json_configuration, load_subjectwise_ds, load_spatiotemporal_dataset
+        load_subjectwise_ds, load_spatiotemporal_dataset
 from mvpa_itab.main_wu import detrend_dataset, balance_dataset_timewise,\
     spatiotemporal, spatial, balance_dataset, normalize_dataset,\
     clustering_analysis, transfer_learning, searchlight, build_events_ds
@@ -33,6 +33,7 @@ from mvpa2.clfs.svm import LinearCSVMC
 from mvpa2.generators.partition import NFoldPartitioner
 from mvpa2.measures.searchlight import sphere_searchlight
 from mvpa2.datasets.mri import map2nifti
+from mvpa_itab.io.configuration import read_json_configuration
 
 logger = logging.getLogger(__name__)
     

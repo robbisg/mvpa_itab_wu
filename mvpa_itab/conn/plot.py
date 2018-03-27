@@ -259,6 +259,8 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
     from mne.externals.six import string_types
     from mne.fixes import normalize_colors
     from functools import partial
+    import seaborn as sns
+    
     
     n_nodes = len(node_names)
 
@@ -277,6 +279,7 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
     else:
         node_width = node_width * np.pi / 180
 
+
     if node_colors is not None:
         if len(node_colors) < n_nodes:
             node_colors = cycle(node_colors)
@@ -284,6 +287,7 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
         # assign colors using colormap
         node_colors = [plt.cm.spectral(i / float(n_nodes))
                        for i in range(n_nodes)]
+
 
     # handle 1D and 2D connectivity information
     if con.ndim == 1:
@@ -403,8 +407,13 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
         t0 += start_noise[pos]
         t1 += end_noise[pos]
 
-        verts = [(t0, r0), (t0, 0.5), (t1, 0.5), (t1, r1)]
-        codes = [m_path.Path.MOVETO, m_path.Path.CURVE4, m_path.Path.CURVE4,
+        verts = [(t0, r0), 
+                 (t0, 0.5), 
+                 (t1, 0.5), 
+                 (t1, r1)]
+        codes = [m_path.Path.MOVETO, 
+                 m_path.Path.CURVE4, 
+                 m_path.Path.CURVE4,
                  m_path.Path.LINETO]
         path = m_path.Path(verts, codes)
         
@@ -428,8 +437,16 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
     height = np.ones(n_nodes) * 1.2
     
     
-    #mean_ = axes.scatter(node_angles, height, s=9, c='red', zorder=2, alpha=0.8, edgecolors='red')
-    bars = axes.scatter(node_angles, height, s=node_size, c=node_colors, zorder=1, alpha=0.9, linewidths=2, facecolor='.9')
+    for i, (x,y) in enumerate(zip(node_angles, height)):
+        cmap = sns.dark_palette(node_colors[i], n_colors=15, as_cmap=True, reverse=True)
+        _ = axes.scatter(x, 
+                            y, 
+                            s=node_size[i], 
+                            c=cmap(node_size[i]/node_size.sum()), 
+                            zorder=1, 
+                            alpha=0.9, 
+                            linewidths=2, 
+                            facecolor='.9')
     axes.set_ylim(0, 2)
     
     '''

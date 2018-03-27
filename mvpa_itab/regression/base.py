@@ -349,8 +349,8 @@ class RegressionSaver(object):
             
 ###### Script ######
 
-#path = "/media/robbis/DATA/fmri/monks"
-path = "/home/robbis/fmri/monks"
+path = "/media/robbis/DATA/fmri/monks"
+#path = "/home/robbis/fmri/monks"
 dir_ = ""
 
 r = '20151103_132009_connectivity_filtered_first_filtered_after_each_run_no_gsr_findlab_fmri'
@@ -374,7 +374,7 @@ _fields = {'path': os.path.join(path, '0_results'),
                       dtype=np.str), 
                #'directory':'20150427_124039_connectivity_fmri', 
                'condition_list':['Samatha', 'Vipassana'],
-               #'directory':'20150427_124039_connectivity_fmri',
+               'directory':'20151103_132009_connectivity_filtered_first_filtered_after_each_run_no_gsr_findlab_fmri',
                #'condition_list':['Rest'],
                'subjects':subjects,
                'filter_':{'groups':'E'},

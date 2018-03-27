@@ -5,10 +5,11 @@ import mvpa_itab.results as rs
 from mvpa_itab.script.carlo.analysis import carlo_memory_set_targets
 from mvpa2.clfs.svm import LinearCSVMC
 from mvpa2.suite import debug
-from mvpa_itab.io.base import read_configuration
+from mvpa_itab.io.base import read_configuration, load_subject_file
 from mvpa2.measures.searchlight import sphere_searchlight
 from mvpa2.datasets.mri import map2nifti
-from mvpa_itab.main_wu import detrend_dataset, normalize_dataset
+from mvpa_itab.main_wu import detrend_dataset, normalize_dataset, slice_dataset,\
+    change_target
 from mvpa2.measures.base import CrossValidation
 from mvpa2.generators.partition import NFoldPartitioner
 
@@ -97,7 +98,7 @@ class SearchlightAnalysisPipeline(object):
         self.result_dict = dict()
         self.maps = []
         
-
+        self._subjects, self._extra_sa = load_subject_file(os.path.join(self._path, self._partecipants))
     
     
     def searchlight(self, ds, cvte):
@@ -120,8 +121,11 @@ class SearchlightAnalysisPipeline(object):
     
     def build_fname(self, i):
         fname = self.name
+               
         
         for k, v in self.conditions:
+            
+            
             fname += "_%s_%s" % (k, v)
             
         fname += "_balance_ds_%s.nii.gz" % (str(i+1))
@@ -156,7 +160,7 @@ class SearchlightAnalysisPipeline(object):
     
     
     
-    def transform(self, **options):
+    def run(self, **options):
         """
         options: dictionary with condition to filter
             e.g. task="memory", evidence="1" depending on your data.
@@ -166,7 +170,11 @@ class SearchlightAnalysisPipeline(object):
         self._collection = rs.ResultsCollection(self._conf, 
                                             self._path, 
                                             self._summarizers,
-                                            **options)
+                                            )
+        
+        summary_key = 'subjects'
+        if 'summary_key' in options.keys():
+            summary_key = options['summary_key']
         
         # Preprocess dataset with options
         ds = self.pre_operations(**options)
@@ -176,8 +184,8 @@ class SearchlightAnalysisPipeline(object):
                                
         
         for i, ds_ in enumerate(balance_generator):
-            self._conf["summary_ds_"+str(i)] = ds_.summary(chunks_attr="subject")
-            logger.info(ds_.summary(chunks_attr="subject"))
+            self._conf["summary_ds_"+str(i)] = ds_.summary(chunks_attr=summary_key)
+            logger.info(ds_.summary(chunks_attr=summary_key))
             self.algorithm(ds_, i)
             
         self._collection.summarize()
@@ -188,7 +196,7 @@ class SearchlightAnalysisPipeline(object):
     def pre_operations(self, **options):
         
         # dictionary of conditions used
-        self.conditions = {k:options[k] for k in self._condition_names}
+        self.conditions = {k: options[k] for k in self._condition_names}
         logger.debug(self._default_conf.keys())      
 
         # On-fly change default options
@@ -203,15 +211,14 @@ class SearchlightAnalysisPipeline(object):
 
         ds = self.ds_orig.copy()
         
-        targets, self._conf = self._set_targets(ds, 
-                                                self._conf, 
-                                                **self.conditions)
-
-        ds.targets = targets
+        ds = change_target(ds, options['task'])
         
         ds = detrend_dataset(ds, 
                             self._data_type, 
                             **self._conf)
+        
+
+        ds = slice_dataset(ds, options['condition'])
         
         ds = normalize_dataset(ds, **self._conf)
 

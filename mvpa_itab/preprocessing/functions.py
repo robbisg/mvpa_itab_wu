@@ -3,6 +3,9 @@ from mvpa2.mappers.detrend import PolyDetrendMapper
 from mvpa2.mappers.fx import mean_group_sample
 from mvpa2.mappers.zscore import ZScoreMapper
 
+import logging
+logger = logging.getLogger(__name__)
+
    
 def function_mapper(name):
     
@@ -10,7 +13,7 @@ def function_mapper(name):
               'detrending':Detrender,
               'class-modifier': TargetTransformer,
               'feature-wise': FeatureWiseNormalizer,
-              'dataset-slicer': DatasetSlicer,
+              'dataset-slicer': SampleSlicer,
               'sample-wise': SampleWiseNormalizer
               }
     
@@ -46,12 +49,13 @@ class NodeBuilder(object):
 class Detrender(Node):
     
     def __init__(self, degree=1, chunks_attr='chunks', **kwargs):
+        self._degree = degree
         self.node = PolyDetrendMapper(chunks_attr=chunks_attr, polyord=degree)
         Node.__init__(self, **kwargs)
-    
+            
     
     def transform(self, ds):
-        # logger
+        logger.info('Dataset preprocessing: Detrending with polynomial of order %s...' %(str(self._degree)))
         return self.node.forward(ds)
                    
 
@@ -65,7 +69,7 @@ class SampleAverager(Node):
         
         
     def transform(self, ds):
-        #logger.info('Dataset preprocessing: Averaging samples...')
+        logger.info('Dataset preprocessing: Averaging samples...')
         return ds.get_mapped(self.node)  
 
 
@@ -79,7 +83,8 @@ class FeatureWiseNormalizer(Node):
         
     
     def transform(self, ds):
-        #logger.info('Dataset preprocessing: Normalization feature-wise...')
+        logger.info('Dataset preprocessing: Normalization feature-wise...')
+        self.node.train(ds)
         return self.node.forward(ds)
     
 
@@ -88,7 +93,7 @@ class FeatureWiseNormalizer(Node):
 class SampleWiseNormalizer(Node):       
 
     def transform(self, ds):
-        #logger.info('Dataset preprocessing: Normalization sample-wise...')
+        logger.info('Dataset preprocessing: Normalization sample-wise...')
         ds.samples -= np.mean(ds, axis=1)[:, None]
         ds.samples /= np.std(ds, axis=1)[:, None]
         
@@ -105,11 +110,60 @@ class TargetTransformer(Node):
         Node.__init__(self, **kwargs)
     
     def transform(self, ds):
+        logger.info("Dataset preprocessing: Target set to %s" %(self._attribute))
         ds.targets = ds.sa[self._attribute]
 
 
 
-class DatasetSlicer(Node):
+
+class FeatureSlicer(Node):
+    """
+    Selects only portions of features in the dataset based on a dictionary
+    The dictionary indicates the feature attributes to be used as key and a list
+    with conditions to be selected:
+    
+    selection_dict = {
+                        'accuracy': ['I'],
+                        'frame':[1,2,3]
+                        }
+                        
+    This dictionary means that we will select all features with frame attribute
+    equal to 1 OR 2 OR 3 AND all samples with accuracy equal to 'I'.
+    
+    """
+    
+    def __init__(self, selection_dictionary=None, **kwargs):
+        self._selection = selection_dictionary
+        Node.__init__(self, **kwargs)  
+
+    def transform(self, ds):
+        
+        selection_dict = self._selection
+    
+        selection_mask = np.ones(ds.shape[1], dtype=np.bool)
+        for key, values in selection_dict.iteritems():
+            
+            logger.info("Selected %s from %s attribute." %(str(values), key))
+            
+            ds_values = ds.fa[key].value
+            condition_mask = np.zeros_like(ds_values, dtype=np.bool)
+            
+            for value in values:
+
+                if str(value)[0] == '!':
+                    array_val = np.array(value[1:]).astype(ds_values.dtype)
+                    condition_mask = np.logical_or(condition_mask, ds_values != array_val)
+                else:
+                    condition_mask = np.logical_or(condition_mask, ds_values == value)
+                    
+            selection_mask = np.logical_and(selection_mask, condition_mask)
+            
+        
+        return ds[:, selection_mask]
+
+
+
+class SampleSlicer(Node):
     """
     Selects only portions of the dataset based on a dictionary
     The dictionary indicates the sample attributes to be used as key and a list
@@ -137,7 +191,7 @@ class DatasetSlicer(Node):
         selection_mask = np.ones_like(ds.targets, dtype=np.bool)
         for key, values in selection_dict.iteritems():
             
-            #logger.info("Selected %s from %s attribute." %(str(values), key))
+            logger.info("Selected %s from %s attribute." %(str(values), key))
             
             ds_values = ds.sa[key].value
             condition_mask = np.zeros_like(ds_values, dtype=np.bool)

@@ -48,6 +48,10 @@ class Pipeline(object):
 
 
 
+
+
+
+
 class RegressionAnalysisPipeline(Pipeline):
     
     _default_fields = {'path':'/media/robbis/DATA/fmri/monks/', 
@@ -120,6 +124,8 @@ class RegressionAnalysisPipeline(Pipeline):
     def transform(self):
         
         self.results = []
+        
+        # Data loading or not maybe not!
         self.loader = ConnectivityDataLoader()
         logger.debug(self.y_field)
         self.X, self.y = self.loader.setup_analysis(self.path, 
@@ -134,12 +140,16 @@ class RegressionAnalysisPipeline(Pipeline):
         
         logger.debug(X.shape, y.shape)
         
+        # This is a preprocessing step
         X = zscore(X, axis=1) # Sample-wise
         y = zscore(np.float_(y))
         
+        # This is another pipeline to be included
         self.fs = FeatureSelectionIterator()
         self.fs.setup_analysis(self.fs_algorithm, self.fs_ranking_fx).transform(X, y).select_first(80)
         
+        
+        # This is the analysis
         self.reg = RegressionAnalysis().setup_analysis(self.cv_schema, 
                                                   self.learner, 
                                                   self.error_fx)
@@ -232,7 +242,7 @@ class FeaturePermutationRegression(RegressionAnalysisPipeline):
                               
         logger.debug(self.X.shape)
         logger.debug(self.y)
-        
+                
         X = self.X
         y = self.y
                              

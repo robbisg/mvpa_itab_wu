@@ -529,6 +529,7 @@ def plot_projection(fig,
 
 
 path_la = "/home/robbis/development/svn/mutual/trunk/result/los_alamos/results_x-y-z-par_numpy_array.npz"
+path_la = "/home/robbis/development/svn/mutual/trunk/result/aalto/results_x-y-z-par_numpy_array.npz"
 results_xyz = np.load(path_la)
 results_xyz = results_xyz['arr_0']
 
@@ -543,15 +544,15 @@ def norm(x, a=1.105, b=1.085):
     c = ((b-a)*(x-min_))/(max_-min_)+a
     return c
 
-xyz_norm = norm(xyz, a=1.142, b=1.138)
-
+#xyz_norm = norm(xyz, a=1.142, b=1.138)
+xyz_norm = norm(xyz)
 max_ = xyz_norm.max()
 min_ = xyz_norm.min()
 
 shape_ = xyz_norm.shape
 
 px, py, pz = [1,1,0]
-
+#px, py, pz = [5,1,0]
 
 
 x_ = shape_[0]-1

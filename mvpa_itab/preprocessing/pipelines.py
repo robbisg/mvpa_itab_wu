@@ -24,18 +24,31 @@ class PreprocessingPipeline(Node):
             
     
     
-class CarloMemoryPreprocessingPipeline(PreprocessingPipeline):
+class StandardPreprocessingPipeline(PreprocessingPipeline):
     
     def __init__(self, **kwargs):
         
         self.nodes = [
-                      
-                      
-                      
+                      Detrender(chunks_attr='file'),
+                      Detrender(),
+                      FeatureWiseNormalizer(),                   
                       
                       ]
         
+        PreprocessingPipeline.__init__(self, self.nodes)
         
+
+
+class MonksPreprocessingPipeline(PreprocessingPipeline):
+    
+    def __init__(self, **kwargs):
         
+        self.nodes = [
+                      Detrender(chunks_attr='file'),
+                      Detrender(),
+                      FeatureWiseNormalizer(),
+                      SampleSlicer(selection_dictionary={'events_number':range(1,13)})                 
+                      
+                      ]
         
-            
+        PreprocessingPipeline.__init__(self, self.nodes)            

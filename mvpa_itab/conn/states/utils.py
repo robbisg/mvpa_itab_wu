@@ -112,7 +112,7 @@ def fit_centroids(X, centroids):
     
     for subj in X:
         km = KMeans(n_clusters=k,
-                    init=centroids).transform(subj)
+                    init=centroids).fit(subj)
                     
         results_.append(km.labels_)
         
@@ -257,8 +257,11 @@ def get_state_duration(group_fitted_timecourse):
     subj_state_duration = []
     mean_subject_duration = []
     
+    n_states = np.max(group_fitted_timecourse)+1
+    
     for _, fitted_tc in enumerate(group_fitted_timecourse):
         state_duration = []
+        
         for i, state in enumerate(fitted_tc):
             if (i+1) < len(fitted_tc):
                 if state == fitted_tc[i+1]:
@@ -271,7 +274,7 @@ def get_state_duration(group_fitted_timecourse):
         subj_state_duration.append(state_duration)
         state_duration = np.array(state_duration)
         mean_subject_duration.append([[i+1, state_duration[state_duration[:,0]==(i+1)].mean(0)[1]]
-                                       for i in range(5)])
+                                       for i in range(n_states)])
     
     subj_state_duration = np.array(subj_state_duration)
     mean_subject_duration = np.array(mean_subject_duration)
@@ -279,7 +282,6 @@ def get_state_duration(group_fitted_timecourse):
     mean_subject_duration[:,:,1][np.isnan(mean_subject_duration[:,:,1])] = 0
     
     return subj_state_duration, mean_subject_duration
-
 
 
 

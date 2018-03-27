@@ -37,3 +37,77 @@ for k, array in grouped.iteritems():
         
     out_filename = '/media/robbis/DATA/fmri/movie_viviana/alpha/masked/mat_corr_sub_%s.mat' % (k)
     savemat(out_filename, {'data': padded})
+    
+############### Conversion #########
+
+path = '/media/robbis/DATA/fmri/movie_viviana/corrected/'
+bands = ['alpha', 'beta']
+conditions_ = ['rest', 'scramble', 'movie']
+mtype = ['masked', 'normal']
+key = 'mat_corr_sub_%s%s%s' # condition,
+
+grouped = dict()
+min_ = dict()
+
+for band in bands:
+    path_ = path+band
+    
+    for condition in conditions_:
+        filelist = os.listdir(path_)
+        filelist = [f for f in filelist if f.find(condition) != -1]
+        
+        for i, f in enumerate(filelist):
+            
+            data = loadmat(path_+'/'+f)
+                        
+            run = str(i+1)
+            if len(filelist) == 1:
+                run = ''
+                
+            for m in mtype:
+                
+                mt = '_'+m
+                if m == 'normal':
+                    mt = ''
+                
+                d_key = key % (condition.upper(), run, mt)
+                dict_key = "%s_%s_%s" % (band, condition, mt)
+                
+                if i == 0:
+                    grouped[dict_key] = []
+                    min_[dict_key] = 10000
+                
+                array_data = data[d_key]
+                
+                grouped[dict_key].append(array_data)
+                min_[dict_key] = array_data.shape[1] if array_data.shape[1] < min_[dict_key] else min_[dict_key]
+
+            del data
+
+
+for k, array in grouped.iteritems():
+    print k
+    value = min_[k]
+    padded = np.zeros((33, value, 45, 45))
+    init = 0
+    end = 0
+    for m in array:
+        
+        end = m.shape[0]+init
+        padded[init:end,:,:,:] = m[:,:value,:,:]
+        init = end
+    
+    key = k.split('_')
+    band = key[0]
+    condition = key[1]
+    
+    mt = key[-1] if key[-1] == 'masked' else 'normal'
+    
+    out_filename = '/media/robbis/DATA/fmri/movie_viviana/corrected/%s/%s/mat_corr_sub_%s.mat' % (band, mt, condition)
+    savemat(out_filename, {'data': padded})
+    del padded
+
+
+
+
+

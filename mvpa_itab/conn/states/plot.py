@@ -10,7 +10,8 @@ def plot_states_matrices(X,
                          node_number=[6,5,8,10,4,5,7], 
                          node_networks=['DAN','VAN','SMN','VIS','AUD','LAN','DMN'],
                          use_centroid=False,
-                         save_fig=True,
+                         n_cols=3,
+                         save_fig=False,
                          save_path="/media/robbis/DATA/fmri/movie_viviana",
                          save_name_condition=None,
                          **kwargs
@@ -31,30 +32,37 @@ def plot_states_matrices(X,
         centroids = X.copy()
         n_states = X.shape[0]
     
-    position_label = [-0.5+position[i]-node_number[i]/2. for i in range(len(node_number))]
     
+    position_label = [-0.5+position[i]-node_number[i]/2. for i in range(len(node_number))]
+    n_rows = np.ceil(n_states / float(n_cols))
+    print n_rows, n_cols
+    fig = pl.figure()
+        
     for i in np.arange(n_states):
-        fig = pl.figure()
+        
+        ax = fig.add_subplot(n_rows, n_cols, i+1)
         
         matrix_ = copy_matrix(array_to_matrix(centroids[i]), diagonal_filler=0)
-        n_states = matrix_.shape[0]
-        pl.imshow(matrix_, interpolation='nearest', vmin=0)
-        for _, n_nodes in zip(node_networks, position):
-            pl.vlines(n_nodes-0.5, -0.5, n_states-0.5)
-            pl.hlines(n_nodes-0.5, -0.5, n_states-0.5)
+        n_nodes = matrix_.shape[0]
+        ax.imshow(matrix_, interpolation='nearest', vmin=0, cmap=pl.cm.inferno)
+        for _, end_network in zip(node_networks, position):
+            ax.vlines(end_network-0.5, -0.5, n_nodes-0.5)
+            ax.hlines(end_network-0.5, -0.5, n_nodes-0.5)
         
-        pl.title('State '+str(i+1))
-        pl.xticks(position_label, node_networks)
-        pl.yticks(position_label, node_networks)
+        ax.set_title('State '+str(i+1))
+        ax.set_xticks(position_label)
+        ax.set_xticklabels(node_networks)
+        ax.set_yticks(position_label)
+        ax.set_yticklabels(node_networks)
         
-        pl.colorbar()
+        #pl.colorbar()
         
-        if save_fig:
-            fname = "%s_state_%s.png" % (str(save_name_condition), str(i+1))
-            pl.savefig(os.path.join(save_path, fname))
-        
-        pl.close('all')
-        return fig
+    if save_fig:
+        fname = "%s_state_%s.png" % (str(save_name_condition), str(i+1))
+        fig.savefig(os.path.join(save_path, fname))
+    
+    pl.close('all')
+    return fig
 
 
 def plot_center_matrix(X, clustering, n_cluster=5, **kwargs):

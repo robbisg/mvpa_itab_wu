@@ -67,14 +67,13 @@ def analysis(**kwargs):
     
     result = dict()
     
-    for cond in conditions:
-        
+    path = os.path.join(configuration['path'], 
+                    configuration['band'], 
+                    configuration['filetype'])
     
-        path = os.path.join(configuration['path'], 
-                            configuration['band'], 
-                            configuration['filetype'])
-        
-        data_, n_roi = get_data(os.path.join(path, "mat_corr_sub_%s.mat" % (str.upper(cond))))
+    for cond in conditions:
+      
+        data_, n_roi = get_data(os.path.join(path, "mat_corr_sub_%s.mat" % (str(cond))))
         
         data_ = data_filter.transform(data_)
             
@@ -129,7 +128,7 @@ def analysis(**kwargs):
 
 def get_results(**kwargs):
     """
-    Gets the labels from precomputer clustering
+    Gets the labels from precomputed clustering
     """
     configuration = {
                      'path':'/media/robbis/DATA/fmri/movie_viviana/',
@@ -168,6 +167,7 @@ def get_results(**kwargs):
         
         
         path_file = os.path.join(path_cluster, fname)
+        logger.info("Reading results from "+path_file)
         clustering_ = pickle.load(file(path_file, 'r'))
         clustering[condition] = clustering_
         
@@ -185,6 +185,7 @@ def get_centers(n_cluster, **kwargs):
     conf = {'path':'/media/robbis/DATA/fmri/movie_viviana/',
               'filetype' : 'masked',
               'fname': 'mat_corr_sub_%s.mat',
+              'band': 'alpha',
               'conditions' : ['movie', 'scramble', 'rest'],
               'state_res_fname' : "clustering_labels_%s_maxk_%s_%s_%s.pyobj",
               'max_k':15,
@@ -196,17 +197,16 @@ def get_centers(n_cluster, **kwargs):
     conf.update(kwargs)
     
     centers = []
-     
+    
+    _, clustering = get_results(**conf)
+    data_fname = os.path.join(conf['path'], conf['band'], conf['filetype'], conf['fname'])
+    
     for c in conditions:
 
-        clustering = get_clustering(condition=c, **conf)
+        data_, _ = get_data(data_fname % str(c))
+        X = get_subsampler(conf['method']).fit_transform(data_)
         
-        data_fname = os.path.join(conf['path'], conf['filetype'], conf['fname'])
-        data_, _ = get_data(data_fname % str.upper(c))
-        subj_min_speed, _ = get_subsampling_measure(conf['method'])(data_)
-        X = data_[subj_min_speed]
-        
-        centroids = get_centroids(X, clustering[n_cluster-2])
+        centroids = get_centroids(X, clustering[c][n_cluster-2])
         
         centers.append(centroids)
         

@@ -18,7 +18,7 @@ def demeaned():
     filename = os.path.join(conf['path'], conf['filetype'], conf['fname'])
     
     for condition in conf["conditions"]:
-        data, n_roi = get_data(filename % (str.upper(condition)))
+        data, n_roi = get_data(filename % (str(condition)))
         
         
         #data = remove_component(data, method="mean", argument="session")

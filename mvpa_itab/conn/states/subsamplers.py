@@ -67,14 +67,15 @@ class Subsampler(object):
         
         return X
     
+    
     def fit_transform(self, data):
-        self.transform(data).transform(data)
+        return self.fit(data).transform(data)
 
 
 
 class NoneThresholder(object):
     
-    def transform(self, measure):
+    def fit(self, measure):
         return measure 
 
 
@@ -130,7 +131,7 @@ class VarianceSubsampler(Subsampler):
 class MeanThresholder(object):
     
     def __init__(self, std=0):
-        self.std = 1
+        self.std = std
 
     def fit(self, measure):
         

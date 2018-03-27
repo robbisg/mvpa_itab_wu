@@ -349,6 +349,10 @@ class ConnectivityLoader(object):
             ds_info.append(ds_subjects)
         ds_info = np.vstack(ds_info)
         
+        logger.debug(ds_info)
+        logger.debug(ds_info.shape)
+        
+        logger.debug(ds_data.shape)
         
         self.ds = dataset_wizard(ds_data, targets=ds_labels, chunks=np.int_(ds_info.T[5]))
         self.ds.sa['subjects'] = ds_info.T[0]
