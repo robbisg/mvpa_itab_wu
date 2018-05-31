@@ -13,7 +13,6 @@ import numpy as np
 from mvpa2.clfs.base import Classifier
 from mvpa2.generators.resampling import Balancer
 
-from mvpa_itab.wrapper.sklearn import SKLCrossValidation
 from sklearn.cross_validation import StratifiedKFold
 
 from sklearn.svm import SVC
@@ -21,13 +20,9 @@ from mvpa2.clfs.skl.base import SKLLearnerAdapter
 from mvpa2.suite import debug, sphere_searchlight
 from mvpa2.suite import *
 
-from scipy.stats import ttest_ind
-from scipy.stats import ttest_1samp
 from numpy.random.mtrand import permutation
 from mvpa_itab.test_wu import load_subjectwise_ds
-from mvpa_itab.similarity.partitioner import MemoryGroupSubjectPartitioner
-
-
+from mvpa_itab.pipeline.partitioner import MemoryGroupSubjectPartitioner
 
 
 

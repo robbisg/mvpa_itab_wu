@@ -481,43 +481,9 @@ def save_matrices(path, results, gsr='gsr', atlas='findlab'):
 
 
 
+
    
-def load_matrices(path, condition):
-    """
-    path = path of result file
-    conditions = analysis label
-    """
-    subjects = os.listdir(path)
-    
-    subjects = [s for s in subjects if s.find('configuration') == -1 \
-                and s.find('.') == -1 ]
-    subjects = [s for s in subjects if s.find("expertise") == -1]
-    
-    logger.debug(path)
-    result = []
-    logger.debug(subjects)
-    for c in condition:
 
-        s_list = []
-        
-        for s in subjects:
-
-            sub_path = os.path.join(path, s)
-
-            filel = os.listdir(sub_path)
-            filel = [f for f in filel if f.find(c) != -1]
-            c_list = []
-            for f in filel:
-                logger.debug(s+" "+f)
-                matrix = np.loadtxt(os.path.join(sub_path, f))
-                
-                c_list.append(matrix)
-        
-            s_list.append(np.array(c_list))
-    
-        result.append(np.array(s_list))
-        
-    return np.array(result)
     
      
 def z_fisher(r):

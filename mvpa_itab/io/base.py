@@ -10,13 +10,14 @@ import logging
 import numpy as np
 import nibabel as ni
 from mvpa2.datasets.eventrelated import find_events
-from mvpa_itab.main_wu import detrend_dataset, normalize_dataset
 from mvpa2.base.dataset import vstack
-from mvpa_itab.io.configuration import read_configuration
+
 from mvpa_itab.io.utils import add_subdirs, build_pathnames
 from mvpa_itab.preprocessing.pipelines import StandardPreprocessingPipeline
+from mvpa_itab.io.configuration import read_configuration
+from mvpa_itab.main_wu import detrend_dataset, normalize_dataset
 #from memory_profiler import profile
-from tqdm import tqdm
+
 logger = logging.getLogger(__name__) 
 
 
@@ -41,17 +42,15 @@ def load_dataset(path, subj, folder, **kwargs):
     ds : ``Dataset``
        Instance of ``mvpa2.datasets.Dataset``
     '''
-
-    # TODO: Slim down algorithm parts and checks
     
     skip_vols = 0
-    roi_labels = None
+    roi_labels = dict()
     
     
     for arg in kwargs:
         if arg == 'skip_vols':              # no. of canceled volumes
             skip_vols = np.int(kwargs[arg])
-        if arg == 'roi_labels':             # dictionary of mask {'mask_label': nibabel_image}
+        if arg == 'roi_labels':             # dictionary of mask {'mask_label': string}
             roi_labels = kwargs[arg]
     
     
@@ -68,11 +67,18 @@ def load_dataset(path, subj, folder, **kwargs):
     
        
     # Loading attributes
-    attr = load_attributes(path, subj, folder, **kwargs)              
+    attr = load_attributes(path, subj, folder, **kwargs)
+    
+    if (attr == None) and (len(file_list) == 0):
+        return None            
 
 
     # Loading mask 
-    mask = load_mask(path, **kwargs)        
+    mask = load_mask(path, **kwargs)
+    roi_labels['brain'] = mask
+    
+    # Check roi_labels
+    roi_labels = load_roi_labels(roi_labels)
           
     
     # Load the pymvpa dataset.    
@@ -83,7 +89,8 @@ def load_dataset(path, subj, folder, **kwargs):
                           targets=attr.targets, 
                           chunks=attr.chunks, 
                           mask=mask,
-                          add_fa=roi_labels) 
+                          add_fa=roi_labels)
+        
         logger.debug('Dataset loaded...')
     except ValueError, e:
         logger.error(subj + ' *** ERROR: '+ str(e))
@@ -126,11 +133,14 @@ def add_filename(ds, fmri_list):
 
 def add_attributes(ds, attr):
     
+    
+    logger.debug(attr.keys())
+    
     try:
         for k in attr.keys():
             ds.sa[k] = attr[k]
-    except BaseException as _:        
-        logger.error('attributes not found.')
+    except BaseException as err:        
+        logger.error(str(err))
         
     return ds
 
@@ -154,14 +164,31 @@ def add_events(ds):
 
 
 def add_subjectname(ds, subj):
+    """
+    This function takes a string (the name of the subject) 
+    and add it to the dataset for each element of the dataset
     
-    ds.sa['name'] = [subj for _ in range(len(ds.sa.chunks))]
+    Parameters
+    ----------
+    
+    ds : pymvpa dataset
+        the dataset where attribute should be added
+        
+    subj : string
+        the name of the subject
+        
+    
+    Returns
+    -------
+    ds : pymvpa dataset modified
+    """
+    
+    ds.sa['name'] = [subj for _ in range(len(ds.sa.targets))]
     
     return ds
 
 
-
-#@profile    
+   
 def load_filelist(path, name, folder, **kwargs):
     ''' Load file given filename, the 
 
@@ -207,6 +234,21 @@ def load_filelist(path, name, folder, **kwargs):
   
 
 
+def load_roi_labels(roi_labels):
+    
+    roi_labels_dict = {}
+    if roi_labels != None:
+        for label, img in roi_labels.items():
+            if isinstance(img, str):
+                roi_labels_dict[label] = ni.load(img)
+            else:
+                roi_labels_dict[label] = img
+                
+    return roi_labels_dict
+
+
+
+
 def load_fmri(filelist, skip_vols=0):
     """
     """   
@@ -219,9 +261,12 @@ def load_fmri(filelist, skip_vols=0):
         img = ni.load(file_)     
         data = img.get_data()
         
-        img = img.__class__(data[:,:,:,skip_vols:], 
-                              affine = img.affine, 
-                              header = img.get_header())
+        
+        if len(data.shape) == 4:
+        
+            img = img.__class__(data[:,:,:,skip_vols:], 
+                                  affine = img.affine, 
+                                  header = img.header)
         del data
         image_list.append(img)
         
@@ -229,7 +274,6 @@ def load_fmri(filelist, skip_vols=0):
     
     logger.debug('The image list is of ' + str(len(image_list)) + ' images.')
     return image_list
-
 
 
       
@@ -266,38 +310,26 @@ def load_spatiotemporal_dataset(ds, **kwargs):
     return evds
 
 
-#@profile
+
 def load_mask(path, **kwargs):
-    '''
-
-    '''
     
-    rois = ['total']   
-    roi_folder = '1_single_ROIs'
-
     for arg in kwargs: 
         if (arg == 'mask_dir'):
-            path = kwargs[arg]
-        if (arg == 'mask_area'):
+            mask_path = kwargs[arg]
+        if (arg == 'brain_mask'):
             rois = kwargs[arg].split(',')
-        if (arg == 'roi_folder'):
-            roi_folder = kwargs[arg]
-        if (arg == 'coords'): # To be implemented
-            coords = kwargs[arg]
-
-
-    mask_path = os.path.join(path, roi_folder)
                               
     mask_list = find_roi(mask_path, rois)
        
     # Load Nifti from list
     data = 0
     for m in mask_list:
-        img = ni.load(os.path.join(mask_path,m))
+        img = ni.load(os.path.join(mask_path, m))
         data = data + img.get_data() 
         logger.info('Mask used: '+img.get_filename())
 
     mask = ni.Nifti1Image(data.squeeze(), img.affine)
+    logger.debug("Mask shape: "+str(mask.shape))
         
     return mask
 
@@ -388,7 +420,7 @@ def load_subjectwise_ds(path,
     
     """
     
-    conf = read_configuration(path, conf_file, task)
+    conf = read_configuration(os.path.join(path, conf_file), task)
            
     conf.update(kwargs)
     logger.debug(conf)
@@ -400,7 +432,7 @@ def load_subjectwise_ds(path,
         subjects, extra_sa = load_subject_file(subjects)
         
     
-    print 'Merging subjects from '+data_path
+    logger.info('Merging subjects from '+data_path)
     
     for i, subj in enumerate(subjects):
         
@@ -430,32 +462,39 @@ def load_subjectwise_ds(path,
 
 
 
-def load_subject_ds(path, 
-                    subjects, 
-                    conf_file, 
+
+def load_subject_ds(conf_file, 
                     task, 
                     extra_sa=None,
                     prepro=StandardPreprocessingPipeline(), 
                     **kwargs):
     
+    """
+    This is identical to load_subjectwise_ds but we can
+    specify a preprocessing pipeline to manage data
     
-    conf = read_configuration(path, conf_file, task)
+    """
+    
+    # TODO: conf file should include the full path
+    conf = read_configuration(conf_file, task)
            
     conf.update(kwargs)
     logger.debug(conf)
     
     data_path = conf['data_path']
     
-    
-    if isinstance(subjects, str):        
-        subjects, extra_sa = load_subject_file(subjects)
+    # Subject file should be included in configuration
+    subject_file = conf['subjects']
+    subjects, extra_sa = load_subject_file(subject_file)
         
+    logger.info('Merging %s subjects from %s' % (str(len(subjects)), data_path))
     
-    print 'Merging subjects from '+data_path
-    
-    for i, subj in tqdm(enumerate(subjects)):
+    for i, subj in enumerate(subjects):
         
         ds = load_dataset(data_path, subj, task, **conf)
+        
+        if ds == None:
+            continue
         
         ds = prepro.transform(ds)
         
@@ -476,12 +515,24 @@ def load_subject_ds(path,
         
         del ds
 
-    return ds_merged, ['group'], conf
+    return ds_merged
+
+
+
+
+def get_ds_data(ds, target_attribute='targets'):
+    """
+    Returns X and y data from pymvpa dataset
+    """
+    
+    return ds.samples, ds.sa[target_attribute].value
+
+
 
 
 def load_subject_file(fname):
     """
-    File format example
+        File format example
         >>>
         subject,group,group_split
         s01_160112alefor,1,1
@@ -499,4 +550,3 @@ def load_subject_file(fname):
     
     return subjects, extra_sa
 
-            

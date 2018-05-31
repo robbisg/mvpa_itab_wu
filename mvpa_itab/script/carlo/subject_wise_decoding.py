@@ -2,7 +2,7 @@ import logging
 import numpy as np
 from mvpa2.generators.splitters import Splitter
 from mvpa2.generators.partition import CustomPartitioner, NFoldPartitioner
-from mvpa_itab.similarity.partitioner import MemoryGroupSubjectPartitioner, \
+from mvpa_itab.pipeline.partitioner import MemoryGroupSubjectPartitioner, \
                                             LeaveOneSubjectPerGroupPartitioner
 from mvpa2.mappers.fx import BinaryFxNode
 from mvpa2.datasets.base import Dataset

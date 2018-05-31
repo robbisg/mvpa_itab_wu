@@ -1,13 +1,10 @@
 import numpy as np
-from mvpa_itab.stats.base import CrossValidation
-from scipy.stats.stats import zscore
-from mvpa_itab.conn.io import ConnectivityLoader
 import os
 from mvpa_itab.stats.base import Correlation
 from mvpa_itab.measure import ranking_correlation
 from sklearn.cross_validation import ShuffleSplit
 from sklearn.svm.classes import SVR
-from sklearn.metrics.regression import mean_squared_error, r2_score
+from sklearn.metrics.regression import mean_squared_error
 from mvpa_itab.measure import correlation
 from mvpa_itab.utils import progress
 from tqdm import *
@@ -29,57 +26,6 @@ class Analysis(object):
     def __str__(self, *args, **kwargs):
         self.__name__
 
-   
-    
-class ConnectivityDataLoader(Analysis):
-    
-    def setup_analysis(self, path, roi_list, directory, conditions, subjects):
-        
-        self.directory = directory
-        self.conditions = conditions
-        self.subjects = subjects
-        
-        conn = ConnectivityLoader(path, self.subjects, self.directory, roi_list)
-        logger.debug(self.conditions)
-        conn.get_results(self.conditions)
-        self.ds = conn.get_dataset()
-        
-        return self
-
-    
-    def filter(self, filter_, operation='and'):
-        """Filter is a dictionary the key is the sample attribute 
-        the value is the value
-        to filter, if the dictionary has more than one item a 
-        logical and is performed"""
-        
-        if operation == 'and':
-            func = np.logical_and
-            mask = np.ones_like(self.ds.targets, dtype=np.bool)
-        else:
-            func = np.logical_or
-            mask = np.zeros_like(self.ds.targets, dtype=np.bool)
-            
-        for k, v in filter_.items():
-            logger.debug(mask)
-            logger.debug(k)
-            logger.debug(v)
-            mask = func(mask, self.ds.sa[k].value == v)
-            
-        self.ds = self.ds[mask]
-        
-        logger.debug(self.ds.shape)
-        
-        return self
-    
-    
-    def get_data(self, y_field='expertise'):
-        """
-        Get X matrix of samples and y array of outcomes
-        """
-        logger.debug(self.ds.sa['age'])
-        logger.debug(y_field)
-        return self.ds.samples, self.ds.sa[y_field].value    
             
 
 
@@ -282,47 +228,7 @@ class FeatureSelectionIterator(object):
 
 
 
-class ScriptIterator(object):
-    
-    
-    def setup_analysis(self, **kwargs):
-        
-        import itertools
-            
-        args = [arg for arg in kwargs]
-        logger.info(kwargs)
-        combinations_ = list(itertools.product(*[kwargs[arg] for arg in kwargs]))
-        self.configurations = [dict(zip(args, elem)) for elem in combinations_]
-        self.i = 0
-        self.n = len(self.configurations)
-    
-    
-    def __iter__(self):
-        return self
-    
-        
-    def next(self):
-        
-        if self.i < self.n:
-            value = self.configurations[self.i]
-            self.i += 1
-            return value
-        else:
-            raise StopIteration()
-        
-    
-    def transform(self, pipeline):
-        results = []
 
-        for conf in tqdm(self, desc='configuration_iterator'):
-            pipeline.update_configuration(**conf)
-            res = pipeline.transform()
-            
-            results.append([conf, res])
-        
-        self.results = results
-
-        return results
     
           
 
@@ -348,7 +254,7 @@ class RegressionSaver(object):
             
             
 ###### Script ######
-
+'''
 path = "/media/robbis/DATA/fmri/monks"
 #path = "/home/robbis/fmri/monks"
 dir_ = ""
@@ -391,7 +297,7 @@ _fields = {'path': os.path.join(path, '0_results'),
 
 
 
-'''
+
 from mvpa_itab.regression.base import *
 from mvpa_itab.regression.pipelines import FeaturePermutationRegression
 pipeline = FeaturePermutationRegression()

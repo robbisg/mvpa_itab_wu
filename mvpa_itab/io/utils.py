@@ -18,7 +18,9 @@ def add_subdirs(path, name, sub_dirs):
         pathname = os.path.join(path, name, d)
         
         logger.debug(pathname)
-        complete_path.append(pathname)
+        
+        if os.path.isdir(pathname):
+            complete_path.append(pathname)
     
     
     complete_path.append(path)

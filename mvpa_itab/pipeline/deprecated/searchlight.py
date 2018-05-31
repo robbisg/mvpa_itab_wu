@@ -4,16 +4,16 @@ import numpy as np
 from mvpa2.generators.resampling import Balancer
 from mvpa2.generators.partition import CustomPartitioner
 from mvpa2.measures.base import CrossValidation
-from mvpa2.misc.errorfx import mean_mismatch_error
 
 from mvpa_itab.io.base import load_subjectwise_ds
-from mvpa_itab.script.carlo.subject_wise_decoding import get_partitioner, SubjectWiseError
-from mvpa_itab.wrapper.sklearn import SKLCrossValidation
+from mvpa_itab.script.carlo.subject_wise_decoding import get_partitioner
+
 from sklearn.cross_validation import StratifiedKFold
 from mvpa_itab.pipeline import SearchlightAnalysisPipeline
 from mvpa_itab.io.base import load_dataset
 
 import logging
+from mvpa_itab.pipeline.partitioner import SKLearnCVPartitioner
 logger = logging.getLogger(__name__)
 
 
@@ -207,8 +207,10 @@ class SingleSubjectSearchlight(SearchlightAnalysisPipeline):
         self._conf["summary_ds_"+str(b)] = ds.summary()
         logger.info(ds.summary())
         
-        partitioner = SKLCrossValidation(StratifiedKFold(y, 
-                                                         n_folds=self._n_folds))
+        partitioner = SKLearnCVPartitioner(
+                            StratifiedKFold(y, 
+                                            n_folds=self._n_folds)
+                                        )
         
         cvte = CrossValidation(self._classifier,
                                partitioner,

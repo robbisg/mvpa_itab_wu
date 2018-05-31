@@ -22,7 +22,8 @@ def array_to_matrix(array, nan_mask=None):
     return matrix
 
 
-def flatten_correlation_matrix(matrix):
+
+def flatten_matrix(matrix):
     
     il = np.tril_indices(matrix.shape[0])
     out_matrix = matrix.copy()
@@ -34,7 +35,7 @@ def flatten_correlation_matrix(matrix):
 
 
 
-def copy_matrix(matrix, diagonal_filler=1):
+def copy_matrix(matrix, diagonal_filler=0):
 
     iu = np.triu_indices(matrix.shape[0])
     il = np.tril_indices(matrix.shape[0])
@@ -44,4 +45,5 @@ def copy_matrix(matrix, diagonal_filler=1):
     for i, j in zip(iu[0], iu[1]):
         matrix[j, i] = matrix[i, j]
 
-    return matrix 
+    return matrix
+

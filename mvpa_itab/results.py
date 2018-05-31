@@ -54,10 +54,12 @@ class ResultsCollection(object):
             for key, value in kwargs.iteritems():
                 
                 if isinstance(value, dict):
+                    
                     for kk, vv in value.iteritems():
-                        dir_ += kk+"_"+"_".join(vv)
+                        vv = [str(v) for v in vv]
+                        dir_ += str(kk)+"_"+"_".join(vv)
                 else:
-                    dir_ += key+"_"+value
+                    dir_ += str(key)+"_"+str(value)
 
         self.path = os.path.join(self.analysis_path, '0_results', dir_)
     
@@ -576,10 +578,10 @@ class SignalDetectionSaver(Saver):
 
 def make_dir(path):
     """ Make dir unix command wrapper """
-    os.mkdir(os.path.join(path))
-    command = 'mkdir '+os.path.join(path)
+    #os.mkdir(os.path.join(path))
+    command = 'mkdir -p '+os.path.join(path)
     logger.info(command)
-    #os.system(command)
+    os.system(command)
     
     
 def save_image(filename, image, zscore=True):

@@ -22,14 +22,14 @@ def function_mapper(name):
     
     
 class Node(object):
-    
-    def __init__(self, name='node', **kwargs):
+    # Bring to __init__.py
+    def __init__(self, name='none', **kwargs):
         self.name = name
     
     
     def transform(self, ds):
         # Return dataset
-        raise NotImplementedError()
+        return ds
     
     
 
@@ -51,7 +51,7 @@ class Detrender(Node):
     def __init__(self, degree=1, chunks_attr='chunks', **kwargs):
         self._degree = degree
         self.node = PolyDetrendMapper(chunks_attr=chunks_attr, polyord=degree)
-        Node.__init__(self, **kwargs)
+        Node.__init__(self, name='detrending', **kwargs)
             
     
     def transform(self, ds):
@@ -65,7 +65,7 @@ class SampleAverager(Node):
     
     def __init__(self, attributes, **kwargs):
         self.node = mean_group_sample(attributes)
-        Node.__init__(self, **kwargs)
+        Node.__init__(self, name='sample_averager', **kwargs)
         
         
     def transform(self, ds):
@@ -79,7 +79,7 @@ class FeatureWiseNormalizer(Node):
     
     def __init__(self, chunks_attr='chunks', param_est=None, **kwargs):
         self.node = ZScoreMapper(chunks_attr=chunks_attr, param_est=param_est)
-        Node.__init__(self, **kwargs)
+        Node.__init__(self, name='feature_normalizer', **kwargs)
         
     
     def transform(self, ds):
@@ -90,7 +90,10 @@ class FeatureWiseNormalizer(Node):
 
 
     
-class SampleWiseNormalizer(Node):       
+class SampleWiseNormalizer(Node):
+    
+    def __init__(self, name='sample_normalizer', **kwargs):
+        Node.__init__(self, name=name, **kwargs)       
 
     def transform(self, ds):
         logger.info('Dataset preprocessing: Normalization sample-wise...')
@@ -107,11 +110,13 @@ class TargetTransformer(Node):
     
     def __init__(self, attribute, **kwargs):
         self._attribute = attribute
-        Node.__init__(self, **kwargs)
+        Node.__init__(self, name='target_transformer', **kwargs)
     
     def transform(self, ds):
         logger.info("Dataset preprocessing: Target set to %s" %(self._attribute))
         ds.targets = ds.sa[self._attribute]
+        
+        return ds
 
 
 
@@ -134,7 +139,7 @@ class FeatureSlicer(Node):
     
     def __init__(self, selection_dictionary=None, **kwargs):
         self._selection = selection_dictionary
-        Node.__init__(self, **kwargs)  
+        Node.__init__(self, name='feature_slicer', **kwargs)  
 
     def transform(self, ds):
         
@@ -170,7 +175,6 @@ class SampleSlicer(Node):
     with conditions to be selected:
     
     selection_dict = {
-                        'accuracy': ['I'],
                         'frame':[1,2,3]
                         }
                         
@@ -181,7 +185,7 @@ class SampleSlicer(Node):
 
     def __init__(self, selection_dictionary=None, **kwargs):
         self._selection = selection_dictionary
-        Node.__init__(self, **kwargs)    
+        Node.__init__(self, name='sample_slicer',**kwargs)    
 
 
     def transform(self, ds):

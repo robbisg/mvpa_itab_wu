@@ -2,9 +2,7 @@
 import os
 import nibabel as ni
 import numpy as np
-from mvpa_itab.conn.connectivity import glm, get_bold_signals, load_matrices, z_fisher
 from mvpa_itab.conn.operations import copy_matrix
-from nitime.timeseries import TimeSeries
 import itertools
 from scipy.stats.stats import zscore
 
@@ -133,22 +131,23 @@ def get_atlas_info(atlas_name, background='black'):
                       dtype=np.str)
         networks = roi_list.T[-2]
         names = roi_list.T[2]
+        
+        dict_ = {'Auditory':'lightgray', 
+                 'Basal_Ganglia':'honeydew', 
+                 'LECN':'tomato',
+                 'Language':'darkgrey', 
+                 'Precuneus':'teal',
+                 'RECN':'lightsalmon', 
+                 'Sensorimotor':'plum', 
+                 'Visuospatial':'slateblue', 
+                 'anterior_Salience':'yellowgreen',
+                 'dorsal_DMN':'lightsteelblue', 
+                 'high_Visual':'khaki', 
+                 'post_Salience':'mediumseagreen', 
+                 'prim_Visual':'gold',
+                 'ventral_DMN':'lightblue'
+                 }
         """
-        dict_ = {'Auditory':'#89CC74', 
-                 'Basal_Ganglia':'#7A84CC', 
-                 'LECN':'#FF1800',
-                 'Language':'#BF2B54', 
-                 'Precuneus':'#390996',
-                 'RECN':'#FF230B', 
-                 'Sensorimotor':'#4D0DC8', 
-                 'Visuospatial':'#DBBF00', 
-                 'anterior_Salience':'#37AEC4',
-                 'dorsal_DMN':'#9AF30B', 
-                 'high_Visual':'#FF8821', 
-                 'post_Salience':'#0289A2', 
-                 'prim_Visual':'#FF7600',
-                 'ventral_DMN':'#92ED00'
-                 }"""
         dict_ = {'Auditory':'silver', 
                  'Basal_Ganglia':'white', 
                  'LECN':'red',
@@ -164,7 +163,7 @@ def get_atlas_info(atlas_name, background='black'):
                  'prim_Visual':'magenta',
                  'ventral_DMN':'royalblue'
                  }
-        
+        """
         if background == 'white':
             dict_['anterior_Salience'] = 'gray'
             dict_['Basal_Ganglia'] = 'black'

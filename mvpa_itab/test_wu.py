@@ -12,7 +12,7 @@ import numpy as np
 import nibabel as ni
 from mvpa2.suite import vstack, Sphere, Searchlight, IndexQueryEngine, Splitter
 import mvpa_itab.results as rs
-from mvpa_itab.similarity.partitioner import TargetCombinationPartitioner
+from mvpa_itab.pipeline.partitioner import TargetCombinationPartitioner
 from mvpa_itab.preprocessing import get_preprocessing
 from mvpa_itab.results import get_time
 from mvpa_itab.io.save import save_results

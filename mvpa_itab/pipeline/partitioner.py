@@ -1,6 +1,7 @@
 from mvpa2.suite import Partitioner
 import numpy as np
 import itertools
+from mvpa2.generators.partition import CustomPartitioner
 
 
 class TargetCombinationPartitioner(Partitioner):
@@ -185,4 +186,16 @@ class GroupWisePartitioner(Partitioner):
                 (['3'],['4'],['1','2']),
                 (['4'],['3'],['1','2']),
                 ]        
+
+
+class SKLearnCVPartitioner(CustomPartitioner):
+    
+    def __init__(self, sklearn_cv_obj, **kwargs):
+        
+        splitrule = []
+        for _, test in sklearn_cv_obj:
+            splitrule+=[(None, test)]
+            
+        CustomPartitioner.__init__(self, splitrule, **kwargs)
+        
         

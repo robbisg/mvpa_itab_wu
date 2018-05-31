@@ -1,17 +1,14 @@
 import numpy as np
 import nibabel as ni
 from scipy.io import loadmat
-from scipy.stats import zscore as sc_zscore
-from mvpa2.suite import dataset_wizard, zscore
 import os
-from nitime.analysis.base import BaseAnalyzer
 from nitime.timeseries import TimeSeries
-from scipy.spatial.distance import euclidean
-from mvpa2.datasets.base import Dataset, dataset_wizard
-from mvpa_itab.conn.connectivity import load_matrices, z_fisher, glm, get_bold_signals
-from mvpa_itab.conn.operations import flatten_correlation_matrix
+from mvpa_itab.conn.connectivity import z_fisher, glm, get_bold_signals
+from mvpa_itab.conn.operations import flatten_matrix
 
 import logging
+from mvpa_itab.io.connectivity import load_matrices
+from mvpa2.datasets.base import dataset_wizard
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +22,7 @@ def load_fcmri_dataset(data, subjects, conditions, group, level, n_run=3):
             for i in range(n_run):
                       
                 matrix = data[ic,isb,i,:]
-                fmatrix = flatten_correlation_matrix(matrix)
+                fmatrix = flatten_matrix(matrix)
                 
                 samples.append(fmatrix)
                 attributes.append([c, s, i, group[isb], level[isb]])
@@ -141,19 +138,6 @@ def load_correlation_matrix(path, pattern_):
 
 
 
-def load_correlation(path, filepattern, format, dictionary):
-    """
-    path: where to find the file?
-    filepattern: is a single file or a serie of?
-    format: which routine use to open the file?
-    dictonary: what is the meaning of each matrix dimension?
-    """
-    # To be implemented
-    
-    return
-
-
-
 class CorrelationLoader(object):
         
     def load(self, path, filepattern, conditions=None):
@@ -233,140 +217,7 @@ class RegressionDataset(object):
     
 
 
-class ConnectivityLoader(object):
-    
-    def __init__(self, path, subjects, res_dir, roi_list):
-        
-        self.path = os.path.join(path, res_dir)
-        self.subjects = subjects
-        self.roi_list = roi_list
-    
-    
-    def get_results(self, conditions):
-        
-        
-        self.conditions = dict(zip(conditions, range(len(conditions))))
-        
-        # Loads data for each subject
-        # results is in the form (condition x subjects x runs x matrix)
-        results = load_matrices(self.path, conditions)
-        
-        # Check if there are NaNs in the data
-        nan_mask = np.isnan(results)
-        for _ in range(len(results.shape) - 2):
-            # For each condition/subject/run check if we have nan
-            nan_mask = nan_mask.sum(axis=0)
-        
-        
-            
-        
-        #pl.imshow(np.bool_(nan_mask), interpolation='nearest')
-        #print np.nonzero(np.bool_(nan_mask)[0,:])
-        # Clean NaNs
-        results = results[:,:,:,~np.bool_(nan_mask)]
-        
-        # Reshaping because numpy masking flattens matrices        
-        rows = np.sqrt(results.shape[-1])
-        shape = list(results.shape[:-1])
-        shape.append(int(rows))
-        shape.append(-1)
-        results = results.reshape(shape)
-        
-        # We apply z fisher to results
-        zresults = z_fisher(results)
-        zresults[np.isinf(zresults)] = 1
-        
-        self.results = zresults
-        
-        # Select mask to delete labels
-        roi_mask = ~np.bool_(np.diagonal(nan_mask))
 
-        # Get some information to store stuff
-        self.store_details(roi_mask)   
-
-        # Mean across runs
-        zmean = zresults.mean(axis=2)
-                
-        new_shape = list(zmean.shape[-2:])
-        new_shape.insert(0, -1)
-        
-        zreshaped = zmean.reshape(new_shape)
-        
-        upper_mask = np.ones_like(zreshaped[0])
-        upper_mask[np.tril_indices(zreshaped[0].shape[0])] = 0
-        upper_mask = np.bool_(upper_mask)
-        
-        # Returns the mask of the not available ROIs.
-        self.nan_mask = nan_mask
-        return self.nan_mask
-
-
-    def store_details(self, roi_mask):
-        
-        fields = dict()
-        # Depending on data
-        self.network_names = list(self.roi_list[roi_mask].T[0])
-        #self.roi_names = list(self.roi_list[roi_mask].T[2]) #self.roi_names = list(self.roi_list[roi_mask].T[1])
-        self.subject_groups = list(self.subjects.T[1])
-        self.subject_level = list(np.int_(self.subjects.T[-1]))
-        #self.networks = self.roi_list[roi_mask].T[-2]
-        
-        return fields
-
-
-    def get_dataset(self):
-        
-        zresults = self.results
-        
-        new_shape = list(zresults.shape[-2:])
-        new_shape.insert(0, -1)
-        
-        zreshaped = zresults.reshape(new_shape)
-        
-        upper_mask = np.ones_like(zreshaped[0])
-        upper_mask[np.tril_indices(zreshaped[0].shape[0])] = 0
-        upper_mask = np.bool_(upper_mask)
-        
-        # Reshape data to have samples x features
-        ds_data = zreshaped[:,upper_mask]
-    
-        labels = []
-        n_runs = zresults.shape[2]
-        n_subj = zresults.shape[1]
-        
-        for l in self.conditions.keys():
-            labels += [l for _ in range(n_runs * n_subj)]
-        ds_labels = np.array(labels)
-        
-        ds_subjects = []
-
-        for s in self.subjects:
-            ds_subjects += [s for _ in range(n_runs)]
-        ds_subjects = np.array(ds_subjects)
-        
-        ds_info = []
-        for _ in self.conditions.keys():
-            ds_info.append(ds_subjects)
-        ds_info = np.vstack(ds_info)
-        
-        logger.debug(ds_info)
-        logger.debug(ds_info.shape)
-        
-        logger.debug(ds_data.shape)
-        
-        self.ds = dataset_wizard(ds_data, targets=ds_labels, chunks=np.int_(ds_info.T[5]))
-        self.ds.sa['subjects'] = ds_info.T[0]
-        self.ds.sa['groups'] = ds_info.T[1]
-        self.ds.sa['chunks_1'] = ds_info.T[2]
-        self.ds.sa['expertise'] = ds_info.T[3]
-        self.ds.sa['age'] = ds_info.T[4]
-        self.ds.sa['chunks_2'] = ds_info.T[5]
-        self.ds.sa['meditation'] = ds_labels
-        
-        logger.debug(ds_info.T[4])
-        logger.debug(self.ds.sa.keys())
-        
-        return self.ds
               
 
 

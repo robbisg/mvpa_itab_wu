@@ -9,11 +9,8 @@ from sklearn.svm import SVC
 from sklearn.manifold import MDS
 from sklearn.cluster import KMeans
 from scipy.spatial.distance import squareform, pdist
-from mvpa_itab.io.base import *
-from utils import *
-from mvpa_itab.similarity.searchlight import *
-from mvpa2.suite import eventrelated_dataset, find_events, debug
-from mvpa2.suite import poly_detrend, zscore, mean_group_sample, mean_sample
+from mvpa2.suite import  debug
+from mvpa2.suite import zscore, mean_group_sample, mean_sample
 from mvpa2.suite import LinearCSVMC, GNB, QDA, LDA, SMLR, GPR, SKLLearnerAdapter
 from mvpa2.suite import map2nifti, mean_mismatch_error, sphere_searchlight
 from mvpa2.suite import FractionTailSelector, FixedNElementTailSelector
@@ -24,15 +21,14 @@ from mvpa2.featsel.base import SensitivityBasedFeatureSelection
 from mvpa2.suite import ChainNode, MCNullDist, Repeater, AttributePermutator
 from mvpa2.suite import CrossValidation
 from mvpa2.mappers.detrend import PolyDetrendMapper
-import os
-import cPickle as pickle
-import nibabel as ni
-from mvpa_itab import timewise
+
 import numpy as np
 import matplotlib.pyplot as plt
 import logging
 import warnings
 from mvpa2.clfs.meta import FeatureSelectionClassifier
+from mvpa2.datasets.eventrelated import find_events, eventrelated_dataset
+
 
 logger = logging.getLogger(__name__)
 
@@ -951,37 +947,3 @@ def inertia_clustering_analysis(ds, max_clusters=13):
 
     return inertia_val
 
-
-def analyze(path, subjects, analysis, model, conf_file, **kwargs):
-
-    configuration = read_configuration(path, conf_file, model)
-
-    mask_area = ''
-    mask_type = ''
-    mask_space = ''
-
-    for arg in kwargs:
-        configuration[arg] = kwargs[arg]
-
-    kwargs = configuration
-    #resFile = open(os.path.join(path, 'spatiotemporal_res_5.log'),'w')
-    results = []
-
-    for subj in subjects:
-        ds = load_dataset(path, subj, model, **kwargs)
-        if ds == 0:
-            continue
-        else:
-            ds = detrend_dataset(ds, model, **kwargs)
-            
-            res = analysis(ds, **kwargs)
-
-            mask = configuration['mask_atlas'] + '_' + configuration['mask_area']
-
-            results.append(dict({'name': subj,
-                                'results': res,
-                                'configuration': configuration}))
-
-    #filename_pre = save_results(path, analysis, type, mask, results)
-
-    return results

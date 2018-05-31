@@ -18,6 +18,91 @@ logger = logging.getLogger(__name__)
 
 
 
+
+class SearchlightPipelineNL(object):
+    """Searchligth Analysis class
+
+    Provides basic interface for searchlight analysis, on the top of that
+    other classes could be used to customize the pipeline with several
+    searchlight flavours.
+
+    Sequence of calls are:
+    - pipeline.transform() -> pipeline.algorithm() -> pipeline.analysis() -> pipeline.searchlight()
+
+    Parameters
+    ----------
+    data_loader : function that implements loading of PyMVPA file
+        data_loader(configuration_file)
+        
+    preprocessing : preprocessing pipeline see ..preprocessing.pipelines
+        
+    analysis
+    
+    configuration_file : 
+        
+
+    Examples
+    --------
+    
+    """
+    def __init__(self, data_loader, analysis, configuration_file, **kwargs):
+        
+        self._data_loader_fx = data_loader
+        
+        object.__init__(self, *args, **kwargs)
+        
+        
+    def fit(self, X, y):
+        
+        return
+        
+        
+
+
+
+
+
+class SearchlightPipelinePyMVPA(object):
+    """Searchligth Analysis class
+
+    Provides basic interface for searchlight analysis, on the top of that
+    other classes could be used to customize the pipeline with several
+    searchlight flavours.
+
+    Sequence of calls are:
+    - pipeline.transform() -> pipeline.algorithm() -> pipeline.analysis() -> pipeline.searchlight()
+
+    Parameters
+    ----------
+    kwargs : dictionary of analysis field
+        
+
+    Examples
+    --------
+    
+    """
+    def __init__(self, name="searchlight", storer=None):
+        self.storer = storer
+        self.name = name
+        return
+    
+    
+    def fit(self, ds, estimator, scorer, partitioner):
+        
+        # for each cross validation fold
+        
+        # fit the searchlight on training
+        # score fitted searchlight on testing data
+        # store results using storer
+          
+        
+        
+        return
+    
+    
+
+
+
 class SearchlightAnalysisPipeline(object):
     """Searchligth Analysis class
 
@@ -48,22 +133,22 @@ class SearchlightAnalysisPipeline(object):
         self.name = name
         
         self._default_conf = {   
-                            'path':'/home/robbis/fmri/memory/',
-                            'configuration_file':"memory.conf",
-                            "project":"carlo_memory",
-                            "partecipants": "subjects.csv",
-                            'data_type': 'BETA_MVPA',
-                            'n_folds':3,
-                            "condition_names":["evidence", "task"],
-                            'evidence': 3, # Default_value (memory : 3)
-                            'task':'decision', # Default_value
-                            'split_attr':'subject', #
-                            'mask_area':'intersect', # memory                            
-                            'normalization':'both',
-                            "radius": 3,
-                            "n_balanced_ds": 1,
-                            "set_targets": carlo_memory_set_targets,
-                            "classifier":LinearCSVMC(C=1)
+                            'path':'/home/robbis/fmri/memory/', # Data
+                            'configuration_file':"memory.conf", # Data
+                            "project":"carlo_memory", # Data
+                            "partecipants": "subjects.csv", # Data+Analysis
+                            'data_type': 'BETA_MVPA', # Data
+                            'n_folds':3, # Analysis
+                            "condition_names":["evidence", "task"], # Data+Analysis
+                            'evidence': 3, # Default_value (memory : 3) # Data+Analysis
+                            'task':'decision', # Data
+                            'split_attr':'subject', # Analysis
+                            'mask_area':'intersect', # Data                          
+                            'normalization':'both', # Analysis
+                            "radius": 3, # Analysis
+                            "n_balanced_ds": 1, # Analysis
+                            "set_targets": carlo_memory_set_targets, # Data+Analysis (Outdated)
+                            "classifier":LinearCSVMC(C=1) # Analysis (Not proper)
                             }
         
         

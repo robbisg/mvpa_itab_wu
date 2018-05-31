@@ -1,4 +1,4 @@
-from mne.viz import *
+from mne.viz import circular_layout
 from mne.viz.circle import _plot_connectivity_circle_onpick
 import matplotlib.pyplot as plt
 import numpy as np
@@ -160,7 +160,7 @@ def plot_matrix(matrix, roi_names, networks, threshold=0, zscore=True, **kwargs)
 
 def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
                                      node_angles=None, node_width=None,
-                                     node_size=100, con_thresh=None,
+                                     node_size=100, node_thresh=100, con_thresh=None,
                                      node_colors=None, facecolor='black',
                                      textcolor='white', node_edgecolor='black',
                                      linewidth=1.5, colormap='hot', vmin=None,
@@ -257,7 +257,6 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
     import matplotlib.path as m_path
     import matplotlib.patches as m_patches
     from mne.externals.six import string_types
-    from mne.fixes import normalize_colors
     from functools import partial
     import seaborn as sns
     
@@ -419,12 +418,12 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
         
         if np.abs(con[pos]) <= con_thresh:
             #colormap = plt.get_cmap('gray')
-            alpha=0.37
-            mult=1
+            alpha=0.4
+            mult=1.5
         else:
             colormap = plt.get_cmap(str_cmap)
             alpha=0.8
-            mult=np.abs(con[pos])*2.5
+            mult=np.abs(con[pos])*5
 
         color = colormap(con_val_scaled[pos])
 
@@ -459,25 +458,33 @@ def plot_connectivity_circle_edited(con, node_names, indices=None, n_lines=None,
     '''
     # Draw node labels
     angles_deg = 180 * node_angles / np.pi
-    for name, angle_rad, angle_deg in zip(node_names, node_angles, angles_deg):
+    for name, angle_rad, angle_deg, n_size in zip(node_names, node_angles, angles_deg, node_size):
         if angle_deg >= 270:
             ha = 'left'
         else:
             # Flip the label, so text is always upright
             angle_deg += 180
             ha = 'right'
-
-        axes.text(angle_rad, 1.25, name, size=fontsize_names,
-                  rotation=angle_deg, rotation_mode='anchor',
-                  horizontalalignment=ha, verticalalignment='center',
-                  color=textcolor)
+        
+        
+        if n_size > node_thresh:
+            axes.text(angle_rad, 1.25, name, size=fontsize_names+4,
+                      rotation=angle_deg, rotation_mode='anchor',
+                      horizontalalignment=ha, verticalalignment='center',
+                      color=textcolor)
+        else:
+            axes.text(angle_rad, 1.25, name, size=fontsize_names-3,
+                      
+                      rotation=angle_deg, rotation_mode='anchor',
+                      horizontalalignment=ha, verticalalignment='center',
+                      color='gray')
 
     if title is not None:
         plt.title(title, color=textcolor, fontsize=fontsize_title,
                   axes=axes)
 
     if colorbar:
-        norm = normalize_colors(vmin=vmin, vmax=vmax)
+        norm = plt.Normalize(vmin=vmin, vmax=vmax)
         sm = plt.cm.ScalarMappable(cmap=colormap, norm=norm)
         sm.set_array(np.linspace(vmin, vmax))
         cb = plt.colorbar(sm, ax=axes, use_gridspec=False,

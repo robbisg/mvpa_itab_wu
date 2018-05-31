@@ -2,9 +2,6 @@ from mvpa_itab.preprocessing.pipelines import PreprocessingPipeline
 from mvpa_itab.preprocessing.functions import NodeBuilder
 
 
-
-
-
 def get_preprocessing(**conf):
     
     import collections

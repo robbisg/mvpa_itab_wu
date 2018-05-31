@@ -7,7 +7,7 @@ from mvpa_itab.wrapper.sklearn import SKLCrossValidation
 from sklearn.cross_validation import StratifiedKFold
 
 from mvpa2.suite import *
-from mvpa_itab.pipeline.searchlight import SearchlightAnalysis
+from mvpa_itab.pipeline.deprecated.searchlight import SearchlightAnalysis
 
 #path = '/media/robbis/DATA/fmri/memory/'
 path = '/home/robbis/fmri/memory/'
