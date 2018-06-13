@@ -1,31 +1,56 @@
-from mvpa_itab.preprocessing.functions import Node
-from mvpa_itab.io.base import get_ds_data
-from sklearn.model_selection._validation import cross_val_score
+import logging
+import os
+from mvpa_itab.pipeline import Analyzer
+from mvpa_itab.results import get_time, make_dir
+logger = logging.getLogger(__name__)
 
 
-
-class Analysis(object):
+class AnalysisPipeline(Analyzer):
     
-    def __init__(self, pipeline, cross_validation, transformer=Node(), **cv_kwargs):
+    def __init__(self, configurator, name="base", **kwargs):
         
-        self._transformer = transformer
-        self._pipeline = pipeline
+        self._configurator = configurator
+        self._name = name
         
-        # Should we use an ad-hoc cross_validator
-        self._cross_validation = cross_validation
-        
-        
-        object.__init__(self, **cv_kwargs)
         
     
-    def fit(self, ds):
+    def fit(self, ds, **kwargs):
+        
+        self._transformer, self._estimator = self._configurator.fit()
         
         ds_ = self._transformer.transform(ds)
         
-        # Is y available for sklearn
-        X, y = get_ds_data(ds_)
-        
-        self._scores = cross_val_score(self._pipeline, X, y, cv=self._cross_validation)
+        self._estimator.fit(ds_, **kwargs)
         
         return self
+    
+    
+    def save(self):
+        
+        # Build dir
+        
+        # Get fname(s)
+        params = self._configurator._get_fname_info()
+        params.update(self._estimator._get_fname_info())
+        
+        
+        logger.info(params)
+        
+        path = params.pop("path")
+        dir_ = "%s_%s_%s_%s_%s" %(
+                                  get_time(),
+                                  self._name,
+                                  params.pop("analysis"),
+                                  params.pop("experiment"),
+                                  "_".join(["%s_%s" %(k, v) for k, v in params.items()])
+                                  )
+                               
+        full_path = os.path.join(path, "0_results", dir_)
+        make_dir(full_path)
+        
+        # Save results
+        self._configurator.save(path=full_path)
+        self._estimator.save(path=full_path)        
+        
+        return
     
