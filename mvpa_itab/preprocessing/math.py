@@ -1,5 +1,5 @@
 import numpy as np
-from mvpa_itab.preprocessing.functions import Node
+from mvpa_itab.pipeline import Transformer
 from mvpa_itab.conn.connectivity import z_fisher
 
 
@@ -8,11 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 
-class ZFisherTransformer(Node):
+class ZFisherTransformer(Transformer):
     
     
     def __init__(self, name='zfisher', **kwargs):
-        Node.__init__(self, name=name, **kwargs)
+        Transformer.__init__(self, name=name, **kwargs)
     
     
     def transform(self, ds):

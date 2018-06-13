@@ -4,54 +4,20 @@ from mvpa2.mappers.fx import mean_group_sample
 from mvpa2.mappers.zscore import ZScoreMapper
 
 import logging
+from itertools import product
+from mvpa2.base.dataset import hstack, vstack
+from mvpa_itab.pipeline import Transformer, Node
 logger = logging.getLogger(__name__)
 
    
-def function_mapper(name):
-    
-    mapper = {
-              'detrending':Detrender,
-              'class-modifier': TargetTransformer,
-              'feature-wise': FeatureWiseNormalizer,
-              'dataset-slicer': SampleSlicer,
-              'sample-wise': SampleWiseNormalizer
-              }
-    
-    return mapper[name]
-    
-    
-    
-class Node(object):
-    # Bring to __init__.py
-    def __init__(self, name='none', **kwargs):
-        self.name = name
-    
-    
-    def transform(self, ds):
-        # Return dataset
-        return ds
-    
-    
-
-class NodeBuilder(object):
-    
-    def __init__(self, **node_dict):
-        name = node_dict['name']
-        self.node = function_mapper(name)(**node_dict)
-        
-    
-    def get_node(self):
-        return self.node
 
 
-  
-
-class Detrender(Node):
+class Detrender(Transformer):
     
     def __init__(self, degree=1, chunks_attr='chunks', **kwargs):
         self._degree = degree
         self.node = PolyDetrendMapper(chunks_attr=chunks_attr, polyord=degree)
-        Node.__init__(self, name='detrending', **kwargs)
+        Transformer.__init__(self, name='detrending', **kwargs)
             
     
     def transform(self, ds):
@@ -60,12 +26,12 @@ class Detrender(Node):
                    
 
 
-class SampleAverager(Node):
+class SampleAverager(Transformer):
     
     
     def __init__(self, attributes, **kwargs):
         self.node = mean_group_sample(attributes)
-        Node.__init__(self, name='sample_averager', **kwargs)
+        Transformer.__init__(self, name='sample_averager', **kwargs)
         
         
     def transform(self, ds):
@@ -75,11 +41,11 @@ class SampleAverager(Node):
 
 
 
-class FeatureWiseNormalizer(Node):
+class FeatureWiseNormalizer(Transformer):
     
     def __init__(self, chunks_attr='chunks', param_est=None, **kwargs):
         self.node = ZScoreMapper(chunks_attr=chunks_attr, param_est=param_est)
-        Node.__init__(self, name='feature_normalizer', **kwargs)
+        Transformer.__init__(self, name='feature_normalizer', **kwargs)
         
     
     def transform(self, ds):
@@ -90,10 +56,10 @@ class FeatureWiseNormalizer(Node):
 
 
     
-class SampleWiseNormalizer(Node):
+class SampleWiseNormalizer(Transformer):
     
     def __init__(self, name='sample_normalizer', **kwargs):
-        Node.__init__(self, name=name, **kwargs)       
+        Transformer.__init__(self, name=name, **kwargs)       
 
     def transform(self, ds):
         logger.info('Dataset preprocessing: Normalization sample-wise...')
@@ -106,11 +72,11 @@ class SampleWiseNormalizer(Node):
 
 
 
-class TargetTransformer(Node):
+class TargetTransformer(Transformer):
     
-    def __init__(self, attribute, **kwargs):
-        self._attribute = attribute
-        Node.__init__(self, name='target_transformer', **kwargs)
+    def __init__(self, target=None, **kwargs):
+        self._attribute = target
+        Transformer.__init__(self, name='target_transformer', **kwargs)
     
     def transform(self, ds):
         logger.info("Dataset preprocessing: Target set to %s" %(self._attribute))
@@ -121,7 +87,7 @@ class TargetTransformer(Node):
 
 
 
-class FeatureSlicer(Node):
+class FeatureSlicer(Transformer):
     """
     Selects only portions of features in the dataset based on a dictionary
     The dictionary indicates the feature attributes to be used as key and a list
@@ -137,9 +103,14 @@ class FeatureSlicer(Node):
     
     """
     
-    def __init__(self, selection_dictionary=None, **kwargs):
-        self._selection = selection_dictionary
-        Node.__init__(self, name='feature_slicer', **kwargs)  
+    def __init__(self, **kwargs):
+        
+        self._selection = dict()
+        for arg in kwargs:
+            self._selection[arg] = kwargs[arg]
+        Transformer.__init__(self, name='feature_slicer', **kwargs)  
+
+
 
     def transform(self, ds):
         
@@ -168,7 +139,8 @@ class FeatureSlicer(Node):
 
 
 
-class SampleSlicer(Node):
+
+class SampleSlicer(Transformer):
     """
     Selects only portions of the dataset based on a dictionary
     The dictionary indicates the sample attributes to be used as key and a list
@@ -183,9 +155,14 @@ class SampleSlicer(Node):
     
     """
 
-    def __init__(self, selection_dictionary=None, **kwargs):
-        self._selection = selection_dictionary
-        Node.__init__(self, name='sample_slicer',**kwargs)    
+    def __init__(self, **kwargs):
+        
+        self._selection = dict()
+        for arg in kwargs:
+            self._selection[arg] = kwargs[arg]
+        
+        
+        Transformer.__init__(self, name='sample_slicer',**kwargs)    
 
 
     def transform(self, ds):
@@ -210,3 +187,59 @@ class SampleSlicer(Node):
     
 
 
+
+class FeatureStacker(Transformer):
+    """
+    Use features in the dictionary to build a rich dataset
+    The dictionary indicates the attributes to be used as key and a list
+    with conditions to be selected:
+    
+    selection_dict = {
+                        'frame':[1,2,3]
+                        }
+                        
+    This dictionary means that we will select all samples with frame attribute
+    equal to 1 OR 2 OR 3 AND all samples with accuracy equal to 'I'.   
+    """
+
+    def __init__(self, selection_dictionary=None, stack_attr=['targets', 'chunks'], **kwargs):
+        self._selection = selection_dictionary
+        self._attr = stack_attr
+        Transformer.__init__(self, name='sample_stacker',**kwargs)    
+
+
+    def transform(self, ds):
+        
+        ds_ = SampleSlicer(self._selection).transform(ds)
+        
+        iterable = [np.unique(ds_.sa[a].value) for a in self._attr]
+        
+        ds_stack = []
+        for attr in product(*iterable):
+            
+            mask = np.ones_like(ds_.targets, dtype=np.bool)
+            
+            for i, a in enumerate(attr):
+                mask = np.logical_and(mask, ds_.sa[self._attr[i]].value == a)
+            
+            ds_stacked = hstack([d for d in ds_[mask]])
+            ds_stacked = self.update_attribute(ds_stacked)
+            ds_stack.append(ds_stacked)
+        
+        return vstack(ds_stack)
+    
+    
+    def update_attribute(self, ds):
+        
+        key = self._selection.keys()[0]
+        value = "-".join(self._selection[key])
+        
+        print key, value
+        print ds.shape
+        ds.sa[key] = [value]
+        
+        return ds
+        
+        
+        
+        
