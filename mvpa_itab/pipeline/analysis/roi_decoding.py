@@ -1,18 +1,20 @@
-from mvpa_itab.preprocessing.functions import Node, FeatureSlicer
+from mvpa_itab.preprocessing.functions import FeatureSlicer
 from sklearn.metrics.scorer import _check_multimetric_scoring
 import numpy as np
 from sklearn.svm import SVC
-from mvpa_itab.io.base import get_ds_data
+from mvpa_itab.io.utils import get_ds_data
 from sklearn.preprocessing.label import LabelEncoder
 from sklearn.model_selection._split import LeaveOneGroupOut
 from sklearn.model_selection._validation import cross_validate
 
 
 import logging
+from mvpa_itab.pipeline import Analyzer, Transformer
+from scipy.io.matlab.mio import savemat
 logger = logging.getLogger(__name__)
 
 
-class Decoding(Node):
+class Decoding(Analyzer):
     """Implement decoding analysis using an arbitrary type of classifier.
 
     Parameters
@@ -69,9 +71,11 @@ class Decoding(Node):
         self.cv = cv
         self.verbose = verbose
         
+        Analyzer.__init__(self, name='decoding')
+        
 
 
-    def fit(self, ds, cv_attr='chunks', roi='all', roi_values=None, prepro=Node()):
+    def fit(self, ds, cv_attr='chunks', roi='all', roi_values=None, prepro=Transformer()):
         """Fits the decoding of the dataset.
 
         Parameters
@@ -106,16 +110,16 @@ class Decoding(Node):
         
         """
 
-        
+
         if roi_values == None:
             roi_values = self._get_rois(ds, roi)
-        
+                
         self.scores = dict()
         
         # TODO: How to use multiple ROIs
         for r, value in roi_values:
             
-            ds_ = FeatureSlicer({r:value}).transform(ds)
+            ds_ = FeatureSlicer(**{r:value}).transform(ds)
             ds_ = prepro.transform(ds_)
             
             logger.info("Dataset shape %s" % (str(ds_.shape)))
@@ -125,6 +129,12 @@ class Decoding(Node):
             
             string_value = "_".join([str(v) for v in value])
             self.scores["%s_%s" % (r, string_value)] = scores
+        
+        
+        self._info = self._store_ds_info(ds, 
+                                         cv_attr=cv_attr,
+                                         roi=roi,
+                                         prepro=prepro)
         
         return self
     
@@ -191,11 +201,101 @@ class Decoding(Node):
 
             scores = cross_validate(self.estimator, X, y_, groups,
                                   self.scoring, self.cv, self.n_jobs,
-                                  self.verbose, return_estimator=True)
+                                  self.verbose, return_estimator=True, return_splits=True)
             
             values.append(scores)
         
         return values
     
+    
+    
+    def save(self, path=None, full_save=False):
+        
+        import cPickle as pickle
+        import os
+        
+        path = Analyzer.save(self, path=path)
+        
+        for roi, scores in self.scores.items():
+            
+            # Save full object!
+            if full_save:
+                with open(os.path.join(path, '%s_scores.pickle' %(roi)), 'wb') as output:
+                    pickle.dump(scores, output)
+                       
+            for p, score in enumerate(scores):
+                    
+                mat_score = self._save_score(score)
+                    
+                # TODO: Better use of cv and attributes for leave-one-subject-out
+                filename = "%s_perm_%04d_data.mat" %(roi, p)
+                logger.info("Saving %s" %(filename))
+                
+                savemat(os.path.join(path, filename), mat_score)
+                
+        return
+
+        
+        
+    def _save_score(self, score):
+         
+        mat_file = dict()
+        
+        for key, value in score.items():
+            
+            if key.find("test_") != -1:
+                mat_file[key] = value
+                
+            elif key == 'estimator':
+                mat_estimator = self._save_estimator(value)
+                mat_file.update(mat_estimator)
+                
+            elif key == "splits":
+                mat_splits = self._save_splits(value)
+                mat_file.update(mat_splits)
+            
+        
+        return mat_file
+        
+    
+    
+    def _save_estimator(self, estimator):
+        
+        mat_ = dict()
+        mat_['weights'] = []
+        mat_['features'] = []
+        
+        for est in estimator:
+            
+            w = est.named_steps['clf'].coef_
+            mat_['weights'].append(w)
+            
+            if 'fsel' in est.named_steps.keys():
+                f = est.named_steps['fsel'].get_support()
+                mat_['features'].append(f)
+                
+        return mat_
+        
+        
+        
+    def _save_splits(self, splits):
+        
+        
+        mat_ = dict()
+        mat_['train'] = []
+        mat_['test'] = []
+        
+        for spl in splits:
+            
+            for set_ in mat_.keys():
+                mat_[set_].append(spl[set_])
+                
+        return mat_        
+        
+        
+        
+        
+        
+        
         
         
