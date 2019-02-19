@@ -2,8 +2,8 @@ import matplotlib.pyplot as pl
 import numpy as np
 import os
 from mvpa_itab.conn.operations import copy_matrix, array_to_matrix
-from mvpa_itab.conn.states.utils import get_centroids
 from sklearn.manifold.mds import MDS
+from mvpa_itab.conn.states.utils import get_centroids
 
 def plot_states_matrices(X, 
                          labels,
@@ -26,7 +26,7 @@ def plot_states_matrices(X,
     position = [sum(node_number[:i+1]) for i in range(len(node_number))]
     
     if not use_centroid:
-        centroids = get_centroids(X, labels)
+        centroids = get_centroids(X, labels)(X, labels)
         n_states = len(np.unique(labels))
     else:
         centroids = X.copy()
@@ -35,7 +35,7 @@ def plot_states_matrices(X,
     
     position_label = [-0.5+position[i]-node_number[i]/2. for i in range(len(node_number))]
     n_rows = np.ceil(n_states / float(n_cols))
-    print n_rows, n_cols
+
     fig = pl.figure()
         
     for i in np.arange(n_states):
@@ -44,7 +44,7 @@ def plot_states_matrices(X,
         
         matrix_ = copy_matrix(array_to_matrix(centroids[i]), diagonal_filler=0)
         n_nodes = matrix_.shape[0]
-        ax.imshow(matrix_, interpolation='nearest', vmin=0, cmap=pl.cm.inferno)
+        ax.imshow(matrix_, interpolation='nearest', vmin=0, cmap=pl.cm.bwr)
         for _, end_network in zip(node_networks, position):
             ax.vlines(end_network-0.5, -0.5, n_nodes-0.5)
             ax.hlines(end_network-0.5, -0.5, n_nodes-0.5)
@@ -97,7 +97,7 @@ def plot_center_matrix(X, clustering, n_cluster=5, **kwargs):
             matrix = copy_matrix(array_to_matrix(matrix), diagonal_filler=0)
             total_nodes = matrix.shape[0]
             ax.imshow(matrix, interpolation='nearest', vmin=0)
-            for name, n_nodes in zip(node_networks, position):
+            for _, n_nodes in zip(node_networks, position):
                 ax.vlines(n_nodes-0.5, -0.5, total_nodes-0.5)
                 ax.hlines(n_nodes-0.5, -0.5, total_nodes-0.5)
             ax.set_xticks(position_label)
@@ -200,8 +200,7 @@ def plot_dynamics(state_dynamics, condition, path, **kwargs):
         fname = os.path.join(path, fname)
         pl.savefig(fname)
         
-    pl.close('all')
-    return 
+    pl.close('all') 
 
 
 
@@ -225,7 +224,7 @@ def plot_frequencies(state_frequency, condition, path):
         pl.savefig(fname)
         
     pl.close('all')
-    return         
+       
     
 
   
@@ -240,7 +239,7 @@ def plot_positions(dict_centroids, **kwargs):
     
     configuration.update(kwargs)
         
-    X_c = [v for k, v in dict_centroids.iteritems()]
+    X_c = [v for _, v in dict_centroids.iteritems()]
     
     X_c = np.vstack(X_c)
     

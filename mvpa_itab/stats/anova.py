@@ -148,14 +148,14 @@ def anova_ftest(data, design_matrix, contrast, const_term, mask_index):
         res = sm.OLS(data[x, y, z], design_matrix).fit()
         try:
             f_test = res.f_test(contrast)
-        except Exception, e:
+        except Exception as e:
             failed += 1
             continue
         values_ = [f_test.fvalue.squeeze(), 1 - f_test.pvalue]
         
         result_map[x,y,z] = np.array(values_)
     
-    print failed
+    print(failed)
       
     return result_map
 

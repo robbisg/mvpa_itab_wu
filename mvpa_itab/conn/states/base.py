@@ -178,7 +178,7 @@ class PeakDensityClustering(BaseEstimator, ClusterMixin, TransformerMixin):
             
         self.perc = percentage
         self.cluster_threshold = cluster_threshold
-        
+        self.labels_ = None
         self.rhofx = rhofx
         
         
@@ -296,7 +296,6 @@ class PeakDensityClustering(BaseEstimator, ClusterMixin, TransformerMixin):
             
             if clustering[i] != clustering[j] and dist[i,j] <= dc:
                 rho_aver = 0.5*(rho[i]+rho[j])
-                print i,j, rho_aver
     
                 idc = np.argwhere(cluster_idx == clustering[i])
                 if rho_aver > bord_rho[idc]:

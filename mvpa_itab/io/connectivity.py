@@ -16,6 +16,18 @@ logger = logging.getLogger(__name__)
 
 
 
+def conn_transformer(data):
+    
+    data = np.rollaxis(np.vstack(data), 0 ,3)
+    data = data[np.triu_indices(data.shape[0], k=1)].T
+    logger.debug(data.shape)
+    
+    return data
+    
+
+
+
+
 def load_meg_seed_ds(conf_file, task, prepro=Node(), **kwargs):
     
     # TODO: conf file should include the full path
@@ -55,7 +67,9 @@ def load_meg_seed_ds(conf_file, task, prepro=Node(), **kwargs):
             
         
         del ds
-
+    
+    ds_merged.a['prepro'] = prepro.get_names()
+    
     return ds_merged
 
 
@@ -66,7 +80,11 @@ def load_mat_data(path, subj, folder, **kwargs):
     
     from scipy.io import loadmat
     
+    meg_transformer = {'connectivity': conn_transformer,
+                       'power': lambda data: np.vstack(data)}
+    
     key = kwargs['mat_key']
+    transformer = meg_transformer[kwargs['transformer']]
     
     # load data from mat
     filelist = load_filelist(path, subj, folder, **kwargs)
@@ -79,14 +97,8 @@ def load_mat_data(path, subj, folder, **kwargs):
         datum = mat[key]
         logger.debug(datum.shape)
         data.append(mat[key])
-
-    #data = np.hstack([d for d in np.vstack(data)]).T
     
-    data = np.rollaxis(np.vstack(data), 0 ,3)
-    data = data[np.triu_indices(data.shape[0], k=1)].T
-    logger.debug(data.shape)
-    
-    return data
+    return transformer(data)
 
 
 
@@ -193,6 +205,7 @@ def load_connectivity_ds(path, subjects, extra_sa_file=None):
     return ds
 
 
+
 def add_subject_attributes(ds, extra_sa, ds_key='subject'):
     """
     ds_key is a key that should be shared 
@@ -241,7 +254,7 @@ def load_txt_matrices(path, subjects):
             
             subj_attributes = get_txt_metadata(mat)
             
-            for k, v in subj_attributes.iteritems():
+            for k, v in subj_attributes.items():
                 if k in attributes.keys():
                     attributes[k].append(v)
                 else:

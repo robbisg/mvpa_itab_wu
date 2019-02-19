@@ -1,5 +1,5 @@
 import os
-import cPickle as pickle
+import _pickle as pickle
 import numpy as np
 from scipy.spatial.distance import euclidean
 
@@ -9,6 +9,7 @@ from nitime.timeseries import TimeSeries
 from nitime.analysis import SpectralAnalyzer
 from mvpa_itab.similarity.analysis import SeedAnalyzer
 from mvpa_itab.conn.states.base import cluster_state
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -48,8 +49,7 @@ def get_data(filename):
 def save_data(X, key, filename):
     logger.info("Saving %s data: %s" %(key, filename))
     savemat(filename, {key: X})
-    
-    return
+
 
 
 
@@ -190,7 +190,7 @@ def get_state_frequencies(state_dynamics, method='spectrum_fourier'):
         S = SpectralAnalyzer(ts)
         try:
             result = getattr(S, method)
-        except AttributeError, _:
+        except AttributeError as  _:
             result = S.spectrum_fourier
         
         results.append(result)

@@ -58,7 +58,7 @@ for k, image_stack in images_.iteritems():
         # Downsample if necessary
         
         if k in ['SPM', 'FSL']:
-            print k
+            print(k)
             rimage = resample(image, 4)
             rimage = np.pad(rimage, ((9, 9), (9,9)), mode='minimum')
             image = rimage.copy()
@@ -77,8 +77,8 @@ for name, fx in dict_functions.iteritems():
         if k not in target:
             try:
                 m = fx(np.int_(image_stack[:6,...].flatten()), images_['LF'].flatten())
-            except Exception, err:
-                print name, err
+            except Exception as err:
+                print(name, err)
                 continue
             stack_.append((k, m))
         
@@ -408,7 +408,7 @@ for off in prod:
     value56_ = lines[-56]
     try:
         results[off[1], off[2], off[3], (off[0]/3-2)] = np.float(value3_)
-    except Exception, exc:
+    except Exception as exc:
         results[off[1], off[2], off[3], (off[0]/3-2)] = np.float(value56_)
         continue
     
@@ -424,7 +424,7 @@ for f in lista_file:
     input_ = input_ = os.path.join(path, f)
     output_ = os.path.join(path,'%s_cp.tif' %(f[:-4]))
     convert_ = 'tiffcp -r 1 -c none %s %s' % (input_, output_)
-    print convert_
+    print(convert_)
     os.system(convert_)
 
 
@@ -447,8 +447,8 @@ for name, fx in selected_functions.iteritems():
     try:
         m = fx(histogram_fina[:gray_level, :gray_level].flatten(), 
                histogram_init[:gray_level, :gray_level].flatten())
-    except Exception, err:
-        print name, err
+    except Exception as err:
+        print (name, err)
         continue
         
     metrics_.append((name, m))

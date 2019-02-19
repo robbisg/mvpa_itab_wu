@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import itertools
 import numpy as np
@@ -71,8 +73,8 @@ def load_beta_subjects(path, subjects, **kwargs):
     img_list = []
     
     key_dict = dict(zip(default_conf.keys(), range(len(default_conf.keys()))))
-    print key_dict
-    print default_conf
+    print(key_dict)
+    print(default_conf)
     
     for elements in conf_product:
         
@@ -197,7 +199,7 @@ def load_total_subjects(path, subject, **kwargs):
     default_conf.update(kwargs)
     default_conf['subject'] = subject
     file_pattern = default_conf.pop("file_pattern")
-    print file_pattern
+    print(file_pattern)
     conf_product = itertools.product(*default_conf.values())
     
     
@@ -206,8 +208,8 @@ def load_total_subjects(path, subject, **kwargs):
     img_list = []
     
     key_dict = dict(zip(default_conf.keys(), range(len(default_conf.keys()))))
-    print key_dict
-    print default_conf
+    print(key_dict)
+    print(default_conf)
     
     for elements in conf_product:
         

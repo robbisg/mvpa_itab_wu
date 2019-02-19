@@ -85,7 +85,7 @@ def load_mat_dataset(datapath, bands, conditions, networks=None):
             for m in masked_mat:
                 m[il] = 0
 
-                #samples = np.array([m[il] = 0 for m in masked_mat])
+            #samples = np.array([m[il] = 0 for m in masked_mat])
             samples = np.array([m[np.nonzero(m)] for m in masked_mat])
             targets = [cond for i in samples]
 

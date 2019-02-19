@@ -1,0 +1,143 @@
+3dLME -model 'level' 
+-prefix 'level_covariate_ofp' 
+-qVars 'level' 
+-ranEff '~1' 
+-SS_type '3' 
+-dataTable 
+Subj  level  InputFile 
+s01  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[0] 
+s02  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[1] 
+s03  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[2] 
+s04  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[3] 
+s05  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[4] 
+s06  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[5] 
+s07  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[6] 
+s08  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[7] 
+s09  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[8] 
+s10  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[9] 
+s11  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[10] 
+s12  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[11] 
+s13  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[12] 
+s14  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[13] 
+s15  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[14] 
+s16  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[15] 
+s17  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[16] 
+s18  1  accuracy_map_radius_3_sl_all_subj_mean_evidence_1.nii.gz[17] 
+s01  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[0] 
+s02  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[1] 
+s03  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[2] 
+s04  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[3] 
+s05  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[4] 
+s06  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[5] 
+s07  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[6] 
+s08  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[7] 
+s09  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[8] 
+s10  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[9] 
+s11  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[10] 
+s12  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[11] 
+s13  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[12] 
+s14  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[13] 
+s15  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[14] 
+s16  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[15] 
+s17  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[16] 
+s18  2  accuracy_map_radius_3_sl_all_subj_mean_evidence_2.nii.gz[17] 
+s01  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[0] 
+s02  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[1] 
+s03  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[2] 
+s04  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[3] 
+s05  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[4] 
+s06  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[5] 
+s07  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[6] 
+s08  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[7] 
+s09  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[8] 
+s10  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[9] 
+s11  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[10] 
+s12  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[11] 
+s13  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[12] 
+s14  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[13] 
+s15  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[14] 
+s16  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[15] 
+s17  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[16] 
+s18  3  accuracy_map_radius_3_sl_all_subj_mean_evidence_3.nii.gz[17]
+
+
+3dMVM  -prefix carlo_memory \
+       -bsVars  'group' \
+       -wsVars "level"         \
+       -SS_type 2 -num_glf 2 \
+       -glfLabel 1 omnibus_level -glfCode 1 'level : 1*level_1 & 1*level_3 & 1*level_5' \
+       -glfLabel 2 omnibus_all -glfCode 2 'level : 1*level_1 -1*level_3 & 1*level_3 -1*level_5' \
+       -dataTable \
+       Subj  group  level  InputFile \
+        s01  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[0] \
+        s02  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[1] \
+        s03  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[2] \
+        s04  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[3] \
+        s05  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[4] \
+        s06  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[5] \
+        s07  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[6] \
+        s08  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[7] \
+        s09  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[8] \
+        s10  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[9] \
+        s11  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[10] \
+        s12  group_1  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[11] \
+        s13  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[12] \
+        s14  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[13] \
+        s15  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[14] \
+        s16  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[15] \
+        s17  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[16] \
+        s18  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[17] \
+        s19  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[18] \
+        s20  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[19] \
+        s21  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[20] \
+        s22  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[21] \
+        s23  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[22] \
+        s24  group_2  level_1  sl_group_decision_evidence_1_demeaned.nii.gz[23] \
+        s01  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[0] \
+        s02  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[1] \
+        s03  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[2] \
+        s04  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[3] \
+        s05  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[4] \
+        s06  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[5] \
+        s07  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[6] \
+        s08  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[7] \
+        s09  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[8] \
+        s10  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[9] \
+        s11  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[10] \
+        s12  group_1  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[11] \
+        s13  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[12] \
+        s14  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[13] \
+        s15  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[14] \
+        s16  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[15] \
+        s17  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[16] \
+        s18  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[17] \
+        s19  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[18] \
+        s20  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[19] \
+        s21  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[20] \
+        s22  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[21] \
+        s23  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[22] \
+        s24  group_2  level_3  sl_group_decision_evidence_3_demeaned.nii.gz[23] \
+        s01  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[0] \
+        s02  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[1] \
+        s03  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[2] \
+        s04  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[3] \
+        s05  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[4] \
+        s06  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[5] \
+        s07  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[6] \
+        s08  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[7] \
+        s09  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[8] \
+        s10  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[9] \
+        s11  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[10] \
+        s12  group_1  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[11] \
+        s13  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[12] \
+        s14  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[13] \
+        s15  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[14] \
+        s16  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[15] \
+        s17  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[16] \
+        s18  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[17] \
+        s19  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[18] \
+        s20  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[19] \
+        s21  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[20] \
+        s22  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[21] \
+        s23  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[22] \
+        s24  group_2  level_5  sl_group_decision_evidence_5_demeaned.nii.gz[23] \

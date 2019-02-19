@@ -161,13 +161,29 @@ for s in subjects:
     os.system(command)
     
     
-    
-    
-    
-    
-    
+###### MDM Rescue ######
+import os
+import numpy as np
 
 
+path_remote = '/home/robbis/mount/meg_carlo/Carlo_MDM/'
+path_local = "/media/robbis/DATA/fmri/carlo_mdm/"
+subdirs = ["RESIDUALS_MVPA/", "RESIDUALS_MVPA/SINGLE_TRIALS/"]
+files_ext = ['nii', 'nii.gz', 'txt']
 
 
-    
+subjects = os.listdir(path_remote)
+subjects = [s for s in subjects if s[0] == '1']
+subjects.sort()
+
+rm_cmd = ""
+
+for s in subjects:
+    for subdir in subdirs:
+        orig_dir = os.path.join(path_remote, s, subdir)
+        for ext in files_ext:
+            #command = "cp --parents %s* %s" % (os.path.join(s,subdir), path)
+            command = "cp --parents %s*.%s %s" % (os.path.join(s, subdir), ext, path_local)
+            print(command)
+            #os.system(command)
+

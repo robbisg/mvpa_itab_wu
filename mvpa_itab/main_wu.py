@@ -49,7 +49,7 @@ def balance_dataset_timewise(ds, label, sort=True, **kwargs):
                  4*((ds.sa.events_number[m_fixation]+2)/4 - 1 )+2)
     ####################################################
     
-    ev_fix=np.array(ev_fix)
+    ev_fix = np.array(ev_fix)
     ds.sa.events_number[m_fixation] = np.int_(ev_fix.T[1])
     arg_sort = np.argsort(ds.sa.events_number)
     events = find_events(chunks = ds[arg_sort].sa.chunks, 
@@ -446,7 +446,7 @@ def spatial(ds, **kwargs):
     # If classifier didn't have sensitivity
     try:
         sensana = fclf.get_sensitivity_analyzer()
-    except Exception, err:
+    except Exception as err:
         allowed_keys = ['map', 'sensitivities', 'stats', 
                         'mapper', 'classifier', 'ds_src', 
                         'perm_pvalue', 'p']
@@ -578,11 +578,11 @@ def spatiotemporal(ds, **kwargs):
     logger.info('Cross validation is performing ...')
     res = cvte(evds)
     
-    print cvte.ca.stats 
+    print(cvte.ca.stats)
     
     
     if permutations != 0:
-        print cvte.ca.null_prob.samples
+        print(cvte.ca.null_prob.samples)
         dist_len = len(cvte.null_dist.dists())
         err_arr = np.zeros(dist_len)
         for i in range(dist_len):
@@ -598,7 +598,7 @@ def spatiotemporal(ds, **kwargs):
     try:
         sensana = fclf.get_sensitivity_analyzer()
         res_sens = sensana(evds)
-    except Exception, err:
+    except Exception as err:
         allowed_keys = ['map', 'sensitivities', 'stats', 
                         'mapper', 'classifier', 'ds', 
                         'perm_pvalue', 'p']
@@ -649,7 +649,7 @@ def spatiotemporal(ds, **kwargs):
         if elem in allowed_keys:
             results[elem] = results_dict[elem]
         else:
-            print '******** '+elem+' result is not allowed! *********'
+            print('******** '+elem+' result is not allowed! *********')
 
     return results
 

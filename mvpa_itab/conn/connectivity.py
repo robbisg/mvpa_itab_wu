@@ -1,4 +1,6 @@
 # pylint: disable=maybe-no-member, method-hidden
+from __future__ import print_function
+
 import nitime.analysis as nta
 import nitime.fmri.io as io
 
@@ -43,7 +45,7 @@ def analyze_connectivity(imagelist, path_roi, roi_names, ts_param, **kwargs):
                ]
     '''
     #roi_names = np.loadtxt('/media/DATA/fmri/learning/roi_labels', dtype=np.str)
-    print 'Length of image list is '+str(len(imagelist))
+    print('Length of image list is '+str(len(imagelist)))
     volume_shape = imagelist[0].get_data().shape[:-1]
     n_shape = list(volume_shape)
     n_shape.append(-1)
@@ -52,7 +54,6 @@ def analyze_connectivity(imagelist, path_roi, roi_names, ts_param, **kwargs):
     
     data_arr = []
     for roi in roi_list:
-        #print roi
         r_mask = ni.load(os.path.join(path_roi, roi))
         mask = r_mask.get_data().squeeze()
         roi_filt = roi_names[roi_names.T[1] == roi]
@@ -60,7 +61,7 @@ def analyze_connectivity(imagelist, path_roi, roi_names, ts_param, **kwargs):
             
             roi_m = np.int_(roi_filt.T[2]) == label
             if roi_m.any():
-                print 'Loading voxels from '+roi_filt[roi_m].T[0][0]
+                print('Loading voxels from '+roi_filt[roi_m].T[0][0])
                 time_serie = io.time_series_from_file([f.get_filename() for f in imagelist], \
                                                       coords[mask==label].T, \
                                                       TR=float(TR), \
@@ -139,7 +140,7 @@ def remove_bold_effect(bold_ts, distance_ts, ts_param, **kwargs):
     
     diff = rl - dl
        
-    print distance_ts.data.shape
+    print(distance_ts.data.shape)
     deconv_ts = []
     for i in range(n_roi):
         deconv_distance = []
@@ -179,7 +180,7 @@ def get_bold_timeserie(imagelist, path_roi, roi_names, ts_param, detrend=False, 
     #roi_list = os.listdir(path_roi)
     #roi_list = [r for r in roi_list if r.find('.hdr') != -1 or r.find('nii.gz') != -1]
     
-    print 'Length of image list is '+str(len(imagelist))
+    print('Length of image list is '+str(len(imagelist)))
     volume_shape = imagelist[0].get_data().shape[:-1]
     n_shape = list(volume_shape)
     n_shape.append(-1)
@@ -189,20 +190,17 @@ def get_bold_timeserie(imagelist, path_roi, roi_names, ts_param, detrend=False, 
     
     data_arr = []
     for roi in np.unique(roi_names.T[-2]):
-        #print roi
-        # roi_names.T[1][i]
+
         roi_name = roi
-        #print roi_name
-        #network_name = roi[0]
+
         r_mask = ni.load(os.path.join(path_roi, roi_name, roi_name+'_separated_3mm.nii.gz'))
         mask = r_mask.get_data().squeeze()
         roi_filt = roi_names[roi_names.T[-2] == roi_name]
-        #print roi_filt
         for label in np.int_(np.unique(mask)[1:]):
             roi_m = np.int_(roi_filt.T[-1]) == label
             
             if roi_m.any():
-                print 'Loading voxels from '+roi_filt[roi_m].T[2][0]
+                print('Loading voxels from '+roi_filt[roi_m].T[2][0])
                 time_serie = io.time_series_from_file([f.get_filename() for f in imagelist], \
                                                       coords[mask==label].T, \
                                                       TR=float(TR), \
@@ -227,11 +225,6 @@ def get_bold_timeserie(imagelist, path_roi, roi_names, ts_param, detrend=False, 
                         data_new.append(z_vt)
                         
                     time_serie.data = np.vstack(data_new)
-                    
-                '''
-                if ts_param['average'] == True:
-                    ts_new = np.mean(time_serie.data, axis=0)
-                '''   
                 
                 data_arr.append(time_serie.data)
 
@@ -264,7 +257,7 @@ def get_similarity_timeserie(path, name, condition, time, **kwargs):
     total_data = []
     for f in file_list:
         
-        print os.path.join(path, f)
+        print(os.path.join(path, f))
         
         data = np.loadtxt(os.path.join(path, f), delimiter=',')
         data = np.sqrt(data.T)
@@ -318,7 +311,7 @@ def get_condition_timeserie(ts, paradigm,
             general_mask = mask_cond * mask_run
             assert general_mask.shape[0] == ts.data.shape[1]
             ts_data = ts.data[:,general_mask]
-            print ts_data.shape
+            print(ts_data.shape)
             ts_dummy.append(ts_data)
         
         ts_dummy = np.array(ts_dummy)
@@ -479,12 +472,7 @@ def save_matrices(path, results, gsr='gsr', atlas='findlab'):
                 
                 np.savetxt(path_fn, matrices[i], fmt='%.4f')
 
-
-
-
-   
-
-    
+ 
      
 def z_fisher(r):
     
