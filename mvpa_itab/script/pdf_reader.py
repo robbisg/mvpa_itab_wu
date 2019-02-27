@@ -116,16 +116,17 @@ def process_info(info):
     return item
 
 
-
+command = 'curl -LH "Accept: text/bibliography; style=bibtex" http://dx.doi.org/10.1101/086637'
 
 import glob
 import PyPDF2
+from tqdm import tqdm
 path = "/home/robbis/Downloads/"
 pdf_list = glob.glob("%s/*.pdf" % (path))
 
 db = dict()
 rejected = dict()
-for f in pdf_list:
+for f in tqdm(pdf_list):
     
     info = getInfo(f)
     if info == None:
@@ -146,3 +147,7 @@ for f, items in db.items():
     new_filename = "%s_%s_%s.pdf" % (items['Author'], items['Year'], items['Journal'])
     command = "mv %s %s" % (f, os.path.join(path, new_filename))
     print(command)
+
+
+path = "/home/robbis/Copy/MEGAsync/SyncDebris/2019-02-26/"
+pdf_list = glob.glob("%s/*.pdf" % (path))
