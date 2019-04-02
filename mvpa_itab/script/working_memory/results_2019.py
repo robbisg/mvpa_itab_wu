@@ -26,7 +26,7 @@ for dir_id in dirs:
              kind="line", legend="full", data=dataframe)
 
         f.axes[0][0].set_ylim(.45, .8)
-        f.savefig("/media/robbis/DATA/fmri/working_memory/figures/2019/%s.png" % (dir_id))
+        #f.savefig("/media/robbis/DATA/fmri/working_memory/figures/2019/%s.png" % (dir_id))
 
 #########################################################################
 from pyitab.utils.atlas import get_atlas_info

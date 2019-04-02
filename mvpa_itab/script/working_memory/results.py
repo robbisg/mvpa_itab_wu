@@ -617,6 +617,13 @@ dataframe_full = dict()
 def probability(x):
         return np.int_(np.mean(x) > .55)
 
+dirs = [
+        #"wm_mpsi_norm_abs", 
+        #"wm_mpsi_norm_sign", 
+        "wm_mpsi_norm_detr",
+        #"wm_power_full_k",
+        "wm_power_norm"
+        ]
 
 frames = []
 for dir_id in dirs:
@@ -636,33 +643,41 @@ task_dict = {'71cff912-51fb-4b15-860c-127600c42cf3':'Power',
 task = [task_dict[id_] for id_ in df_merged['id'].values]
 df_merged['measure'] = task
 
-f = sns.relplot(x="k", y="score_accuracy", row="band", col="measure", hue="targets",
-        height=5, aspect=.75, facet_kws=dict(sharex=False),
-        kind="line", legend="full", data=df_merged)
-
-f.axes[0][0].set_ylim(.4, .85)
-#
+colors = {'rest_2back': 'darkgray','0back_rest': 'silver' ,'0back_2back':'royalblue'}
+col_order = ['theta', 'alpha', 'beta', 'gamma']
+hue_order = ['rest_2back', '0back_rest', '0back_2back']
 
 
+f = sns.relplot(x="k", y="score_accuracy", row="measure", col="band", hue="targets",
+        height=5, aspect=.75, facet_kws=dict(sharex=False), col_order=col_order,
+        kind="line", legend="full", data=df_merged, palette=colors, hue_order=hue_order)
+
+f.axes[0][0].set_ylim(.4, .81)
 
 
 for i, t in enumerate(['MPSI', 'Power']):
-    for j, band in enumerate(np.unique(df_merged['band'].values)):
-        for k, target in enumerate(np.unique(df_merged['targets'])):
-            
-            ax = f.axes[j][i]
-            
-            df = filter_dataframe(df_merged, measure=[t], band=[band], targets=[target])
-            df_avg = df_fx_over_keys(df, 
-                                     attr='score_accuracy',
-                                     keys=['k'], 
-                                     fx= np.mean)
-            values = np.int_(df_avg['score_accuracy'].values >= .55)
-            kk = df_avg['k'].values
-            values = values * (.80 + k/50.)
-            values[values == 0] = np.nan
-            ax.plot(kk, values, 'o', c=ax.get_children()[k+3].get_color())
+    for j, band in enumerate(col_order):
+        #for k, target in enumerate(np.unique(df_merged['targets'])):
 
-f.savefig("/media/robbis/DATA/fmri/working_memory/figures/ohbm.png", dpi=150)
+        k = 0
+        target = "0back_2back"
+
+        ax = f.axes[i][j]
+        
+        df = filter_dataframe(df_merged, measure=[t], band=[band], targets=[target])
+        df_avg = df_fx_over_keys(df, 
+                                    attr='score_accuracy',
+                                    keys=['k'], 
+                                    fx= np.mean)
+        values = np.int_(df_avg['score_accuracy'].values >= .55)
+        kk = df_avg['k'].values
+        values = values * (.80 + k/50.)
+        values[values == 0] = np.nan
+        #ax.plot(kk, values, 'o', c=ax.get_children()[k+3].get_color())
+        ax.plot(kk, values, 'o', c="royalblue")
+
+
+
+f.savefig("/media/robbis/DATA/fmri/working_memory/figures/2019_power_mpsi_blue.png", dpi=150)
 
 
