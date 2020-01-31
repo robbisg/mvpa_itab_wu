@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import nibabel as ni
 import numpy as np
@@ -84,9 +86,9 @@ class ResultsCollection(object):
             for saver in result.savers:
                 saver.save(subj_path, result)
         else:
-            print result.__class__
-            print type(result)
-            print SubjectResult
+            logger.debug(result.__class__)
+            logger.debug(type(result))
+            logger.debug(SubjectResult)
             
                 
     
@@ -246,7 +248,7 @@ class SimilaritySummarizer(Summarizer):
             fig = pl.figure()
             
             for i, k_ in enumerate(self._items):
-                print i, len(self._items)
+                logger.debug(i, len(self._items))
                 ax = fig.add_subplot(len(self._items),1,(i+1))
                 
                 for p in self._unique_predictions:
@@ -393,7 +395,7 @@ class DecodingSaver(Saver):
         for obj_name in self._fields:
             try:
                 obj = getattr(result, '_'+obj_name)
-            except AttributeError, err:
+            except AttributeError as err:
                 logger.error(err)
                 continue
             if obj_name == 'classifier':
@@ -537,7 +539,7 @@ class SimilaritySaver(Saver):
         file_ = open(os.path.join(path ,fname), 'w')
         try:
             file_.write(str(cmatrix_mahala))
-        except ValueError,err:
+        except ValueError as err:
             file_.write('None')
             logging.error(err)
         

@@ -7,12 +7,12 @@ import cPickle as pickle
 def demeaned():
     
     conf = {'path':'/media/robbis/DATA/fmri/movie_viviana/',
-              'filetype' : 'masked',
-              'fname': 'mat_corr_sub_%s.mat',
-              'conditions' : ['movie', 'scramble', 'rest'],
-              'state_res_fname' : "clustering_labels_%s_maxk_%s_%s_%s.pyobj",
-              'max_k':15,
-              'method':'speed'                 
+            'filetype' : 'masked',
+            'fname': 'mat_corr_sub_%s.mat',
+            'conditions' : ['movie', 'scramble', 'rest'],
+            'state_res_fname' : "clustering_labels_%s_maxk_%s_%s_%s.pyobj",
+            'max_k':15,
+            'method':'speed'                 
             }
  
     filename = os.path.join(conf['path'], conf['filetype'], conf['fname'])

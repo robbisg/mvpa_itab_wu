@@ -2,7 +2,7 @@ import numpy as np
 import os
 from mvpa_itab.stats.base import Correlation
 from mvpa_itab.measure import ranking_correlation
-from sklearn.cross_validation import ShuffleSplit
+from sklearn.model_selection import ShuffleSplit
 from sklearn.svm.classes import SVR
 from sklearn.metrics.regression import mean_squared_error
 from mvpa_itab.measure import correlation

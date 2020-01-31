@@ -8,176 +8,6 @@ from scipy.stats.stats import zscore
 
 
 
-def find_roi_center(img, roi_value):
-    """
-    This function gives the x,y,z coordinates of a particular ROI using
-    the given segmented image and the image level value used to select the ROI.
-    
-    Parameters
-    ----------
-    img : nibabel Nifti1Image instance
-        The Nifti1Image instance of the segmented image.
-    roi_value : int
-        The value of the ROI as represented in the segmented image
-        
-    Returns
-    -------
-    xyz : tuple
-        A triplets representing the xyz coordinate of the selected ROI.
-    """
-    
-    
-    affine = img.get_affine()
-    
-    mask_ = np.int_(img.get_data()) == roi_value
-    ijk_coords = np.array(np.nonzero(mask_)).mean(1)
-    
-    xyz_coords = ijk_coords * affine.diagonal()[:-1] + affine[:-1,-1]
-    
-    return xyz_coords
-
-
-
-def get_atlas90_coords():
-    """
-    Function used to obtain coordinates of the ROIs contained in the AAL90 atlas.
-    The atlas used is the 2mm nifti version of the atlas.
-    
-    Returns
-    -------
-    coords : n x 3 numpy array
-        The array containing n xyz coordinates in MNI space, one for each unique value of the atlas
-    """
-    atlas90 = ni.load('/media/robbis/DATA/fmri/templates_AAL/atlas90_mni_2mm.nii.gz')
-    coords = [find_roi_center(atlas90, roi_value=i) for i in np.unique(atlas90.get_data())[1:]]
-    
-    return np.array(coords)
-
-
-
-def get_findlab_coords():
-    """
-    Function used to obtain coordinates of the networks contained in the findlab atlas.
-    The atlas used is the 2mm nifti version of the atlas.
-    
-    Returns
-    -------
-    coords : n x 3 numpy array
-        The array containing n xyz coordinates in MNI space, one for each unique value of the atlas
-    """
-    roi_list = os.listdir('/media/robbis/DATA/fmri/templates_fcmri/0_findlab/')
-    roi_list.sort()
-    findlab = [ni.load('/media/robbis/DATA/fmri/templates_fcmri/0_findlab/'+roi) for roi in roi_list]
-    f_coords = []
-    for img_ in findlab:
-        f_coords.append(np.array([find_roi_center(img_, roi_value=np.int(i)) for i in np.unique(img_.get_data())[1:]]))
-        
-    return np.vstack(f_coords)
-           
-
-
-
-
-def get_atlas_info(atlas_name, background='black'):
-    
-    """
-    Utility function used to load informations about the atlas used
-    
-    Parameters
-    ----------
-    
-    atlas_name : string | {'atlas90', 'findlab'}
-        A string used to understand the atlas information used for plots.
-        
-    Returns
-    -------
-    names : list of string
-        The list of ROI names.
-    
-    colors : list of string
-        The list of colors used in other functions
-    
-    index_ : list of int
-        How node values should be ordered if the atlas has another order
-        (used to separate left/right in the atlas90)
-        
-    coords : list of tuple (x,y,z)
-        Coordinates of the ROI center (used in plot_connectomics)
-        
-    networks : list of string
-        The list of network names.
-
-    """
-    
-    if atlas_name.find('atlas90') != -1 or atlas_name.find('20150') != -1:
-        coords = get_atlas90_coords()
-        roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_AAL/atlas90.cod',
-                              delimiter='=',
-                              dtype=np.str)
-        names = roi_list.T[1]
-        names_inv = np.array([n[::-1] for n in names])
-        index_ = np.argsort(names_inv)
-        names_lr = names[index_]
-        dict_ = {'L':'#89CC74', 'R':'#7A84CC'}
-        colors_lr = np.array([dict_[n[:1]] for n in names_inv])    
-        names = np.array([n.replace('_', ' ') for n in names])
-        networks = names
-
-    
-    elif atlas_name.find('findlab') != -1 or atlas_name.find('2014') != -1:
-        coords = get_findlab_coords()
-        roi_list = np.loadtxt('/media/robbis/DATA/fmri/templates_fcmri/findlab_rois.txt', 
-                      delimiter=',',
-                      dtype=np.str)
-        networks = roi_list.T[-2]
-        names = roi_list.T[2]
-        
-        dict_ = {'Auditory':'lightgray', 
-                 'Basal_Ganglia':'honeydew', 
-                 'LECN':'tomato',
-                 'Language':'darkgrey', 
-                 'Precuneus':'teal',
-                 'RECN':'lightsalmon', 
-                 'Sensorimotor':'plum', 
-                 'Visuospatial':'slateblue', 
-                 'anterior_Salience':'yellowgreen',
-                 'dorsal_DMN':'lightsteelblue', 
-                 'high_Visual':'khaki', 
-                 'post_Salience':'mediumseagreen', 
-                 'prim_Visual':'gold',
-                 'ventral_DMN':'lightblue'
-                 }
-        """
-        dict_ = {'Auditory':'silver', 
-                 'Basal_Ganglia':'white', 
-                 'LECN':'red',
-                 'Language':'darkorange', 
-                 'Precuneus':'green',
-                 'RECN':'plum', 
-                 'Sensorimotor':'gold', 
-                 'Visuospatial':'blueviolet', 
-                 'anterior_Salience':'beige',
-                 'dorsal_DMN':'cyan', 
-                 'high_Visual':'yellow', 
-                 'post_Salience':'lime', 
-                 'prim_Visual':'magenta',
-                 'ventral_DMN':'royalblue'
-                 }
-        """
-        if background == 'white':
-            dict_['anterior_Salience'] = 'gray'
-            dict_['Basal_Ganglia'] = 'black'
-        
-        
-        colors_lr = np.array([dict_[r.T[-2]] for r in roi_list])
-        index_ = np.arange(90)
-        
-    return names, colors_lr, index_, coords, networks
-
-   
-  
-
-        
 def network_connections(matrix, label, roi_list, method='within'):
     """
     Function used to extract within- or between-networks values
@@ -190,11 +20,12 @@ def network_connections(matrix, label, roi_list, method='within'):
     else:
         mask2 = roi_list != label
     
-    matrix_mask = np.meshgrid(mask1, mask1)[1] * np.meshgrid(mask2, mask2)[0]
+    matrix_hori = np.meshgrid(mask1, mask1)[0] * np.meshgrid(mask2, mask2)[1]
+    matrix_vert = np.meshgrid(mask1, mask1)[1] * np.meshgrid(mask2, mask2)[0]
+
+    connections_ = matrix * (matrix_hori + matrix_vert)
     
-    connections_ = matrix * matrix_mask
-    
-    return connections_, matrix_mask
+    return connections_, matrix_hori + matrix_vert
     
 
 
@@ -220,7 +51,7 @@ def get_signed_connectome(matrix, method='negative'):
     return signed_matrix       
 
 
-def aggregate_networks(matrix, roi_list):
+def aggregate_networks(matrix, roi_list, aggregation_fx=np.sum):
     """
     Function used to aggregate matrix values using 
     aggregative information provided by roi_list
@@ -261,7 +92,7 @@ def aggregate_networks(matrix, roi_list):
         # Build the mask of the intersection between
         mask_roi = np.meshgrid(mask1, mask1)[1] * np.meshgrid(mask2, mask2)[0]
         
-        value = np.sum(matrix * mask_roi)
+        value = aggregation_fx()(matrix * mask_roi)
         #value /= np.sum(mask_roi)
         
         aggregate_matrix[x, y] = value
@@ -273,7 +104,7 @@ def aggregate_networks(matrix, roi_list):
     for i, n in enumerate(unique_rois):
         
         diag_matrix, _ = network_connections(matrix, n, roi_list)
-        aggregate_matrix[i, i] = np.sum(diag_matrix) 
+        aggregate_matrix[i, i] = aggregation_fx(diag_matrix) 
         # aggregate_matrix[i, i] = np.mean(diag_matrix) 
     
     return aggregate_matrix
@@ -315,7 +146,7 @@ def within_between(matrix, networks):
     return wb_results        
         
 
-def get_feature_weights_matrix(weights, sets, mask, indices):
+def get_feature_weights_matrix(weights, sets, mask, indices=None):
     """
     Function used to compute the average weight matrix in case of
     several cross-validation folds and feature selection for each
@@ -323,12 +154,12 @@ def get_feature_weights_matrix(weights, sets, mask, indices):
     
     Parameters
     ----------
-    weights : ndarray shape n_folds x n_selected_features
+    weights : ndarray shape=(n_folds,  n_selected_features)
         The weights matrix with the shape specified in the signature
-    sets : ndarray shape n_folds x n_selected_features
+    sets : ndarray shape=(n_folds, n_selected_features)
         This represents the index in the square matrix of the feature selected 
         by the algorithm in each cross-validation fold
-    mask : ndarray shape n_roi x n_roi 
+    mask : ndarray shape=(n_roi, n_roi)
         The mask matrix of the valid ROIs selected. Important: this matrix
         should be triangular with the lower part set to zero.
     indices : tuple
@@ -341,6 +172,9 @@ def get_feature_weights_matrix(weights, sets, mask, indices):
         square form.
     
     """
+    
+    if indices is None:
+        indices = np.nonzero(mask)
     
     
     weights = weights.squeeze()

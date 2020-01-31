@@ -22,7 +22,7 @@ from mvpa2.suite import *
 
 from numpy.random.mtrand import permutation
 from mvpa_itab.test_wu import load_subjectwise_ds
-from mvpa_itab.pipeline.partitioner import MemoryGroupSubjectPartitioner
+from mvpa_itab.pipeline.deprecated.partitioner import MemoryGroupSubjectPartitioner
 
 
 

@@ -1,6 +1,5 @@
 import numpy as np
 import scipy as sp
-import minepy
 
 def mutual_information(signal1, signal2, bins=40):
     
@@ -36,13 +35,6 @@ def joint_entropy(pdf_):
     
     return -1 * entropy_
 
-
-def mic(signal1, signal2):
-    
-    mine = minepy.MINE()
-    mine.compute_score(signal1, signal2)
-    
-    return mine.mic()
 
 
 def correlation(y_true, y_pred):

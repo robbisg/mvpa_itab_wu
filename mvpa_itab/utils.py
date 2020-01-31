@@ -10,13 +10,11 @@ import sys
 import datetime as ora
 import nibabel as ni
 import numpy as np
-import cPickle as pickle
+import _pickle as pickle
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-from mvpa2.base.hdf5 import h5load
 import logging
 import itertools
-from xlrd.biffh import XLRDError
 
 #from mvpa2.suite import h5load
       
@@ -64,10 +62,10 @@ def writeResults(experiment, list):
     timeString = timenow.strftime('%H%M')
     
     if os.listdir(path).count(newDir) == 0:
-        print 'Making new directory...'
+        print('Making new directory...')
         os.mkdir(path+time+'_'+experiment+'_'+clf)
     else:
-        print 'Directory found...'
+        print('Directory found...')
     os.mkdir(path+time+'_'+experiment+'_'+clf+'/'+timeString)
     '''Write experiment settings'''
     pathToNewDir = path+time+'_'+experiment+'_'+clf+'/'+timeString+'/'    
@@ -85,7 +83,7 @@ def writeResults(experiment, list):
     
     i = 0
     
-    resultSummaryFile = open (pathToNewDir+'0__classifier_results.txt','w')
+    resultSummaryFile = open(pathToNewDir+'0__classifier_results.txt','w')
        
        
     for elem in list:
@@ -147,7 +145,7 @@ def fidl2txt (fidlPath, outPath):
     '''
     
     
-    print 'Converting fidl file '+fidlPath+' in '+outPath
+    print('Converting fidl file '+fidlPath+' in '+outPath)
     
     fidlFile = open(fidlPath)
     
@@ -198,7 +196,7 @@ def fidl2txt (fidlPath, outPath):
             
             
             
-def fidl2txt_2(fidlPath, outPath, runs=12., vol_run=248, stim_tr=4, offset_tr=2):
+def fidl2txt_2(fidlPath, outPath, runs=12., vol_run=248, stim_tr=4, offset_tr=0):
     '''
     Fidl file event to text utility.
     
@@ -211,7 +209,7 @@ def fidl2txt_2(fidlPath, outPath, runs=12., vol_run=248, stim_tr=4, offset_tr=2)
     stim_tr: number of volumes to consider a stimulus in the trial
     offset_tr: number of volumes to eliminate at event/stimulus beginning
     '''
-    print 'Converting fidl file '+fidlPath+' in '+outPath
+    print('Converting fidl file '+fidlPath+' in '+outPath)
     
     fname, ext = fidlPath.split('.')
     
@@ -225,10 +223,11 @@ def fidl2txt_2(fidlPath, outPath, runs=12., vol_run=248, stim_tr=4, offset_tr=2)
     fidlFile = open(fidlPath, 'r')
         
     line_ = fidlFile.readline().split(delimiter)
-    line_ = [l.split(' ') for l in line_ if l!='' and l!='\r\n']
+    line_ = [l.split(' ') for l in line_ if l!='' and l!='\r\n' and l!='\n']
     line_ = list(itertools.chain(*line_))
     line_ = [l.split('\r')[0] for l in line_]
-    
+    line_ = [l.split('\n')[0] for l in line_]
+
     tokens = line_
     #tokens.reverse()
     TR = float(tokens[0])
@@ -242,7 +241,7 @@ def fidl2txt_2(fidlPath, outPath, runs=12., vol_run=248, stim_tr=4, offset_tr=2)
     
     try:
         _ = np.float_(data[0])
-    except ValueError, _:
+    except ValueError as _:
         data = data[1:]
     
     onset = np.float_(data.T[0])
@@ -267,44 +266,50 @@ def fidl2txt_2(fidlPath, outPath, runs=12., vol_run=248, stim_tr=4, offset_tr=2)
     if onset[0] != 0:
         f = 0
         while f < np.rint(onset[0]/TR):
-            outFile.write(u'FIX_00 0 0 0 0\n')
+            outFile.write(u'FIX 0 0 0 0\n')
             f = f + 1
     
     chunk_size = int(len(line_)/runs)
     r = 1
+    sum_ = 0
+    c_ = 0
     for i in range(len(onset)-1):
 
-        j = 0
+        #j = 0
         
         duration_volumes = np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR)
-        
+        sum_ += duration_volumes   
 
-            
-
-        while j < np.rint(onset[i+1]/TR) - np.rint(onset[i]/TR):
+        for j in range(int(duration_volumes)):
             
             #if (j < np.rint(duration[i]/TR)):#-1
             if (offset_tr < (j+1) <= offset_tr + stim_tr):#-1
                 #outFile.write(eventLabels[int(events[i])]+' '+str(runArr[int(events[i])])+'\n')
                 outFile.write(eventLabels[int(events[i])]+' '
-                                            +str(i/chunk_size)+' '  #Chunk
-                                            +str(int(r/vol_run))+' '#Run
-                                            +str(i)+' '             #Event
-                                            +str(j+1)+'\n')         #Frame
+                                            +str(int(i/chunk_size))+' '  #Chunk
+                                            +str(int(r/vol_run))+' '     #Run
+                                            +str(i)+' '                  #Event
+                                            +str(j+1)+'\n')              #Frame
             else:
                 #outFile.write(u'fixation '+str(runArr[int(events[i])])+'\n')
-                outFile.write(u'FIX_00 '
-                              +str(i/chunk_size)+' '
+                outFile.write(u'FIX '
+                              +str(int(i/chunk_size))+' '
                               +str(int(r/vol_run))+' '     #Run
                               +str(i)+' '
                               +str(j+1)+'\n')
-            j = j + 1
+            #j = j + 1
             r = r + 1
+
+            c_ += 1
+        print(i)
+        print()
+        print(c_ - sum_)
         
         if r == vol_run:
             r = 0
 
-            
+    print(sum_)
+    print(c_)
     outFile.close()   
 
 
@@ -315,7 +320,7 @@ def extract_events_xls(filename, sheet_name):
     book = xlrd.open_workbook(filename)
     try:
         sh = book.sheet_by_name(sheet_name)
-    except XLRDError, e:
+    except XLRDError as e:
         raise XLRDError(e)
     
     onset = sh.col(0)
@@ -487,7 +492,7 @@ def enhance_attributes_ofp(filename, current_header=['targets', 'run', 'chunks',
     np.savetxt(fname, attr_, fmt='%s')
 
 
-def enhance_attributes_memory(filename, current_header=['targets', 'chunks', 'trial', 'frame']):
+def enhance_attributes_memory(filename, current_header=['targets', 'chunks', 'run', 'trial', 'frame']):
     
     """Only for Carlo's memory experiment"""
     import re
@@ -513,8 +518,8 @@ def enhance_attributes_memory(filename, current_header=['targets', 'chunks', 'tr
     pattern_new = ['O_._0', 'N_._1']
     
     
-    mask_old = np.array([a[0]=='O' for a in attr.T[0]])
-    mask_new = np.array([a[0]=='N' for a in attr.T[0]])
+    mask_old = np.array([a[0] == 'O' for a in attr.T[0]])
+    mask_new = np.array([a[0] == 'N' for a in attr.T[0]])
     
     memory_status = attr.T[0].copy()
     memory_status[mask_new] = 'NEW'
@@ -552,7 +557,7 @@ def load_results(path, name, task):
 
     folder = '0_results'
     
-    print 'Opening ' + os.path.join(path, folder, name+'_'+task+'_120618_map.hdf5')
+    print('Opening ' + os.path.join(path, folder, name+'_'+task+'_120618_map.hdf5'))
     map = h5load(os.path.join(path, folder, name+'_'+task+'_120618_map.hdf5'))
     
     mapper = pickle.load(open(os.path.join(path, folder, name+'_'+task+'_120618_mapper.pyobj'), 'r'))
@@ -581,13 +586,13 @@ def load_results(path, name, task):
               ' -applyxfm' + \
               ' -out '+ os.path.join(path, name,name+'_nifti_map.nii.gz')[:-7] +'_120618_mni.nii.gz' 
                   
-    print command         
+    print(command)
     os.system(command)
     
     results = pickle.load(open(os.path.join(path, folder, name+'_'+task+'_120618_res.pyobj'), 'r'))
 
-    print '**************** '+name+' **********************'
-    print results.stats
+    print('**************** '+name+' **********************')
+    print(results.stats)
     
     
     
@@ -646,7 +651,7 @@ def read_stats(formatted_results):
     
     for el in formatted_results:
         for info in el['info']:
-            print info
+            print(info)
     
     
     
@@ -673,8 +678,8 @@ def load_results_map (path, namelist, datetime, task, mask='none'):
     fileList.sort()
     
     if (len(fileList) == 0):
-        print 'Results not found!'
-        return;
+        print('Results not found!')
+        return
     
     fileName = [elem for elem in os.listdir(os.path.join(path, 'andant','rest')) if elem.find('.nii.gz') != -1][0]
     niftiimg = ni.load(os.path.join(path, 'andant', 'rest', fileName))
@@ -688,10 +693,10 @@ def load_results_map (path, namelist, datetime, task, mask='none'):
         parts = mapFile.split('_')
         name = parts[2]     
         
-        print 'Opening: ' + os.path.join(path, resFolder, mapFile)
+        print('Opening: ' + os.path.join(path, resFolder, mapFile))
         map = h5load(os.path.join(path, resFolder, mapFile))
         
-        print 'Opening: ' + os.path.join(path, resFolder, mapperFile)
+        print('Opening: ' + os.path.join(path, resFolder, mapperFile))
         mapper = pickle.load(open(os.path.join(path, resFolder, mapperFile), 'r'))
     
         rev_map = mapper.reverse(map.samples)
@@ -700,7 +705,7 @@ def load_results_map (path, namelist, datetime, task, mask='none'):
     
         niftiimg = ni.load(os.path.join(path, name,'rest',fileName))
     
-        print 'Saving results at: ' + os.path.join(path, name, mapFile.split('.')[0] + '.nii.gz')
+        print('Saving results at: ' + os.path.join(path, name, mapFile.split('.')[0] + '.nii.gz'))
         ni.save(ni.Nifti1Image(rev_map.squeeze(), affine_tr), os.path.join(path, name, mapFile.split('.')[0] + '.nii.gz'))
         
 
@@ -732,11 +737,11 @@ def remove_flirt_files (path, type='both'):
                 fileListT = [elem for elem in fileListT if (elem.find('mni') != -1)]
                 
         for fileR in fileListR:
-            print 'Deleting '+os.path.join(path,folder,'rest',fileR)
+            print('Deleting '+os.path.join(path,folder,'rest',fileR))
             os.remove(os.path.join(path,folder,'rest',fileR))
             
         for fileT in fileListT:
-            print 'Deleting '+os.path.join(path,folder,'task',fileT)
+            print('Deleting '+os.path.join(path,folder,'task',fileT))
             os.remove(os.path.join(path,folder,'task',fileT))
 
 
@@ -761,7 +766,7 @@ def searchlight_to_mni(path, subj):
                  ' -searchry -180 180' + \
                  ' -searchrz -180 180'
         
-    print command
+    print(command)
     os.system(command)
     
     matrix = os.path.join(path, subj, subj+'_matrix_to_mni.mat')
@@ -777,5 +782,5 @@ def searchlight_to_mni(path, subj):
                   ' -applyxfm' + \
                   ' -out '+ imgIn[:-7] +'_mni.nii.gz' 
                   
-        print command         
+        print(command)
         os.system(command)

@@ -1,14 +1,14 @@
 import os
 import numpy as np
 import matplotlib.pyplot as pl
-from mvpa_itab.conn.io import ConnectivityLoader
 from mvpa_itab.conn.operations import copy_matrix
 from mvpa_itab.conn.utils import get_atlas_info
-from mvpa_itab.conn.plot import *
-import nibabel as ni
 from scipy.stats.stats import zscore
 
 import logging
+from mvpa_itab.io.connectivity import ConnectivityLoader
+from mvpa_itab.conn.plot.base import plot_connectivity_circle_edited,\
+    plot_connectome
 logger = logging.getLogger(__name__)
 
 

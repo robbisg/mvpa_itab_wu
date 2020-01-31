@@ -1,6 +1,3 @@
-from mvpa2.suite import CrossValidation
-from mvpa2.generators.partition import NFoldPartitioner
-from mvpa2.clfs.svm import LinearCSVMC
 import numpy as np
 from collections import Counter
 from scipy.stats.stats import ttest_1samp, ttest_ind, pearsonr
@@ -206,8 +203,6 @@ class TTest(object):
         self.dataset = ds
         self.conditions=conditions
         self.sample_value=sample_value
-        print 'version new'
-        print len(conditions)
 
         
     def transform(self, labels):

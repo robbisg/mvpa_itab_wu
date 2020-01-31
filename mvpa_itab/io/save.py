@@ -488,11 +488,7 @@ def save_results_clustering(path, results):
   
     return
 
-def save_map(filename, map_np_array, affine=np.eye(4)):
-        
-    map_zscore = ni.Nifti1Image(map_np_array, affine)
-    ni.save(map_zscore, filename)
-    return
+
 
 def write_all_subjects_map(path, dir_):
     

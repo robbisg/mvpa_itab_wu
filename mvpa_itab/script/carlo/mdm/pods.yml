@@ -1,0 +1,25 @@
+kind: Pod
+metadata:
+  labels:
+    foo: bar
+spec:
+  restartPolicy: Never
+  containers:
+  - image: robbisg/dask-k8s:debug
+    imagePullPolicy: Always
+    args: [dask-worker, 
+           --nthreads, '2', 
+           --no-bokeh, 
+           --memory-limit, 1G, 
+           --death-timeout, '180']
+    name: dask
+    env:
+      - name: EXTRA_PIP_PACKAGES
+        value: fastparquet git+https://github.com/dask/distributed
+    resources:
+    #  limits:
+    #    cpu: "0.5"
+    #    memory: 1G
+      requests:
+        cpu: "0.001"
+        memory: 1G

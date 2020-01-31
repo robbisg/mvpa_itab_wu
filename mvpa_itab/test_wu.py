@@ -3,7 +3,7 @@
 #
 #     See the file license.txt for copying permission.
 ########################################################
-
+from __future__ import print_function
 
 from mvpa2.clfs.transerror import ConfusionMatrix
 import os
@@ -12,7 +12,7 @@ import numpy as np
 import nibabel as ni
 from mvpa2.suite import vstack, Sphere, Searchlight, IndexQueryEngine, Splitter
 import mvpa_itab.results as rs
-from mvpa_itab.pipeline.partitioner import TargetCombinationPartitioner
+from mvpa_itab.pipeline.deprecated.partitioner import TargetCombinationPartitioner
 from mvpa_itab.preprocessing import get_preprocessing
 from mvpa_itab.results import get_time
 from mvpa_itab.io.save import save_results
@@ -103,8 +103,7 @@ def test_spatial(path, subjects, conf_file, type_, **kwargs):
         print '------'
         try:
             ds = load_dataset(data_path, subj, type_, **conf)
-        except Exception, err:
-            print err
+        except Exception:
             continue
         
         #ds = preprocess_dataset(ds, type_, **conf)
@@ -150,7 +149,7 @@ def _test_spatial(path, subjects, conf_file, type_, **kwargs):
         print '------'
         try:
             ds = load_dataset(data_path, subj, type_, **conf)
-        except Exception, err:
+        except Exception as err:
             print err
             continue
         
