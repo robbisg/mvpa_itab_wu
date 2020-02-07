@@ -1,132 +1,191 @@
 
-class ConnectivtitySourceSimulator():
-    def __init__(self, n_sorces=4, n_states=10, freq=256, n_changes=300):
-
-        self._n_sources = n_sorces
-        self._n_states = n_states
-        self._freq = freq
-        self._n_changes = n_changes
-        self._avg_ts_lenght = freq * n_changes
-
 import itertools
+import numpy as np
+import scipy as sp
+from scipy import signal
 
-n_nodes = 4
-n_states = 10
-freq = 256
-n_changes = 300
-avg_ts_lenght = freq * n_changes
 
-edges = [edge for edge in itertools.combinations(np.arange(n_nodes), 2)]
+n_nodes = 10
+n_brain_states = 6
+max_edges = 5
+lifetime_range = [2.5, 3.5] # seconds
+n_iteration = 1
+sample_frequency = 256
+
+
+model = PhaseDelayedModel(snr=10)
+
+edges = [e for e in itertools.combinations(np.arange(n_nodes), 2)]
 n_edges = len(edges)
 
-brain_states = []
-for i in range(n_edges):
+n_seq_states = np.floor(60*sample_frequency*5/(sample_frequency*np.mean(lifetime_range)))
+n_seq_states = np.int(60*5/np.mean(lifetime_range))
 
-    for j in itertools.combinations(np.arange(n_edges), i+1):
+states = []
+for i in range(max_edges):
+    states += [e for e in itertools.combinations(np.arange(n_edges), i+1)]
 
-        brain_states.append([edges[e] for e in j])
-
-
-
-
+states = np.array(states)
 
 
-% parameter settings
-nNodes=4; % number of nodes
-nBS=10; % number of brain states (BSs) to simulate 
-nIter=1; % number of simulation realizations
-order=5; % order of the MVAR model
-fsample=256; %sampling frequency
-Lt=60*fsample*5; % average length of the time series
-nseqBS=Lt/fsample; % number of BS changes in one run/session
+for i in range(n_iteration):
+    selected_states = states[np.random.randint(0, len(states), n_brain_states)]
+    length_bs = np.random.randint(sample_frequency*lifetime_range[0], 
+                                  sample_frequency*lifetime_range[1], 
+                                  n_seq_states
+                                  )
 
-% selection of the brain states
-Edges = nchoosek([1:nNodes],2); % possible edges in the graph
-nEdges=(nNodes*(nNodes-1)/2); % total number of edges in the graph
+    # This is done using Hidden Markov Models but since 
+    # Transition matrix is uniformly distributed we can use random sequency
+    #     mc = mcmix(nBS,'Fix',ones(nBS)*(1/nBS));
+    #     seqBS= simulate(mc,nseqBS-1);
+    seqBS = np.random.randint(0, n_brain_states, n_seq_states)
 
-% all the possible BSs
-BS=NaN(1,nEdges);
-k=1;
-for iedge=1:nEdges
-    combapp=nchoosek([1:nEdges],iedge);
-    BS(k+1:k+size(combapp,1),1:nEdges) = [combapp,NaN(size(combapp,1),nEdges-iedge)];
-    k=k+length(combapp);
-end
+    full_bs_matrix = np.zeros((n_brain_states, n_nodes, n_nodes, model.order))
 
-% definition of the structure with useful parameters
-structure.edges=Edges;
-structure.possibleBS=BS;
-structure.whichBS=cell(1,nIter);
-structure.seqBS=cell(1,nIter);
-structure.lengthBS=cell(1,nIter);
-structure.probtrans=cell(1,nIter);
-structure.data=cell(1,nIter);
+    for j in range(n_brain_states):
+        matrix = np.eye(n_nodes)
+        selected_edges = selected_states[j]
+        for edge in selected_edges:
+            matrix[edges[np.array(edge)]] = 1
+        pl.figure()
+        pl.imshow(matrix)
+        matrix = np.dstack([matrix for _ in range(model.order)])
 
-% MVAR parameters shared by all the BSs
-Mdl = varm(nNodes,order);
-Mdl.Constant=zeros(nNodes,1);
-Mdl.Covariance=eye(nNodes)*1/10;
+        cycles = 0
+        FA = np.zeros((n_nodes*model.order, n_nodes*model.order))
+        eye_idx = n_nodes*model.order - n_nodes
+        FA[n_nodes:, :eye_idx] = np.eye(eye_idx)
+        for k in range(10000):
+            A = 1/2.5 * np.random.rand(n_nodes, n_nodes, model.order) * matrix
+            FA[:n_nodes,:] = np.reshape(A, (n_nodes, -1), 'F')
 
-ARmatrices=cell(1,nBS);
+            eig, _ = sp.linalg.eig(FA)
 
-% for each realization...
-for iiter=1:1
-    iiter
-    % which BSs (among the possible BSs) are we considering in this realization?
-    whichBS=BS(randperm(size(BS,1),nBS),:);
-    
-    % sequence life times of the BSs
-    lengthBS=randi([fsample/2,fsample*3/2],1,nseqBS);
-    
-    % generate Markov model and BSs sequence with random transition probabilities
-    mc = mcmix(nBS);
-    seqBS= simulate(mc,nseqBS-1);
-    
-    % generate lag matrices of the MVAR for each BS considered and check the stability
-    for iBS=1:nBS
-        matrix{iBS}=eye(nNodes);
-        whichEdge=whichBS(iBS,isnan(whichBS(iBS,:)')==0);
-        for iEdge=1:length(whichEdge)
-            matrix{iBS}(Edges(whichEdge(iEdge),1),Edges(whichEdge(iEdge),2))=1;
-        end
-        %matrix{iBS}=matrix{iBS}+matrix{iBS}'-eye(size(matrix{iBS})); % to
-        %make the interactions bidirectional
-        unstable = true;
-        numc2=0;
-        while unstable && numc2<100000
-            numc2 = numc2+1;
-            A = 1/10*randn(nNodes,nNodes,order).*repmat(matrix{iBS},1,1,order);
-            FA = [reshape(A,nNodes,nNodes*order);
-                 eye(nNodes*(order-1),nNodes*(order-1)),zeros(nNodes*(order-1),nNodes)];
-            if all(abs(eig(FA))<1); 
-                unstable = false;    
-            end
-        end
-        for ilag=1:order
-            ARmatrices{iBS}{ilag}=squeeze(A(:,:,ilag));
-        end
-    end  
-    
-    % generate MVAR data according to the previously defined lag matrices
-    data=[];  
-    for iseq=1:nseqBS
-       Mdl.AR=ARmatrices{seqBS(iseq)};
-       dataBS = simulate(Mdl,lengthBS(iseq));
-       dataBS=dataBS-mean(dataBS,1);
-       data=[data;dataBS];
-    end    
-    
+            if np.all(np.abs(eig) < 1):
+                print(k)
+                break
+
+        
+        if k==10000:
+            raise("Solutions not found")
+
+
+
+        full_bs_matrix[j] = A.copy()
+
+
+    data = model.fit(full_bs_matrix, seqBS, length_bs)
+
+
+           
+    """    
     % writing the structure with the useful info
     structure.whichBS{iiter}=whichBS;
     structure.seqBS{iiter}=seqBS;
     structure.lengthBS{iiter}=lengthBS;
     structure.probtrans{iiter}=mc.P;
     structure.data{iiter}=data;
-       
+    
+    SNR = 10;
+    noise = randn(size(data));
+    datanoisy = data + sqrt(1/SNR)*(noise./std(noise)); 
+    structure.SNR = SNR;
+    structure.datanoisy{iiter} = datanoisy;       
+    """
+data = data.T
+window_length = 1 * sample_frequency
+for i in range(n_iteration):
+    
+    # Butter filter
+    """
+    iir_params = dict(order=8, ftype='butter')
+    filt = mne.filter.create_filter(data, sample_frequency, l_freq=6, h_freq=20,
+                                    method='iir', iir_params=iir_params,
+                                    verbose=True)
+
+    data_filtered = signal.sosfiltfilt(filt['sos'], data.T).T
+    """
+    #b, a = signal.butter(8, [6, 20], btype='bandpass', fs=sample_frequency)
+    #data_filtered = signal.filtfilt(b, a, data.T).T
+
+    # Window-length
+    connectivity_lenght = data.shape[1] - window_length + 1
+    timewise_connectivity = np.zeros((n_edges, connectivity_lenght))
+    for w in range(connectivity_lenght):
+        data_window = data[:, w:w+window_length]
+        assert data_window.shape[1] == 256
+        phi = np.angle(signal.hilbert(data_window))
+        for e, (x, y) in enumerate(edges):
+            coh = np.imag(np.exp(1j*(phi[x] - phi[y])))
+            iplv = np.abs(np.mean(coh))
+            timewise_connectivity[e, w] = iplv
+
+        print(w/connectivity_lenght*100)
+
+    # Storing structure n_edges x (time - window)
+    b, a = signal.butter(4, 2*(1/window_length), btype='lowpass', fs=sample_frequency)
+    iplv_filtered = signal.filtfilt(b, a, timewise_connectivity.T).T
+
+
+
+
+
+stat = [];
+for i=1:length(structure.seqBS{1})
+    stat = [stat (structure.seqBS{1}(i)-1)*ones(1,structure.lengthBS{1}(i))];
 end
+offset = winleng/2;
+stat = stat((offset+1):end-offset);
+stat = stat.';
+
+conn = structure.cts{1};
+nsec = 60;
+n = 256*nsec; figure; plot([1:n]/256,[conn(:,1:n); stat(1:n).'/5] )
 
 % save the structure
-save('data.mat','structure','-v7.3')
+% save('newstruct-16122019_AR.mat','structure','-v7.3')
+
+%% K means clustering % FIXME: ciclo sulle ripetizioni!!!!
+
+% FIXME: data-driven identification of number of clusters (Roberto's algorithms)
+
+idx = kmeans(structure.cts_filt{1}.',6);
+
+stat = [];
+for i=1:length(structure.seqBS{1})
+    stat = [stat (structure.seqBS{1}(i)-1)*ones(1,structure.lengthBS{1}(i))];
+end
+offset = winleng/2;
+stat = stat((offset+1):end-offset);
+stat = stat.'+1;
+
+% find the right estimated state order
+UNCI = unique(idx); % uniquely numbered cluster indexes
+P = perms(UNCI);
+ERR = zeros(size(UNCI,1),1);
+for i=1:size(P,1) % for all permutations
+    idx_loc = idx;
+    for j=1:length(UNCI)
+        idx_loc(idx==UNCI(j)) = P(i,j);
+    end
+    ERR(i)=sum(double( not(idx_loc==stat) ))/numel(idx_loc);
+end
+
+% choose the permutation which gives the minimum ERROR
+[v,imin] = min(ERR);
+idx_loc = idx;
+for j=1:length(UNCI)
+   idx_loc(idx==UNCI(j)) = P(imin,j);
+end
+    
+figure
+nsec = 120;
+n = 256*nsec; figure; plot([1:n]/256,[idx_loc(1:n)'; stat(1:n)'] )
+
+
+
+
 
 %% plots
 
