@@ -413,7 +413,7 @@ def make_sister(prototype,distance,name):  #orginial version that works
     surface=Image.new('RGB',size)
     im=ImageDraw.Draw(surface)
     sister.draw(im)
-    surface.save("%s_sis.gif" % name) 
+    surface.save("%s_sis.jpg" % name) 
 
     if verbose:
        sister.desc()
@@ -422,21 +422,24 @@ def make_sister(prototype,distance,name):  #orginial version that works
     
 ##########################
 # class kaleido:
-#    def __init__(self,poly_type='h',size=(640,480),npoly=2,num_deflect=4,\
-#                 scale=1.5,zoom=0.7,color_list=[],
-#                 load_txt=0,copy_from=0,distort=0,deflects=[]):
-    
-def main(color_list=[], stem=""):
+def main(poly_type='h', size=(640,480), npoly=2, num_deflect=4,
+         scale=1.5, zoom=0.7,color_list=[], load_txt=0,
+         copy_from=0, distort=0, deflects=[], folder='./normal', 
+         name='image', num=1, schema=0):
+    import os
+#def main(color_list=[], stem=""):
 
     if verbose:
         print ("Size=(%d,%d), Scale=%f, Zoom=%f, Poly=%d, Deflect=%d" % \
-              (size[0],size[1],scale,zoom,npoly,deflect))
-        print ("Generating %d images as %sXXX.jpg" % (num,out))
+              (size[0], size[1], scale, zoom, npoly, deflect))
+        print ("Generating %d images as %sXXX.jpg" % (num, name))
         if same_color:
-            print ("Color scheme held constant")   
-    for i in range(1,num+1):  #used to say: for i in range(0,num) : change to renumber
+            print ("Color scheme held constant")
+    
+    prog_num = schema * num
+    for i in range(1, num+1):  #used to say: for i in range(0,num) : change to renumber
         if not same_color or color_list==[]:
-            k=kaleido(poly_init_type,size,npoly,deflect,scale,zoom)
+            k = kaleido(poly_init_type,size,npoly,deflect,scale,zoom)
             for p in k.polyList:
                 color_list.append(p.color)
         else:
@@ -446,21 +449,31 @@ def main(color_list=[], stem=""):
             if verbose:
                 print ("Fixing size at",gdist)
             k.resize(gdist)
-        surface=Image.new('RGB',size)
+        surface=Image.new('RGB', size)
         im=ImageDraw.Draw(surface)
         k.draw(im)
-        surface.save("%s%s-%d.png" % (out,stem,i))
+        
+
+        os.makedirs(folder, exist_ok=True)
+        path_normal = os.path.join(folder, "normal")
+
+        os.makedirs(path_normal, exist_ok=True)
+        n = prog_num + i
+        surface.save("%s/%s-%03d.jpg" % (path_normal, name, n))
         if verbose:
             k.desc()
         # Adding a sister paired image
-        make_sister(k,10,"%s%s-%d" % (out,stem,i)) #change the 'distance' variable here
+        os.makedirs(os.path.join(folder, "sister"), exist_ok=True)
+        path_sister = os.path.join(folder, "sister")
+        make_sister(k, 10, "%s/%s-%03d" % (path_sister, name, n)) #change the 'distance' variable here
 
 
 
 if __name__ == '__main__':
     ###################
     # Default variables
-    size=(640,480)          # Size of canvas to draw to
+    
+    size=(640, 480)          # Size of canvas to draw to
     poly_init_type='r'      # Starting polygon to deflect from, defaults to 'r' = random
     npoly=2                 # Number of overlaid polygons
     deflect=4               # Number of side deflection rounds
@@ -481,15 +494,20 @@ if __name__ == '__main__':
     same_color=1   # All with same color scheme
     npoly=3        # 3 overlaid polygons #change when changing numcolors
     deflections=10
-
+    
     # Main can be called with a color list if you want to set the color scheme
     # main( [ (255,0,0),(0,255,0),(0,0,255) ] )
 
     # This calls the main program to make the images with a random color scheme
     # Change the value of the number inside range() to make multiple sets, each with "num" kscopes, changing the color scheme between but not within sets
-    for i in range(104):
-        main([random_color(), random_color(), random_color()],"%d" % (i+1))
-        #main([],"%d" % (i+1))
+    n_schemes = 6
+    n_images = 100
+    
+    for schema in range(n_schemes):
+        color_list = random_color(), random_color(), random_color()
+        folder = "schema_%01d" % (schema+1)
+        main(size=size, npoly=npoly, num_deflect=deflect, scale=scale, zoom=zoom,
+                    color_list=color_list, deflects=deflections, folder=folder, num=n_images, schema=schema)
 
 
 
