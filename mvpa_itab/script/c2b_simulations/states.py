@@ -272,3 +272,117 @@ figure('Position', [100 100 900 400])
 hist(seqBS,10)
 ylabel('Occurrency')
 xlabel('Brain state')
+
+
+
+
+
+stat = [];
+for i=1:length(structure.seqBS{1})
+    stat = [stat (structure.seqBS{1}(i)-1)*ones(1,structure.lengthBS{1}(i))];
+end
+offset = winleng/2;
+stat = stat((offset+1):end-offset);
+stat = stat.';
+
+conn = structure.cts{1};
+nsec = 60;
+n = 256*nsec; figure; plot([1:n]/256,[conn(:,1:n); stat(1:n).'/5] )
+
+
+stat = [];
+for i=1:length(structure.seqBS{1})
+    stat = [stat (structure.seqBS{1}(i)-1)*ones(1,structure.lengthBS{1}(i))];
+end
+offset = winleng/2;
+stat = stat((offset+1):end-offset);
+stat = stat.'+1;
+
+% find the right estimated state order
+UNCI = unique(idx); % uniquely numbered cluster indexes
+P = perms(UNCI);
+ERR = zeros(size(UNCI,1),1);
+for i=1:size(P,1) % for all permutations
+    idx_loc = idx;
+    for j=1:length(UNCI)
+        idx_loc(idx==UNCI(j)) = P(i,j);
+    end
+    ERR(i)=sum(double( not(idx_loc==stat) ))/numel(idx_loc);
+end
+
+% choose the permutation which gives the minimum ERROR
+[v,imin] = min(ERR);
+idx_loc = idx;
+for j=1:length(UNCI)
+   idx_loc(idx==UNCI(j)) = P(imin,j);
+end
+    
+figure
+nsec = 120;
+n = 256*nsec; figure; plot([1:n]/256,[idx_loc(1:n)'; stat(1:n)'] )
+
+
+
+
+
+%% plots
+
+% example of BSs considered
+figure('Position', [100 100 900 900])
+for ibs=1:nBS
+    subplot(floor(nBS/2),2,ibs)
+    WBS=whichBS(ibs,isnan(whichBS(ibs,:))==0);
+    G = digraph(1,1);
+    for inode=2:nNodes
+        G = addedge(G,inode,inode);
+    end
+    if(length(WBS)>0)
+      for il=1:length(WBS)
+          G = addedge(G,Edges(WBS(il),1),Edges(WBS(il),2));
+      end
+    end
+    plot(G,'Layout','force')
+    axis off
+    str = sprintf('Brain state %d', ibs);
+    title(str)
+end
+
+% graph of the BSs and transition probability matrix
+figure('Position', [100 100 900 900])
+subplot(2,1,1)
+graphplot(mc,'ColorEdges',true);
+colormap parula
+caxis([0 0.3])
+subplot(2,1,2)
+imagesc(mc.P);
+xlabel('Brain state')
+ylabel('Brain state')
+title('Transition probability')
+colormap parula
+caxis([0 0.3])
+colorbar
+
+% example of BSs sequence 
+figure('Position', [100 100 900 400])
+seqplot=[];
+for iBS=1:length(lengthBS)
+    seqplot=[seqplot,seqBS(iBS)*ones(1,lengthBS(iBS))];
+end
+plot(1/256:1/256:60,seqplot(1:256*60))
+ylabel('Brain state')
+xlabel('Sec')
+
+% example of time series realization
+figure('Position', [100 100 900 900])
+for iplot=1:nNodes
+    subplot(nNodes,1,iplot)
+    plot(1/256:1/256:60,data(1:256*60,iplot))
+    ylabel('Simulated time series')
+    xlabel('Sec')
+end
+
+% histogram of life time for each BS
+figure('Position', [100 100 900 400])
+hist(seqBS,10)
+ylabel('Occurrency')
+xlabel('Brain state')

@@ -105,7 +105,6 @@ def analysis(**kwargs):
         fig.savefig(fig_fname)
         
         #save_data(X, 'metrics', metrics_)
-        
         for i, labels in enumerate(clustering_):
             if not os.path.exists(os.path.join(directory,str(i+2))):
                 os.makedirs(os.path.join(directory,str(i+2)))
