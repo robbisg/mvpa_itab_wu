@@ -1,0 +1,12 @@
+*.pyc
+*.py~
+mvpa_itab.egg-info/
+build/
+dist/
+.project
+.pydevproject
+.gitignore~
+.settings/
+doc/
+*.gif
+*.png

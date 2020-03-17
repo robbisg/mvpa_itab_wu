@@ -459,13 +459,13 @@ def main(poly_type='h', size=(640,480), npoly=2, num_deflect=4,
 
         os.makedirs(path_normal, exist_ok=True)
         n = prog_num + i
-        surface.save("%s/%s-%03d.jpg" % (path_normal, name, n))
+        surface.save("%s/%s-%04d.jpg" % (path_normal, name, n))
         if verbose:
             k.desc()
         # Adding a sister paired image
         os.makedirs(os.path.join(folder, "sister"), exist_ok=True)
         path_sister = os.path.join(folder, "sister")
-        make_sister(k, 10, "%s/%s-%03d" % (path_sister, name, n)) #change the 'distance' variable here
+        make_sister(k, 10, "%s/%s-%04d" % (path_sister, name, n)) #change the 'distance' variable here
 
 
 
@@ -500,7 +500,7 @@ if __name__ == '__main__':
 
     # This calls the main program to make the images with a random color scheme
     # Change the value of the number inside range() to make multiple sets, each with "num" kscopes, changing the color scheme between but not within sets
-    n_schemes = 6
+    n_schemes = 15
     n_images = 100
     
     for schema in range(n_schemes):

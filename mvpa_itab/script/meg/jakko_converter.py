@@ -1,8 +1,8 @@
 from scipy.io import loadmat
 import os
 import numpy as np
-from mvpa_itab.conn.operations import copy_matrix
-from scipy.io.matlab.mio import savemat
+from pyitab.utils.matrix import copy_matrix
+from scipy.io import savemat
 
 
 
@@ -44,6 +44,7 @@ def get_full_power(x):
 
 
 path = "/media/robbis/DATA/fmri/working_memory/"
+path = "/home/robbis/data/jaakko/"
 n_subjects = 57
 
 def get_subject_results(path, pattern="MPSI", n_subjects=57, read_fx=get_full_matrix):
@@ -56,23 +57,25 @@ def get_subject_results(path, pattern="MPSI", n_subjects=57, read_fx=get_full_ma
     #path = "/media/robbis/DATA/fmri/working_memory/"
     list_mat = os.listdir(path)
     list_mat = [m for m in list_mat if m.find(pattern) != -1]
+    list_mat = [m for m in list_mat if m.find("NEW") != -1]
     results = dict()
     
     #n_subjects = 57
     
     for m in list_mat:
-        band = m[len(pattern):-4]
+        #band = m[len(pattern):-4] # first 57
+        band = m.split("_")[1]
         #band = m[4:-4]
         mat_file = loadmat(os.path.join(path, m))
         conditions = [k for k in mat_file.keys() if k[0] != '_']
         
         for c in conditions:
             data = mat_file[c]
-            
             for s in range(data.shape[0]):
                 session = data[s]
                 
-                for subject in range(len(session)):
+                for subject in range(session.shape[0]):
+                    
                     matrix = session[subject]
                     
                     full_matrix = read_fx(matrix)

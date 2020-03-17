@@ -6,8 +6,10 @@ from pyitab.analysis.results.dataframe import apply_function
 from pyitab.utils import make_dict_product
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 
-data = get_results('/u/97/guidotr1/unix/data/simulations/meg/derivatives', 
+
+data = get_results('/media/robbis/Seagate_Pt1/data/simulations/derivatives/', 
                    pipeline='c2b+real', 
                    field_list=['sample_slicer', 
                                'n_clusters', 
@@ -16,18 +18,18 @@ data = get_results('/u/97/guidotr1/unix/data/simulations/meg/derivatives',
                                'ds.a.time',
                                'ds.a.states',
                                'fetch', 
-                               'algorithm'])
+                               'algorithm'],
+                               
+                    filter={'algorithm':['KMeans']}
+                    )
 
 df = purge_dataframe(data)
 
-
-
-
 conditions = {
 
-    #'time': [0.5, 1, 1.5, 2.],
+    'time': [0.5, 1, 1.5, 2.],
     #'num': [str(j) for j in np.arange(1, 480)],
-    #'snr': [10, 100, 1000, 10000],
+    'snr': [10, 100, 1000, 10000],
     'algorithm': ['GaussianMixture',
                   'KMeans',
                   'AgglomerativeClustering', 
@@ -36,7 +38,6 @@ conditions = {
     'subject': [str(i) for i in np.arange(1, 21)]
     
 }
-
 
 combinations = make_dict_product(**conditions)
 
@@ -74,9 +75,78 @@ df = state_errors(df)
 df = dynamics_errors(df)
 
 
+#################################
+
+conditions = {
+
+    'time': [0.5, 1, 1.5, 2.],
+    #'num': [str(j) for j in np.arange(1, 480)],
+    'snr': [10, 100, 1000, 10000],
+    #'algorithm': ['GaussianMixture',
+    #              'KMeans',
+    #              'AgglomerativeClustering', 
+    #              'SpectralClustering',
+    #              'MiniBatchKMeans'],
+    'subject': [str(i) for i in np.arange(1, 21)]
+    
+}
+
+combinations = make_dict_product(**conditions)
+
+metrics = []
+best_k = []
+
+algorithms = ['GaussianMixture',
+             'KMeans',
+             'AgglomerativeClustering', 
+             'SpectralClustering',
+             'MiniBatchKMeans']
+
+for algorithm in algorithms:
+
+    data = get_results('/media/robbis/Seagate_Pt1/data/simulations/derivatives/', 
+                   pipeline='c2b+real', 
+                   field_list=['sample_slicer', 
+                               'n_clusters', 
+                               'n_components', 
+                               'ds.a.snr',
+                               'ds.a.time',
+                               'ds.a.states',
+                               'fetch', 
+                               'algorithm'],
+                    n_jobs=5,
+                    filter={'algorithm': [algorithm]})
+    df = purge_dataframe(data, keys=['ds.a.snr', 
+                                'ds.a.time', 
+                                #'ds.a.states',
+                                'n_clusters', 
+                                'n_components'])
+
+    for options in tqdm(combinations):
+        df_ = filter_dataframe(df, **options)
+        options = {k: v[0] for k, v in options.items()}
+        options.update({'algorithm':algorithm})
+        df_metric = calculate_metrics(df_, fixed_variables=options)
+        df_metric = df_metric.sort_values('k')
+        df_k = find_best_k(df_metric)
+        metrics.append(df_metric)
+        best_k.append(df_k)
+    
+    del data, df
+    gc.collect()
+
+df_metrics = pd.concat(metrics)
+df_guess = pd.concat(best_k)
+
+df_guess['hit'] = np.int_(df_guess['guess'].values == 6)
+df_guess['abshit'] = np.abs(df_guess['guess'].values - 6)
+df_great_mean = apply_function(df_guess, keys=['name', 'algorithm'], attr='abshit', fx=np.mean)
+df_great_mean = apply_function(df_guess, keys=['name', 'algorithm'], attr='hit', fx=np.mean)
 
 
 
+
+df = purge_dataframe(data)
 
 from pyitab.plot.connectivity import plot_connectivity_lines
 from matplotlib import animation
