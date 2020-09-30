@@ -330,21 +330,133 @@ for ratio in np.unique(df['sampling_strategy'])[:-1]:
     print(sys_command)
     os.system(sys_command)
 
+#################################
 
-df_results = pd.read_excel('/media/robbis/DATA/fmri/ds105/p-values-table.xlsx')
-df_stack = df_results.melt(id_vars=['Algorithm', 'Type'], var_name='ratio') 
+df = pd.read_excel("./p-values-table.xlsx", sheet_name="Sheet1")
+df_melt = pd.melt(df, id_vars=['Algorithm', 'Type'], 
+                  value_vars=[0.1, 0.2, 0.3, 0.4, 0.5], 
+                  var_name='ratio', 
+                  value_name='pvalue')
+df_ = filter_dataframe(df_melt, Type=['B', 'O', 'U', 'W'])
+df = filter_dataframe(df, Type=['U', 'O', 'B', 'W'])
+df['avg'] = df.mean(numeric_only=True, axis=1)
 
 
-def avg_plot(**kwargs):
-    from scipy.stats import ttest_1samp
-    data = kwargs['data']
+colors = {
+    'O': 'red',
+    'W': 'limegreen',
+    'U': 'deepskyblue',
+    'B': 'gray',
+}
+
+colors_list = [colors[v] for v in df.sort_values("avg", ascending=False)['Type'].values]
+
+g = sns.PairGrid(df.sort_values("avg", ascending=False),
+                 x_vars=['avg', 0.1, 0.2, 0.3, 0.4, 0.5], 
+                 y_vars=["Algorithm"])
+
+# Draw a dot plot using the stripplot function
+g.map(sns.stripplot, size=10, orient="h",
+      palette=colors_list, linewidth=1, edgecolor="w")
+
+# Use the same x axis limits on all columns and add better labels
+g.set(xlabel="t-value", ylabel="")
+
+# Use semantically meaningful titles for the columns
+titles = ["Average", "ratio = 0.1", "ratio = 0.2",
+          "ratio = 0.3", "ratio = 0.4", "ratio = 0.5"]
+
+for ax, title in zip(g.axes.flat, titles):
+
+    # Set a different title for each axes
+    ax.set(title=title)
+
+    # Make the grid horizontal instead of vertical
+    ax.xaxis.grid(False)
+    ax.yaxis.grid(True)
+    ax.set_xlim(2., 7.05)
+
+sns.despine(left=True, bottom=True)
+pl.tight_layout()
+                 
+#################################
+
+from collections import Counter
+
+import matplotlib.pyplot as plt
+from sklearn.datasets import make_moons
+from sklearn import svm
+from imblearn.datasets import make_imbalance
+
+print(__doc__)
 
 
+def plot_decoration(ax):
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.get_xaxis().tick_bottom()
+    ax.get_yaxis().tick_left()
+    ax.set_xlim([-4, 4])
+    ax.grid(False)
+    ax.set_xticks([])
+    ax.set_yticks([])
 
 
+# Generate the dataset
+X, y = make_moons(n_samples=200, shuffle=True, noise=0.5, random_state=15)
 
-grid = sns.FacetGrid(df_stack, col="Type", hue="Type",
-                     col_wrap=3, height=1.5)
-grid.map(pl.plot, "ratio", "value", marker="o", err_style="bars")
-grid.map(pl.legend)                   
+# Two subplots, unpack the axes array immediately
+f, axs = plt.subplots(2, 3)
 
+axs = [a for ax in axs for a in ax]
+
+
+def ratio_func(y, multiplier, minority_class):
+    target_stats = Counter(y)
+    return {minority_class: int(multiplier * target_stats[minority_class])}
+
+
+multipliers = [1, 0.5, 0.4, 0.3, 0.2, 0.1]
+for i, multiplier in enumerate(multipliers):
+    ax = axs[i]
+
+    X_, y_ = make_imbalance(X, y, sampling_strategy=ratio_func,
+                            **{"multiplier": multiplier,
+                               "minority_class": 1})
+    ax.scatter(X_[y_ == 0, 0], 
+               X_[y_ == 0, 1], 
+               label="Class #0", 
+               #alpha=0.5, 
+               color='c')
+    ax.scatter(X_[y_ == 1, 0], 
+               X_[y_ == 1, 1], 
+               label="Class #1", 
+               #alpha=0.5,
+               color='salmon')
+    
+    clf = svm.SVC(kernel='linear', C=1)
+    clf.fit(X_, y_)
+
+    xlim = X.min(0)[0], X.max(0)[0]
+    ylim = X.min(0)[1], X.max(0)[1]
+    xx = np.linspace(xlim[0], xlim[1], 40)
+    yy = np.linspace(ylim[0], ylim[1], 40)
+
+    YY, XX = np.meshgrid(yy, xx)
+    xy = np.vstack([XX.ravel(), YY.ravel()]).T
+    Z = clf.decision_function(xy).reshape(XX.shape)
+    ax.contour(XX, YY, Z, colors='dimgray', levels=[ 0], alpha=0.7,
+           linestyles=['-'])
+
+    ax.set_title('ratio = {}'.format(multiplier))
+    if i == 0:
+        ax.set_title('Original dataset')
+
+    plot_decoration(ax)
+
+plt.tight_layout()
+plt.show()
+
+################################################à

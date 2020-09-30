@@ -1,0 +1,5 @@
+{
+  "mvpa_itab/script/carlo/afni_test.py": true,
+  "mvpa_itab/script/perceptual_learning/test_script.py": true,
+  "mvpa_itab/test_wu.py": true
+}

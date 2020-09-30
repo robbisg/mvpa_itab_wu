@@ -93,8 +93,10 @@ for conf in iterator:
 
 ################################# Results
 from pyitab.analysis.results.bids import get_results_bids
+from pyitab.analysis.results.dataframe import apply_function
+from pyitab.analysis.results.base import filter_dataframe
 
-path = '/media/guidotr1/Seagate_Pt1/data/Viviana2018/meg/derivatives/'
+path = '/media/robbis/Seagate_Pt1/data/Viviana2018/meg/derivatives/'
 
 dataframe = get_results_bids(path=path,  
                              pipeline="movie+revenge",
@@ -107,29 +109,76 @@ dataframe = get_results_bids(path=path,
 tasks = np.unique(dataframe['targets'].values)
 bands = np.unique(dataframe['band'].values)
 
-for task in tasks:
-    for band in bands:
 
-        df = filter_dataframe(dataframe, targets=[task], band=[band])
-        
-        df_diagonal = df_fx_over_keys(dataframe=df, 
-                                      keys=['value'], 
-                                      attr='score_score', 
-                                      fx=lambda x: np.diagonal(np.mean(np.dstack(x), axis=2)))
+df_diagonal = apply_function(dataframe, 
+                                keys=['value', 'band', 'targets'], 
+                                attr='score_score', 
+                                fx=lambda x: np.diagonal(np.mean(np.dstack(x), axis=2)))
 
-        df_exploded = df_diagonal.explode('score_score')
-        n_roi = len(np.unique(df_diagonal['value']))
-        frames = np.hstack([np.arange(7)+1 for _ in range(n_roi)])
+df_exploded = df_diagonal.explode('score_score')
+targets = len(np.unique(df_diagonal['targets']))
+bands = len(np.unique(df_diagonal['band']))
+tasks = targets * bands
+n_frames = len(df_exploded) / tasks
+frames = np.hstack([np.arange(int(n_frames))+1 for _ in range(tasks)])
 
-        df_exploded['value'] = np.int_(df_exploded['value'])
-        df_exploded['frame'] = frames
-        rois = [big_table[mask][value-1][3]+" "+str(value) for value in df_exploded['value'].values]
-        df_exploded['roi'] = rois
+df_exploded['value'] = np.int_(df_exploded['value'])
+df_exploded['frame'] = frames
 
-        #pl.figure()
-        grid = sns.FacetGrid(df_exploded, col="roi", hue="value", col_wrap=4, height=1.5)
-        grid.map(pl.axhline, y=0.5, ls=":", c=".5")
-        grid.map(pl.plot, "frame", "score_score", marker="o")
-        grid.set(yticks=[.45, .5, .55, .6])
-        figname = "/media/robbis/DATA/fmri/carlo_mdm/derivatives/temporal+decoding_task-%s_mask-%s.png" %(task, mask)
-        grid.savefig(figname, dpi=100)
+#pl.figure()
+grid = sns.FacetGrid(df_exploded, row="targets", hue="band", aspect=3, height=2)
+grid.map(pl.axhline, y=0.5, ls=":", c=".5")
+grid.map(pl.plot, "frame", "score_score", marker="o")
+grid.set(yticks=[.45, .5, .55, .6])
+figname = "/media/robbis/Seagate_Pt1/data/Viviana2018/meg/derivatives/temporal+decoding.png")
+grid.savefig(figname, dpi=250)
+
+
+###### Matrix
+import itertools
+fig1, ax1 = pl.subplots(2, 4, sharex=True)
+
+tasks = np.unique(dataframe['targets'].values)
+bands = np.unique(dataframe['band'].values)
+
+combinations = itertools.product(tasks, bands)
+cmap = pl.cm.Paired
+
+for j, (target, band) in enumerate(combinations):
+
+    filtered_df = filter_dataframe(dataframe, targets=[target], band=[band])
+    df_average = apply_function(filtered_df, 
+                                keys=['value', 'band', 'targets'], 
+                                attr='score_score', 
+                                fx=lambda x: np.mean(np.dstack(x), axis=2))
+    
+    matrix = df_average['score_score'].values[0]
+
+    p = ax1[0, j].plot(np.diagonal(matrix), 'o-', c=cmap.colors[j])
+
+    palette_within = sns.light_palette(cmap.colors[j], 
+                                       #reverse=True,
+                                       n_colors=256,
+                                       as_cmap=True)
+
+    im = ax1[1, j].imshow(matrix, 
+                          origin='lower', 
+                          vmin=0.55, 
+                          vmax=0.65, 
+                          cmap='magma')
+
+    ax1[0, j].set_ylim(0.35, 0.75)
+    ax1[0, j].set_title("%s | %s" % (target, band))
+
+
+for ax in ax2.flat:
+    ax.set(xlabel='frame', ylabel='accuracy')
+
+for ax in ax1.flat:
+    ax.set(xlabel='testing-frame', ylabel='training-frame')
+
+for ax in ax2.flat:
+    ax.label_outer()
+
+for ax in ax1.flat:
+    ax.label_outer()

@@ -306,7 +306,6 @@ for label, indices in arrows.items():
             axes.ax.text(x, y+2, np.hstack(indices)[i], color=colors_text[i])
 
 
-
     f.savefig("/media/robbis/DATA/fmri/working_memory/figures/20191118_direction_%s.svg" % (label), dpi=300)
 
 
@@ -314,7 +313,7 @@ for label, indices in arrows.items():
 
 #################################
 
-
+from pyitab.utils.atlas import get_aalmeg_info
 info_lobe = get_aalmeg_info(background='white', grouping='other')
 info_lr = get_aalmeg_info(background='white', grouping='LR')
 
@@ -362,8 +361,6 @@ unet, idx = np.unique(labels_lobe.T[-1], return_index=True)
 cnet = np.array(colors)[idx]
 
 unet = [u.replace("_", " ") for u in unet]
-
-
 
 matplotlib.rcParams['figure.facecolor'] = 'white'
 matplotlib.rcParams['axes.facecolor'] = 'white'

@@ -1,64 +1,17 @@
 ###################
-import _pickle as pickle
-
-from sklearn.model_selection._split import GroupShuffleSplit
-from sklearn.svm.classes import SVC
 import numpy as np
-from pyitab.io.loader import DataLoader
 from scipy.io import loadmat, savemat
 import os
-
-from sklearn.pipeline import Pipeline
-from sklearn.feature_selection.univariate_selection import SelectKBest
-
-from pyitab.analysis.iterator import AnalysisIterator
-from pyitab.analysis.configurator import ScriptConfigurator
-from pyitab.analysis.pipeline import AnalysisPipeline
-from pyitab.analysis.results import get_results, filter_dataframe
-from pyitab.preprocessing.pipelines import PreprocessingPipeline
-from pyitab.preprocessing.functions import Detrender, FeatureZNormalizer,\
-    SampleZNormalizer, SampleSlicer, TargetTransformer, SampleSigmaNormalizer, \
-    Transformer
-from pyitab.preprocessing import Node
-from pyitab.analysis.decoding.roi_decoding import Decoding
-from pyitab.io.connectivity import load_mat_ds
-
+import glob
 import warnings
-from pyitab.preprocessing.math import AbsoluteValueTransformer
 warnings.filterwarnings("ignore")
-
-
-conf_file = "/media/robbis/DATA/fmri/working_memory/working_memory.conf"
-
-loader = DataLoader(configuration_file=conf_file, 
-                    loader=load_mat_ds,
-                    task='CONN')
-
-prepro = PreprocessingPipeline(nodes=[
-                                      Transformer(), 
-                                      #Detrender(), 
-                                      #SampleSigmaNormalizer()
-                                      #FeatureZNormalizer()
-                                      ])
-#prepro = PreprocessingPipeline()
-
-
-ds = loader.fetch(prepro=prepro)
-
-prepro = PreprocessingPipeline(nodes=[Transformer()])
-detr = PreprocessingPipeline(nodes=[Detrender()])
-
-ds_plain = loader.fetch(prepro=prepro)
-ds_detr = loader.fetch(prepro=detr)
-
-pl.plot(ds_plain.samples[:12,:5])
-pl.plot(ds_detr.samples[:12,:5])
 
 ################################################
 
 # Correction of connectivity data
 path = "/media/robbis/DATA/fmri/working_memory/"
-subject_list = glob.glob(path+"sub*")
+path = "/media/robbis/Seagate_Pt1/data/working_memory/"
+subject_list = glob.glob(path+"data/sub*")
 subject_list.sort()
 
 for i, subj in enumerate(subject_list):
@@ -74,11 +27,19 @@ for i, subj in enumerate(subject_list):
     for j, matrix in enumerate(data):
         condition, band, _ = labels[j]
 
-        size_mat = loadmat(os.path.join(path, "parcelsizes_%s.mat" % (band)))
-        size_key = "%s%s" % (band, condition)
-
-        size = np.expand_dims(size_mat[size_key][i], axis=0)
+        if i < 57:
+            size_mat = loadmat(os.path.join(path, "parcelsizes_%s.mat" % (band)))
+            idx = i
+        else:
+            size_mat = loadmat(os.path.join(path, "parcelsizes_%s_NEW.mat" % (band)))
+            idx = i - 57
         
+        size_key = "%s%s" % (band, condition)
+        size = np.expand_dims(size_mat[size_key][idx], axis=0)
+        
+        #size = np.expand_dims(size_mat[size_key].mean(0), axis=0)
+
+        size = np.int_(size)
         size_matrix = np.dot(size.T, size)
 
         norm_matrix = matrix / np.float_(size_matrix)
@@ -133,7 +94,7 @@ for i, subj in enumerate(subject_list):
 # Correction of power #
 
 path = "/media/robbis/DATA/fmri/working_memory/"
-subject_list = glob.glob(path+"sub*")
+subject_list = glob.glob(path+"data/sub*")
 subject_list.sort()
 
 for i, subj in enumerate(subject_list):
@@ -149,11 +110,19 @@ for i, subj in enumerate(subject_list):
     for j, matrix in enumerate(data):
         condition, band, _ = labels[j]
 
-        size_mat = loadmat(os.path.join(path, "parcelsizes_%s.mat" % (band)))
+
+        if i < 57:
+            size_mat = loadmat(os.path.join(path, "parcelsizes_%s.mat" % (band)))
+            idx = i
+        else:
+            size_mat = loadmat(os.path.join(path, "parcelsizes_%s_NEW.mat" % (band)))
+            idx = i - 57        
+        
         size_key = "%s%s" % (band, condition)
 
-        size = size_mat[size_key][i]
+        #size = np.int_(size_mat[size_key].mean(0))
 
+        size = size_mat[size_key][idx]
         norm_matrix = data[j] * size
         norm_matrix[np.isnan(norm_matrix)] = 0.
 
@@ -163,10 +132,18 @@ for i, subj in enumerate(subject_list):
 
     savemat(os.path.join(subj, "meg", "power_normalized.mat"), norm_ds)
 
+# Copying script
+subject_list = glob.glob(path+"data/sub*")
+subject_list.sort()
 
-
-
-
+for i, subj in enumerate(subject_list):
+    folder = subj.split("/")[-1]
+    command = "cp %s %s" % (os.path.join(subj, "meg", "power_normalized.mat"), 
+                            "/home/robbis/mount/triton.aalto.fi/data/"+folder+"/meg/")
+    print(command)
+    command = "cp %s %s" % (os.path.join(subj, "meg", "mpsi_normalized.mat"), 
+                            "/home/robbis/mount/triton.aalto.fi/data/"+folder+"/meg/")
+    print(command)
 
 
 
