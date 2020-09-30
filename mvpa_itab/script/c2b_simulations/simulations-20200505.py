@@ -15,9 +15,10 @@ from sklearn import cluster, mixture
 from joblib import Parallel, delayed
 from pyitab.simulation.loader import SimulationLoader
 
-n_repetitions = 2
+n_repetitions = 25
 conf_file = '/media/robbis/Seagate_Pt1/data/simulations/simulations.conf'
 conf_file = "/home/robbis/mount/simulations.conf"
+conf_file = "/media/robbis/DATA/fmri/c2b/simulations.conf"
 
 
 loader_configuration = {
@@ -62,8 +63,6 @@ loader_options = {
     'fetch__phase_delayed_model__snr': [3, 5, 10]
 }
 
-
-
 iterator = AnalysisIterator(loader_options, 
                             AnalysisConfigurator,
                             config_kwargs=loader_configuration,
@@ -72,8 +71,8 @@ iterator = AnalysisIterator(loader_options,
 
 ds_list = Parallel(n_jobs=-1)(delayed(generate)(configurator) for configurator in iterator)
 
-for configurator in iterator:
-    ds = generate(configurator)
+ds_list = [generate(configurator) for configurator in iterator]
+
 
 def generate(configurator):
     loader = configurator._get_loader()
@@ -87,3 +86,70 @@ def generate(configurator):
     fname = fname[:-1]
     #loader.save(fname)
     return ds
+
+
+def count_states(ds):
+    return np.array([ sum( 1 for _ in group ) for key, group in itertools.groupby( ds.targets )])
+
+
+################### Analysis ###########################à
+
+from mvpa2.base.hdf5 import h5load
+import os
+files = os.listdir(path)
+files.sort()
+files = [f for f in files if f.find("ds_c2b") != -1]
+ds_list = [h5load(os.path.join(path, f)) for f in files]
+
+n_repetitions = 25
+
+_default_config = { 
+                    'prepro': ['sample_slicer'],
+                    'analysis': Clustering,
+                    'butter_filter__order': 4,
+                    'butter_filter__btype': 'lowpass',
+                    'butter_filter__max_freq': 2,
+                }
+
+_default_options = {
+
+                    'kwargs__ds': ds_list,
+                    
+                    'estimator': [
+                        [[('clf1', cluster.MiniBatchKMeans())]],
+                        [[('clf1', cluster.KMeans())]], 
+                        [[('clf1', cluster.SpectralClustering())]],
+                        [[('clf1', cluster.AgglomerativeClustering())]],
+                        [[('clf5', mixture.GaussianMixture())]], 
+                    ],
+
+                    'estimator__clf1__n_clusters': range(3, 9),
+                    'estimator__clf5__n_components': range(3, 9),
+
+                    'sample_slicer__subject': [[i+1] for i in range(n_repetitions)],
+                    }
+
+iterator = AnalysisIterator(_default_options, 
+                            AnalysisConfigurator,
+                            config_kwargs=_default_config,
+                            kind='combined'
+                            )
+def analysis(conf, name):
+    #print(conf._default_options)
+    kwargs = conf._get_kwargs()
+    #print(kwargs)
+    a = AnalysisPipeline(conf, name=name).fit(**kwargs)
+    a.save(path="/media/robbis/DATA/fmri/c2b/")
+    return
+
+
+results = Parallel(n_jobs=-1, verbose=1)(delayed(analysis)(conf, "c2b+chieti") for conf in iterator)
+
+
+errors = 0
+for conf in iterator:
+    try:
+        _ = analysis(conf, "c2b+chieti")
+    except Exception as _:
+        errors += 1
+        continue
