@@ -21,7 +21,6 @@ from pyitab.preprocessing.functions import Detrender, SampleSlicer, \
 from pyitab.preprocessing.normalizers import FeatureZNormalizer, \
     SampleZNormalizer, SampleZNormalizer, SampleSigmaNormalizer, \
     FeatureSigmaNormalizer
-from pyitab.preprocessing import Node
 from pyitab.analysis.decoding.roi_decoding import RoiDecoding
 from pyitab.io.connectivity import load_mat_ds
 
@@ -33,17 +32,17 @@ warnings.filterwarnings("ignore")
  
 ######################################
 # Only when running on permut1
-from mvpa_itab.utils import enable_logging
+from pyitab.utils import enable_logging
 root = enable_logging()
 #####################################
 
 #conf_file = "/home/carlos/mount/megmri03/working_memory/working_memory_remote.conf"
 conf_file =  "/media/robbis/DATA/fmri/working_memory/working_memory.conf"
-
+conf_file = "/media/robbis/Seagate_Pt1/data/working_memory/working_memory.conf"
 
 loader = DataLoader(configuration_file=conf_file, 
                     loader=load_mat_ds,
-                    task='MPSI_NORM')
+                    task='CONN')
 
 prepro = PreprocessingPipeline(nodes=[
                                       Transformer(), 
@@ -88,7 +87,7 @@ _default_config = {
 
                        'scores' : ['accuracy'],
 
-                       'analysis': Decoding,
+                       'analysis': RoiDecoding,
                        'analysis__n_jobs': 5,
                        'analysis__permutation': 0,
                        'analysis__verbose': 0,
@@ -119,7 +118,7 @@ prepro = PreprocessingPipeline(nodes=[
                                       Transformer(), 
                                       #SignTransformer(),
                                       Detrender(),
-                                      AbsoluteValueTransformer(),
+                                      #AbsoluteValueTransformer(),
                                       #SignTransformer(),
                                       #SampleSigmaNormalizer(),
                                       #FeatureSigmaNormalizer(),
@@ -175,3 +174,77 @@ for conf in iterator:
     a.save(subdir="0_results/analysis_201901/")
     del a
 
+#################################################
+path = "/scratch/work/guidotr1/"
+path = "/home/robbis/mount/triton.aalto.fi/"
+
+conf_file = "%s/data/working_memory.conf" % (path)
+loader = DataLoader(configuration_file=conf_file, 
+                    loader='mat',
+                    task='POWER',
+                    data_path="%s/data/" % (path),
+                    subjects="%s/data/participants.csv" % (path)
+                    )
+
+prepro = PreprocessingPipeline(nodes=[
+                                      Transformer(), 
+                                      #SignTransformer(),
+                                      Detrender(),
+                                      #AbsoluteValueTransformer(),
+                                      #SignTransformer(),
+                                      #SampleSigmaNormalizer(),
+                                      #FeatureSigmaNormalizer(),
+                                      ])
+#prepro = PreprocessingPipeline()
+
+
+ds = loader.fetch(prepro=prepro)
+    
+_default_options = {
+                       'sample_slicer__targets' : [['0back', '2back'], ['0back', 'rest'], ['rest', '2back']],
+                       #'sample_slicer__targets' : [['0back', '2back']],
+                       'sample_slicer__band': [[c] for c in np.unique(ds.sa.band)],
+                       #'estimator__clf__C': [0.1, 1, 10],                          
+                       #'cv__n_splits': [75, 150, 200, 250],
+                       #'estimator__fsel__k': np.arange(50, 350, 50),
+                       #'estimator__fsel__k':np.arange(1, 600, 1),
+                       'estimator__fsel__k': np.arange(1, 88, 1)
+                    }    
+    
+_default_config = {
+               
+                       'prepro':['sample_slicer'],
+                       #'ds_normalizer__ds_fx': np.std,
+                       'sample_slicer__band': ['gamma'], 
+                       'sample_slicer__targets' : ['0back', '2back'],
+
+                       'estimator': [('fsel', SelectKBest(k=150)),
+                                     ('clf', SVC(C=1, kernel='linear'))],
+                       'estimator__clf__C':1,
+                       'estimator__clf__kernel':'linear',
+
+                       'cv': GroupShuffleSplit,
+                       'cv__n_splits': 75,
+                       'cv__test_size': 0.25,
+
+                       'scores' : ['accuracy'],
+
+                       'analysis': RoiDecoding,
+                       'analysis__n_jobs': -1,
+                       'analysis__permutation': 0,
+                       'analysis__verbose': 0,
+                       'kwargs__roi': ['matrix_values'],
+                       'kwargs__cv_attr':'subjects',
+
+                    }
+ 
+ 
+iterator = AnalysisIterator(_default_options, 
+                            AnalysisConfigurator,
+                            config_kwargs=_default_config)
+from tqdm import tqdm
+for conf in tqdm(iterator):
+    kwargs = conf._get_kwargs()
+    a = AnalysisPipeline(conf, name="power+triton").fit(ds, **kwargs)
+    a.save()
+    del a

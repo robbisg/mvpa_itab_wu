@@ -20,6 +20,24 @@ conf_file = '/media/robbis/Seagate_Pt1/data/simulations/simulations.conf'
 conf_file = "/home/robbis/mount/simulations.conf"
 conf_file = "/media/robbis/DATA/fmri/c2b/simulations.conf"
 
+"""
+[path]
+data_path=/
+subjects=participants.csv
+experiment=simulations
+types=simulations
+
+[simulations]
+sub_dir=/
+event_file=meg_attributes.txt
+event_header=True
+img_pattern=connectivity_matrix.mat
+mat_key=data
+transformer=connectivity
+atlas=aal_meg
+"""
+
+
 
 loader_configuration = {
 

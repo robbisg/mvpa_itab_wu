@@ -34,10 +34,11 @@ def clustering(eps, min_samples=9):
 
 #centroids = Parallel(n_jobs=-1)(delayed(clustering)(i, j) for i, j in idx(20, 30))
 
-centroids = Parallel(n_jobs=-1)(delayed(clustering)(i) for i in np.arange(4, 8))
+centroids = Parallel(n_jobs=-1)(delayed(clustering)(i) for i in np.arange(4, 10))
 
 for i, centroid in enumerate(centroids):
-        pl.plot(centroid, [i]*len(centroid), '|', ms=10)
+    pl.plot(X, [-1.]*len(X), '|', color='k', ms=15)
+    pl.plot(centroid, [i]*len(centroid), '|', ms=10)
         #sns.rugplot(centroid, offsets=(0, 0.05+i), ax=ax )
 
 
@@ -45,9 +46,17 @@ for i, centroid in enumerate(centroids):
 
 dfs = []
 for c in centroids:
-    dfs.append(pd.DataFrame(c))
+    dfs.append(pd.DataFrame(np.sort(c)))
 
-times_df = pd.concat([pd.DataFrame(c) for c in centroids],
+times_df = pd.concat([pd.DataFrame(np.sort(c)) for c in centroids],
                     ignore_index=True, axis=1)
 
-times_df.to_excel("/home/robbis/centroids.xlsx")
+times_df.to_csv("/home/robbis/centroids.csv")
+
+
+##########################################
+import pandas as pd
+import seaborn as sns
+from sklearn.cluster import *
+
+dataframe = pd.read_excel("/home/robbis/Downloads/Boundaries_Wallace\&Gromit.xlsx")

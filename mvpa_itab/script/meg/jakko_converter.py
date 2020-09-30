@@ -29,7 +29,7 @@ def get_full_matrix(matrix):
 
 
 def get_full_power(x):
-    data = loadmat("/media/robbis/DATA/fmri/working_memory/sub_01/meg/mpsi_normalized.mat")
+    data = loadmat("/media/robbis/Seagate_Pt1/data/working_memory/data/sub_60/meg/connectivity_matrix.mat")
     matrix = data['data']
     parcels = matrix[0].shape[0]
     idx = np.nonzero((matrix[0] != 0).sum(0))[0]
@@ -58,14 +58,16 @@ def get_subject_results(path, pattern="MPSI", n_subjects=57, read_fx=get_full_ma
     list_mat = os.listdir(path)
     list_mat = [m for m in list_mat if m.find(pattern) != -1]
     list_mat = [m for m in list_mat if m.find("NEW") != -1]
+    list_mat.sort()
     results = dict()
     
     #n_subjects = 57
     
     for m in list_mat:
         #band = m[len(pattern):-4] # first 57
-        band = m.split("_")[1]
+        #band = m.split("_")[1]
         #band = m[4:-4]
+        band = m[len(pattern):].split("_")[0]
         mat_file = loadmat(os.path.join(path, m))
         conditions = [k for k in mat_file.keys() if k[0] != '_']
         
@@ -77,14 +79,18 @@ def get_subject_results(path, pattern="MPSI", n_subjects=57, read_fx=get_full_ma
                 for subject in range(session.shape[0]):
                     
                     matrix = session[subject]
+                    #if matrix.shape[0] == 1:
+                    #    continue
                     
                     full_matrix = read_fx(matrix)
-                    key = "sub_%02d" %(subject+1)
+                    subj_number = subject+1+57
+                    key = "sub_%02d" %(subj_number)
                     
                     if not key in results.keys():
                         results[key] = dict()
                     
                     key_cond = "%s_%s_%s" % (band, c[len_cond:], str(s+1))
+                    print(m, key_cond, subj_number)
                     results[key][key_cond] = full_matrix
     return results
                 
@@ -95,19 +101,19 @@ def store_results(path, results, fname="connectivity_matrix.mat", attr="meg_attr
 
     fname = "power_parcel.mat"
     attr  = "power_attributes.txt"
-    
+    c=0
     for subject, result in results.items():
         path_ = os.path.join(path, subject, 'meg')
         command = "mkdir -p "+path_
+        print(command)
         os.system(command)
         attributes = [['targets','band','run']]
         data = []
         for label, matrix in result.items():
             band, condition, run = label.split("_")
             data.append(matrix)
-            attributes.append([condition, band, run]) 
-            
-        
+            attributes.append([condition, band, run])
+        print(len(attributes))
         np.savetxt(os.path.join(path, subject, attr), 
                    np.array(attributes, dtype=np.str_), 
                    fmt="%s", delimiter=" ", 

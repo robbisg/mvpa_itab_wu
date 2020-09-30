@@ -92,7 +92,7 @@ def aggregate_networks(matrix, roi_list, aggregation_fx=np.sum):
         # Build the mask of the intersection between
         mask_roi = np.meshgrid(mask1, mask1)[1] * np.meshgrid(mask2, mask2)[0]
         
-        value = aggregation_fx()(matrix * mask_roi)
+        value = aggregation_fx(matrix * mask_roi)
         #value /= np.sum(mask_roi)
         
         aggregate_matrix[x, y] = value
