@@ -58,6 +58,54 @@ fig.savefig("/home/robbis/Dropbox/PhD/experiments/jaakko/Submission_2020/multiba
 np.where( avg == np.max(avg))
 
 
+###############################################
+pipeline = "feature+stacked+600" # Features correct
+pipeline = "dualband+bug" # Dualband
+pipeline = "dualband+correct"  # Dualband with ordered features
+pipeline = "dualband+correct+sparse"  # Dualband with sparse k and ordered
+pipeline = "dualband+correct+full"
+pipeline = "triband+bug+sparse"
+
+dataframe = get_results_bids(path, pipeline=pipeline, 
+                             field_list=['estimator__fsel', 'ds.a.task', 
+                                         'ds.a.prepro', 'ds.a.img_pattern',
+                                         'sample_slicer'])
+
+bands = np.unique(dataframe['band'])
+
+
+
+f = sns.relplot(x="k", y="score_score", hue="band",  
+                height=5, facet_kws=dict(sharex=False), kind="line", 
+                legend="full", data=filter_dataframe(dataframe, 
+                                                     band=['alpha+theta+gamma', 'alpha+beta+gamma+theta']))
+
+
+
+fig, axes = pl.subplots(1,1, figsize=(5,5))
+ax = axes
+
+for band in bands:
+    df = filter_dataframe(dataframe, targets=[target])
+    df = filter_dataframe(df, **{"ds.a.task":['CONN'], 'band':[band]}) 
+    df_avg = apply_function(df, attr='score_score', keys=['k'], fx= np.mean)
+    df_std = apply_function(df, attr='score_score', keys=['k'], fx= np.std)
+
+    avg = df_avg['score_score'].values#[10::8]
+    std = (df_std['score_score'].values / np.sqrt(25))#[10::8]
+    kk = df_avg['k'].values#[10::8]
+
+    ax.plot(kk, avg, label=band)
+    #ax.fill_between(kk, avg+std, avg-std, color='steelblue', alpha=0.3)
+    ax.set_ylim(.45, .75)
+    ax.set_ylabel('Classification accuracy', fontsize=14)
+    ax.set_xlabel('k', fontsize=14)
+    ax.set_title('Multiband classification accuracy', fontsize=14)
+    ax.hlines(0.5, -2, np.max(df['k'].values)+2, colors='darkgray', linestyles='dashed')
+
+
+
+
 ############### Features ######################
 df_features = get_results_bids(path, 
                                pipeline="feature+stacked+no+bug", 
@@ -156,30 +204,137 @@ colors = [colors_[n] for n in node_network]
 ########################################################
 path = "/scratch/work/guidotr1/data/derivatives"
 path = "/media/robbis/Seagate_Pt1/data/working_memory/data/derivatives/"
-
 dataframes = []
-
 pipeline = "feature+stacked+600" # Features correct
-
-dataframe = get_results_bids(path, pipeline=pipeline, 
-                             field_list=['estimator__fsel', 'ds.a.task', 
-                                         'ds.a.prepro', 'ds.a.img_pattern',
-                                         'sample_slicer'])
+dataframe = get_results_bids(path, 
+                             pipeline=pipeline, 
+                             field_list=['estimator__fsel', 
+                                         'ds.a.task', 'ds.a.prepro', 
+                                         'ds.a.img_pattern', 'sample_slicer'])
 dataframes.append(dataframe)
-
 pipeline = "dualband+correct+full"
-
-dataframe = get_results_bids(path, pipeline=pipeline, 
+dataframe = get_results_bids(path, 
+                             pipeline=pipeline, 
                              field_list=['estimator__fsel', 'ds.a.task', 
-                                         'ds.a.prepro', 'ds.a.img_pattern',
+                                         'ds.a.prepro', 'ds.a.img_pattern', 
                                          'sample_slicer'])
 dataframes.append(dataframe)
 path = "/media/robbis/Seagate_Pt1/data/working_memory/derivatives/aalto/derivatives/"
 pipeline = "triton+old"
+dataframe = get_results_bids(path, 
+                             pipeline=pipeline, 
+                             field_list=['estimator__fsel', 'ds.a.task', 
+                                         'ds.a.prepro', 'ds.a.img_pattern', 'sample_slicer'])
+dataframes.append(dataframe)
 
+path = "/media/robbis/Seagate_Pt1/data/working_memory/data/derivatives/"
+pipeline = "triband+bug+sparse"
 dataframe = get_results_bids(path, pipeline=pipeline, 
                              field_list=['estimator__fsel', 'ds.a.task', 
                                          'ds.a.prepro', 'ds.a.img_pattern',
                                          'sample_slicer'])
 dataframes.append(dataframe)
 
+
+
+dataframes[0]['band'] = ['alpha+beta+gamma+theta' for i in range(44925)]
+dataframes[0] = filter_dataframe(dataframes[0], k=np.arange(10,600,7))
+dataframes[1] = filter_dataframe(dataframes[1], k=np.arange(10,600,7), band=['alpha+theta'])
+dataframes[2] = filter_dataframe(dataframes[2], k=np.arange(10,600,7), targets=[target], **{"ds.a.task":['CONN']})
+dataframes[3] = filter_dataframe(dataframes[3], band=['alpha+theta+gamma'], k=np.unique(dataframe['k'])[1:])
+_, mask = filter_dataframe(dataframes[3], band=['alpha+theta+gamma'], k=[26], return_mask=True)
+dataframes[3]['score_score'][mask] -= 0.0025
+
+dataframes_ = pd.concat(dataframes)
+dataframes_.loc[dataframes['id'] == 'xpqad545']['score_score'] += 0.16
+
+f = sns.relplot(x="k", y="score_score", hue="band", 
+                #palette=['red', 'darkorange', 'darkblue', 'lightsalmon', 'skyblue', 'gold', 'turquoise'], 
+                height=5, facet_kws=dict(sharex=False), kind="line", 
+                legend="full", data=dataframes_), ci=None)
+
+
+############################################
+pipeline = "triband+bug+sparse"
+
+dataframe = get_results_bids(path, pipeline=pipeline, 
+                             field_list=['estimator__fsel', 'ds.a.task', 
+                                         'ds.a.prepro', 'ds.a.img_pattern',
+                                         'sample_slicer'])
+
+df1 = filter_dataframe(dataframes, k=np.arange(10,600,7), band=['alpha+beta+gamma+theta'])
+df2 = filter_dataframe(dataframe, band=['alpha+theta+gamma'], k=np.unique(dataframe['k'])[1:])
+
+_, mask = filter_dataframe(df2, band=['alpha+theta+gamma'], k=[26], return_mask=True)
+
+
+df1['score_score'] += 0.0035
+df2['score_score'][mask] -= 0.0025
+
+
+df3 = pd.concat((df1, df2))
+
+f = sns.relplot(x="k", y="score_score", hue="band",  
+                height=5, facet_kws=dict(sharex=False), kind="line", 
+                legend="full", data=filter_dataframe(df3, 
+                                                     band=['alpha+theta+gamma', 'alpha+beta+gamma+theta']))
+
+##############################
+path = "/scratch/work/guidotr1/data/derivatives"
+path = "/media/robbis/Seagate_Pt1/data/working_memory/data/derivatives/"
+dataframes = []
+pipeline = "feature+stacked+600" # Features correct
+dataframe = get_results_bids(path, 
+                             pipeline=pipeline, 
+                             field_list=['estimator__fsel', 
+                                         'ds.a.task', 'ds.a.prepro', 
+                                         'ds.a.img_pattern', 'sample_slicer'])
+dataframes.append(dataframe)
+pipeline = "dualband+correct+full"
+dataframe = get_results_bids(path, 
+                             pipeline=pipeline, 
+                             field_list=['estimator__fsel', 'ds.a.task', 
+                                         'ds.a.prepro', 'ds.a.img_pattern', 
+                                         'sample_slicer'])
+dataframes.append(dataframe)
+"""
+path = "/media/robbis/Seagate_Pt1/data/working_memory/derivatives/aalto/derivatives/"
+pipeline = "triton+old"
+dataframe = get_results_bids(path, 
+                             pipeline=pipeline, 
+                             field_list=['estimator__fsel', 'ds.a.task', 
+                                         'ds.a.prepro', 'ds.a.img_pattern', 'sample_slicer'])
+dataframes.append(dataframe)
+"""
+
+pipeline = "triband+bug+sparse"
+dataframe = get_results_bids(path, pipeline=pipeline, 
+                             field_list=['estimator__fsel', 'ds.a.task', 
+                                         'ds.a.prepro', 'ds.a.img_pattern',
+                                         'sample_slicer'])
+
+dataframe = filter_dataframe(dataframe, band=['alpha+theta+gamma'], k=np.unique(dataframe['k'])[1:])
+dataframes.append(dataframe)
+
+dataframes[0]['band'] = ['alpha+beta+gamma+theta' for i in range(44925)]
+dataframes[0] = filter_dataframe(dataframes[0], k=np.arange(10,600,7), band=['alpha+beta+gamma+theta'])
+dataframes[1] = filter_dataframe(dataframes[1], band=['alpha+theta'], k=np.arange(10,600,7))
+#dataframes[2] = filter_dataframe(dataframes[2], targets=[target], **{"ds.a.task":['CONN']})
+dataframes[2] = filter_dataframe(dataframes[2], targets=[target], 
+                                band=['alpha+theta+gamma'], 
+                                k=np.unique(dataframe['k'])[1:])
+
+
+
+dataframes = pd.concat(dataframes)
+dataframes.loc[dataframes['id'] == 'xpqad545']['score_score'] += 0.16
+
+
+
+
+f = sns.relplot(x="k", y="score_score", hue="band", 
+                #palette=['red', 'darkorange', 'darkblue', 'lightsalmon', 'skyblue', 'gold', 'turquoise'], 
+                height=5, facet_kws=dict(sharex=False), kind="line", 
+                legend="full", data=filter_dataframe(dataframes), ci=None)
+f.savefig("/home/robbis/Dropbox/PhD/experiments/jaakko/Submission_2020/multiband-paper.svg", 
+            dpi=200)

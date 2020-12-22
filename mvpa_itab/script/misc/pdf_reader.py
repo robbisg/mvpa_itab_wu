@@ -69,13 +69,21 @@ def getInfo(filename):
 def requests_by_doi(doi):
     import requests
     url = "http://dx.doi.org/%s" % (doi)
+    print(url)
     try:
         response = requests.get(url, headers={'style':'bibtex', "Accept":"text/bibliography"})
     except Exception as err:
-        print(err)
+        try:
+            response = requests.get(url, headers={'style':'bibtex', "Accept":"text/bibliography"})
+        except Exception as err:
+            print(err)
+            return {}
+    
+    response = response.content.decode()
+
+    if len(response) == 0:
         return {}
 
-    response = response.content.decode()
     if response[0] == "<":
         print("doi html: "+doi)
         return {}
@@ -183,6 +191,8 @@ def doi_splitter(doi, delimiter):
 
 
 
+
+
 def pdf_scraper(filename, info):
     output = pdf2txt(filename)
     parsed_info = {}
@@ -196,7 +206,7 @@ def pdf_scraper(filename, info):
             if len(doi) == 0:
                 doi = doish.split("\n")[1]
             
-            for delimiter in [' ', ',', ')', '\t', 'http:']:
+            for delimiter in [' ', ',', ')', '\t', 'http:', '\n']:
                 doi = doi_splitter(doi, delimiter)
 
             if doi[-1] == '.':
@@ -272,6 +282,7 @@ import PyPDF2
 from tqdm import tqdm
 path = "/home/robbis/MEGAsync/renamed"
 path = "/home/robbis/MEGAsync/PAPER/MVPA"
+path = '/home/robbis/CloudMEGA/'
 pdf_list = glob.glob("%s/*.pdf" % (path))
 pdf_list.sort()
 

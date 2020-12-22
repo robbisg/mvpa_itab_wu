@@ -144,4 +144,53 @@ for p in pipelines:
             os.system(command)
             count_dictionary.append(os.path.join(subject_dir, filename))
 
+######################################################
+# Mask
+from pyitab.io.subjects import load_subject_file
+from bids import BIDSLayout
+from pyitab.utils.image import save_map
 
+
+
+path = '/media/robbis/DATA/fmri/EGG/'
+subjects, _ = load_subject_file(fname='/media/robbis/DATA/fmri/EGG/participants.tsv', delimiter='\t')
+layout = BIDSLayout(path, derivatives=True)
+mask_list = list()
+
+for t in ['smoothAROMAnonaggr']:
+    for s in subjects:
+
+        fname = layout.get(return_type='file', 
+                            task=t, 
+                            extension='.nii.gz', 
+                            subject=s,
+                            )[0]
+
+        command = "bet2 %s %s -m -n" % (fname, os.path.join(path, s))
+        print(command)
+        os.system(command)
+
+        mask_list.append(os.path.join(path, s+"_mask.nii.gz"))
+
+    total_mask = np.array([ni.load(m).get_data() for m in mask_list])
+    new_mask = total_mask.mean(0) >= 0.5
+    print(new_mask.shape, t)
+    m = mask_list[0]
+    save_map(os.path.join(path, t+"_brain_mask.nii.gz"), np.int_(new_mask), affine=ni.load(m).affine, return_nifti=False)
+
+####################################
+# Events
+
+for t in ['plain', 'filtered', 'beta', 'smoothAROMAnonaggr']:
+    for s in subjects:
+        event_files = layout.get(return_type='file',
+                                task=t,
+                                extension='.tsvbad',
+                                suffix='events',
+                                subject=s)
+
+        for m in event_files:
+            if m.find('stimlast') != -1:
+                command = "mv %s %s" % (m, m[:-3])
+                print(command)
+                os.system(command)

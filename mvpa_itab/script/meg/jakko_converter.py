@@ -219,3 +219,67 @@ for subject, result in results.items():
                 )
     
     savemat(os.path.join(path_, fname), {'data': np.array(data)})
+
+
+#####################################################
+pattern = "PSI":
+len_cond = len(pattern)
+
+    
+path = "/media/robbis/Seagate_Pt1/data/working_memory/"
+list_mat = os.listdir(path)
+list_mat = [m for m in list_mat if m.find("realigned") != -1]
+results = dict()
+
+#n_subjects = 57
+
+for m in list_mat:
+    #band = m[len(pattern):-4] # first 57
+    band = m.split("_")[1]
+    #band = m[4:-4]
+    mat_file = loadmat(os.path.join(path, m))
+    conditions = [k for k in mat_file.keys() if k[0] != '_']
+    
+    for c in conditions:
+        data = mat_file[c]
+        for subject in range(data.shape[0]):
+            subj_data = data[subject]
+            
+            for session in range(subj_data.shape[0]):
+                
+                full_matrix = subj_data[session]
+                
+                #full_matrix = read_fx(matrix)
+                key = "sub_%02d" %(subject+1)
+                
+                if not key in results.keys():
+                    results[key] = dict()
+                
+                if session == 0:
+                    key_cond = "%s_%s_%s" % (band, c[len_cond:], str(session+1))
+                    results[key][key_cond] = full_matrix
+
+
+fname = "psicorr_matrix.mat"
+attr  = "psicorr_attributes.txt"
+
+path_write = "/media/robbis/Seagate_Pt1/data/working_memory/data/"
+for subject, result in results.items():
+    path_ = os.path.join(path_write, subject, 'meg')
+    command = "mkdir -p "+path_
+    os.system(command)
+    attributes = [['targets','band','run']]
+    data = []
+    for label, matrix in result.items():
+        band, condition, run = label.split("_")
+        data.append(matrix)
+        attributes.append([condition, band, run]) 
+        
+    
+    np.savetxt(os.path.join(path_write, subject, attr), 
+                np.array(attributes, dtype=np.str_), 
+                fmt="%s", delimiter=" ", 
+                #header=['condition', 'band', 'run']
+                )
+    
+    savemat(os.path.join(path_, fname), {'data': np.array(data)})

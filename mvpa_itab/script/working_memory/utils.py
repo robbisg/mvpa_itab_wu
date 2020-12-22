@@ -148,3 +148,5 @@ for i, subj in enumerate(subject_list):
 
 
 
+    list_mat = os.listdir(path)
+    list_mat = [m for m in list_mat if m.find(pattern) != -1]

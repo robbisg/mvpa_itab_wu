@@ -45,7 +45,8 @@ f = sns.relplot(x="k", y="score_score", col="band", hue="targets", row='ds.a.tas
               )
 
 ##########################
-order = ['alpha', 'theta', 'beta', 'gamma']
+order = ['theta', 'alpha', 'beta', 'gamma']
+titles = ['Theta', 'Alpha', 'Beta', 'Gamma']
 
 
 full_df = filter_dataframe(full_df, **{'ds.a.task':['CONN']})
